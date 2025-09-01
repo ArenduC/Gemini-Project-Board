@@ -1,9 +1,14 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
+import { GEMINI_API_KEY } from '../config';
 
-// The platform is responsible for injecting the API_KEY environment variable.
-// If it's not present, we use a placeholder to prevent the app from crashing on startup.
-const apiKey = process.env.API_KEY || 'placeholder-gemini-api-key';
+// Use the API key from the central config file.
+const apiKey = GEMINI_API_KEY;
+
+if (apiKey === 'placeholder-gemini-api-key') {
+  console.warn('Gemini API Key is not configured. Please add your key to config.ts');
+}
+
 const ai = new GoogleGenAI({ apiKey });
 
 interface SubtaskResponse {
@@ -69,8 +74,8 @@ export const generateSubtasks = async (title: string, description: string): Prom
   } catch (error) {
     console.error("Error calling Gemini API:", error);
     // Provide a more user-friendly error message
-    if (error instanceof Error && error.message.includes('API key not valid')) {
-        throw new Error("The Gemini API key is invalid. Please check your configuration.");
+    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
+        throw new Error("The Gemini API key is invalid. Please check your configuration in config.ts.");
     }
     throw new Error("Failed to generate subtasks from AI. Please try again later.");
   }

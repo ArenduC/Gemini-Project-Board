@@ -1,11 +1,15 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { UserRole } from '../types';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config';
 
-// The platform is responsible for injecting these environment variables.
-// If they are not present, we use placeholder values to prevent the app from crashing on startup.
-const supabaseUrl = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'placeholder-anon-key';
+// Use credentials from the central config file.
+const supabaseUrl = SUPABASE_URL;
+const supabaseAnonKey = SUPABASE_ANON_KEY;
+
+if (supabaseUrl === 'https://placeholder.supabase.co') {
+  console.warn('Supabase credentials are not configured. Please add your credentials to config.ts');
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
