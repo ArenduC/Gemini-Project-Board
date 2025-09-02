@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, FormEvent } from 'react';
 import { Task, Subtask, User, TaskPriority } from '../types';
 import { generateSubtasks as generateSubtasksFromApi } from '../services/geminiService';
-import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon } from './Icons';
+import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon, TrashIcon } from './Icons';
 
 interface TaskDetailsModalProps {
   task: Task;
@@ -195,6 +195,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
       handleUpdateField('tags', newTags);
   };
 
+  const handleDeleteSubtask = (subtaskId: string) => {
+    const updatedSubtasks = editedTask.subtasks.filter(subtask => subtask.id !== subtaskId);
+    handleUpdateField('subtasks', updatedSubtasks);
+  };
+
   const completedSubtasks = editedTask.subtasks.filter(st => st.completed).length;
   const totalSubtasks = editedTask.subtasks.length;
   const progress = totalSubtasks > 0 ? (completedSubtasks / totalSubtasks) * 100 : 0;
@@ -305,22 +310,28 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                 const subtaskCreator = users.find(u => u.id === subtask.creatorId);
                 return (
                     <div key={subtask.id} className="flex items-center gap-3 bg-slate-100 dark:bg-slate-700/50 p-2 rounded-md group">
-                    <input
-                        type="checkbox"
-                        id={subtask.id}
-                        checked={subtask.completed}
-                        onChange={() => handleSubtaskToggle(subtask.id)}
-                        className="w-5 h-5 rounded text-indigo-600 bg-slate-300 dark:bg-slate-600 border-slate-400 dark:border-slate-500 focus:ring-indigo-500 flex-shrink-0"
-                    />
-                    <label htmlFor={subtask.id} className={`flex-1 min-w-0 ${subtask.completed ? 'line-through text-slate-500 dark:text-slate-400' : ''}`}>
-                        {subtask.title}
-                    </label>
-                    <div className="flex-grow" />
-                    {subtaskCreator ? (
-                        <img src={subtaskCreator.avatarUrl} alt={subtaskCreator.name} className="w-6 h-6 rounded-full flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" title={`Added by ${subtaskCreator.name}`} />
-                    ) : (
-                        <div className="w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-600 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" title="Added by an unknown user"></div>
-                    )}
+                        <input
+                            type="checkbox"
+                            id={subtask.id}
+                            checked={subtask.completed}
+                            onChange={() => handleSubtaskToggle(subtask.id)}
+                            className="w-5 h-5 rounded text-indigo-600 bg-slate-300 dark:bg-slate-600 border-slate-400 dark:border-slate-500 focus:ring-indigo-500 flex-shrink-0"
+                        />
+                        <label htmlFor={subtask.id} className={`flex-grow ${subtask.completed ? 'line-through text-slate-500 dark:text-slate-400' : ''}`}>
+                            {subtask.title}
+                        </label>
+                        {subtaskCreator ? (
+                            <img src={subtaskCreator.avatarUrl} alt={subtaskCreator.name} className="w-6 h-6 rounded-full flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" title={`Added by ${subtaskCreator.name}`} />
+                        ) : (
+                            <div className="w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-600 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" title="Added by an unknown user"></div>
+                        )}
+                        <button 
+                            onClick={() => handleDeleteSubtask(subtask.id)}
+                            className="ml-auto p-1 rounded-full text-slate-400 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Delete subtask"
+                        >
+                            <TrashIcon className="w-4 h-4" />
+                        </button>
                     </div>
                 )
               })}
