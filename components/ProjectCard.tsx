@@ -27,7 +27,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onSele
   return (
     <div 
       onClick={() => onSelect(project.id)}
-      className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 p-6 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
+      className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-800 p-6 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
     >
       <div>
         <div className="flex justify-between items-start mb-2">
@@ -35,7 +35,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onSele
             {creator && (
                  <UserAvatar 
                     user={creator} 
-                    className="w-8 h-8 ring-2 ring-white dark:ring-slate-800 text-sm"
+                    className="w-8 h-8 ring-2 ring-white dark:ring-slate-900 text-sm"
                     title={`Created by ${creator.name}`}
                  />
             )}

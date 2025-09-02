@@ -1,5 +1,3 @@
-
-
 export enum UserRole {
   ADMIN = 'Admin',
   MANAGER = 'Manager',
@@ -35,6 +33,13 @@ export interface Comment {
     createdAt: string;
 }
 
+export interface TaskHistory {
+  id: string;
+  user: User;
+  changeDescription: string;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -44,6 +49,7 @@ export interface Task {
   subtasks: Subtask[];
   tags: string[];
   comments: Comment[];
+  history: TaskHistory[];
   creatorId: string;
   createdAt: string;
 }
@@ -90,4 +96,22 @@ export interface AppState {
   projects: Record<string, Project>;
   users: Record<string, User>;
   projectOrder: string[];
+}
+
+export interface FilterSegment {
+  id: string;
+  name: string;
+  filters: {
+    searchTerm: string;
+    priorityFilter: string;
+    assigneeFilter: string;
+    statusFilter: string;
+  };
+}
+
+export interface AugmentedTask extends Task {
+  projectId: string;
+  projectName: string;
+  columnId: string;
+  columnName: string;
 }

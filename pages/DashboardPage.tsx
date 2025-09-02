@@ -1,8 +1,9 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Project, User } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
-import { PlusIcon } from '../components/Icons';
+import { ProjectListRow } from '../components/ProjectListRow';
+import { PlusIcon, DownloadIcon, GridIcon, ListIcon } from '../components/Icons';
+import { exportTasksToCsv } from '../utils/export';
 
 interface DashboardPageProps {
   projects: Project[];
@@ -13,29 +14,89 @@ interface DashboardPageProps {
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, onSelectProject, onCreateProject, onManageMembers }) => {
+  const [view, setView] = useState<'grid' | 'list'>('grid');
+
+  const handleExport = () => {
+    exportTasksToCsv(projects, users);
+  };
+  
   return (
     <div>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
             <h2 className="text-3xl font-bold">Projects Dashboard</h2>
-            <button
-              onClick={onCreateProject}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 transition-all"
-            >
-              <PlusIcon className="w-5 h-5" />
-              Create New Project
-            </button>
+            <div className="flex items-center gap-2">
+                 {/* View Toggle */}
+                <div className="flex items-center p-1 bg-slate-200 dark:bg-slate-900 rounded-lg">
+                    <button
+                        onClick={() => setView('grid')}
+                        className={`p-2 rounded-md ${view === 'grid' ? 'bg-white dark:bg-slate-800 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/50'}`}
+                        aria-label="Grid View"
+                    >
+                        <GridIcon className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={() => setView('list')}
+                        className={`p-2 rounded-md ${view === 'list' ? 'bg-white dark:bg-slate-800 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/50'}`}
+                        aria-label="List View"
+                    >
+                        <ListIcon className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* Export Button */}
+                <button
+                  onClick={handleExport}
+                  className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+                >
+                    <DownloadIcon className="w-5 h-5"/>
+                    <span>Export to CSV</span>
+                </button>
+
+                {/* Create Project Button */}
+                <button
+                  onClick={onCreateProject}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 transition-all"
+                >
+                  <PlusIcon className="w-5 h-5" />
+                  Create New Project
+                </button>
+            </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {projects.map(project => (
-                <ProjectCard 
-                    key={project.id} 
-                    project={project} 
-                    users={users}
-                    onSelect={onSelectProject}
-                    onManageMembers={onManageMembers} 
-                />
-            ))}
-        </div>
+
+        {/* Conditional Rendering */}
+        {view === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {projects.map(project => (
+                    <ProjectCard 
+                        key={project.id} 
+                        project={project} 
+                        users={users}
+                        onSelect={onSelectProject}
+                        onManageMembers={onManageMembers} 
+                    />
+                ))}
+            </div>
+        ) : (
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-md border border-slate-200 dark:border-slate-800 overflow-hidden">
+                {/* List Header */}
+                 <div className="grid grid-cols-12 gap-4 items-center px-4 py-2 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
+                    <div className="col-span-4 font-semibold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Project</div>
+                    <div className="col-span-3 font-semibold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Progress</div>
+                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 text-center">Status</div>
+                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Members</div>
+                    <div className="col-span-1"></div>
+                </div>
+                {projects.map(project => (
+                    <ProjectListRow
+                        key={project.id}
+                        project={project}
+                        users={users}
+                        onSelect={onSelectProject}
+                        onManageMembers={onManageMembers}
+                    />
+                ))}
+            </div>
+        )}
     </div>
   );
 };

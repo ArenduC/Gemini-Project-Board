@@ -34,13 +34,13 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onDele
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={onClick}
-          className={`relative group bg-white dark:bg-slate-800 rounded-lg shadow-sm dark:shadow-md border border-slate-200 dark:border-slate-700 mb-4 p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all duration-200 transform hover:-translate-y-1 ${
-            snapshot.isDragging ? 'shadow-lg dark:shadow-xl scale-105' : ''
+          className={`relative group bg-white dark:bg-slate-800 rounded-lg shadow-sm dark:shadow-lg border border-slate-200 dark:border-slate-800 mb-4 p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-200 transform hover:-translate-y-1 ${
+            snapshot.isDragging ? 'shadow-lg dark:shadow-2xl scale-105' : ''
           }`}
         >
           <button
             onClick={handleDelete}
-            className="absolute top-2 right-2 p-1.5 rounded-full text-slate-400 bg-white/50 dark:bg-slate-800/50 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all z-10"
+            className="absolute top-2 right-2 p-1.5 rounded-full text-slate-400 bg-white/50 dark:bg-slate-800/50 hover:bg-red-100 dark:hover:bg-red-900/70 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all z-10"
             aria-label="Delete task"
           >
             <TrashIcon className="w-4 h-4"/>
@@ -56,7 +56,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onDele
               {task.priority}
             </div>
             {task.tags.map(tag => (
-              <span key={tag} className="text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full">{tag}</span>
+              <span key={tag} className="text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full">{tag}</span>
             ))}
           </div>
           
@@ -73,7 +73,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onDele
             {task.assignee && (
               <UserAvatar 
                 user={task.assignee} 
-                className="w-7 h-7 ring-2 ring-white dark:ring-slate-800 text-xs"
+                className="w-7 h-7 ring-2 ring-white dark:ring-slate-900 text-xs"
                 title={`Assigned to ${task.assignee.name}`}
               />
             )}

@@ -1,5 +1,7 @@
+
+
 import { supabase } from './supabase';
-import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage } from '../types';
+import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory } from '../types';
 import { Session } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
@@ -126,6 +128,7 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
                         ...cmt,
                         author: cmt.author,
                     })) || [],
+                    history: [], // Initialize history as empty; will be populated in a separate query
                     subtasks: t.subtasks || [],
                     createdAt: t.created_at,
                     creatorId: t.creator_id,
@@ -151,6 +154,40 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
             createdAt: p.created_at,
         };
     }
+
+    // Fetch history separately to avoid RLS issues with deep nesting
+    const allTaskIds = Object.values(projectsRecord).flatMap(p => Object.keys(p.board.tasks));
+    if (allTaskIds.length > 0) {
+        const { data: tasksWithHistory, error: historyError } = await supabase
+            .from('tasks')
+            .select('id, history:task_history(*, user:users(*))')
+            .in('id', allTaskIds)
+            .order('created_at', { foreignTable: 'task_history', ascending: false });
+
+        if (historyError) {
+            console.warn(`Could not fetch task history. This might be because the 'task_history' table's security policies are too restrictive. Proceeding without history data.`, historyError);
+        } else if (tasksWithHistory) {
+            const historyMap = new Map<string, TaskHistory[]>();
+            tasksWithHistory.forEach((task: any) => {
+                const histories = (task.history || []).map((h: any): TaskHistory => ({
+                    id: h.id,
+                    user: h.user,
+                    changeDescription: h.change_description,
+                    createdAt: h.created_at,
+                }));
+                historyMap.set(task.id, histories);
+            });
+
+            // Merge history back into the projectsRecord
+            for (const project of Object.values(projectsRecord)) {
+                for (const taskId in project.board.tasks) {
+                    if (historyMap.has(taskId)) {
+                        project.board.tasks[taskId].history = historyMap.get(taskId)!;
+                    }
+                }
+            }
+        }
+    }
     
     return {
         projects: projectsRecord,
@@ -159,19 +196,55 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
     };
 };
 
-const subscribeToChanges = (callback: () => void) => {
-     const changes = supabase.channel('any')
-      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        console.log('Change received!', payload)
-        callback();
-      })
-      .subscribe();
-    return changes;
+const subscribeToProjectChat = (projectId: string, callback: (payload: any) => void) => {
+    const channel = supabase.channel(`project-chat-${projectId}`)
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'project_chats',
+            filter: `project_id=eq.${projectId}`
+        }, callback)
+        .subscribe();
+    return channel;
 };
 
 // --- DATA MUTATION ---
 
-const moveTask = async (taskId: string, newColumnId: string, newPosition: number) => {
+const moveTask = async (taskId: string, newColumnId: string, newPosition: number, actorId: string) => {
+    const { data: taskData, error: fetchError } = await supabase
+        .from('tasks')
+        .select('column_id, column:columns(id, title)')
+        .eq('id', taskId)
+        .single();
+    
+    const { data: newColumnData, error: fetchNewColError } = await supabase
+        .from('columns')
+        .select('title')
+        .eq('id', newColumnId)
+        .single();
+
+    if (!fetchError && !fetchNewColError && taskData) {
+        if (taskData.column_id !== newColumnId && newColumnData) {
+            const oldColumnName = (taskData as any).column?.title;
+            const newColumnName = newColumnData.title;
+            const change_description = `moved this task from '${oldColumnName || 'No Column'}' to '${newColumnName}'`;
+
+            try {
+                const { error: historyError } = await supabase.from('task_history').insert({
+                    id: crypto.randomUUID(),
+                    task_id: taskId,
+                    user_id: actorId,
+                    change_description,
+                });
+                if (historyError) {
+                    console.warn("Could not log task move history:", historyError.message || historyError);
+                }
+            } catch (error) {
+                console.warn("Error inserting into task_history:", error);
+            }
+        }
+    }
+
     const { error } = await supabase.rpc('move_task', {
         task_id: taskId,
         new_column_id: newColumnId,
@@ -180,7 +253,46 @@ const moveTask = async (taskId: string, newColumnId: string, newPosition: number
     if (error) console.error("Error moving task:", error.message || error);
 };
 
-const updateTask = async (updatedTask: Task) => {
+const updateTask = async (updatedTask: Task, actorId: string) => {
+    // Fetch old task data for comparison to create history logs
+    const { data: oldTaskData, error: fetchError } = await supabase
+        .from('tasks')
+        .select('*, assignee:users!tasks_assignee_id_fkey(*)') // FIX: Explicitly define relationship to resolve ambiguity
+        .eq('id', updatedTask.id)
+        .single();
+
+    if (fetchError) {
+        console.warn("Error fetching old task for history logging:", fetchError.message || fetchError);
+    } else {
+        const historyItems: { task_id: string; user_id: string; change_description: string; }[] = [];
+        if (oldTaskData.title !== updatedTask.title) {
+            historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `changed the title to "${updatedTask.title}"` });
+        }
+        if (oldTaskData.description !== updatedTask.description) {
+            historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `updated the description` });
+        }
+        if (oldTaskData.priority !== updatedTask.priority) {
+            historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `set the priority to ${updatedTask.priority}` });
+        }
+        if (oldTaskData.assignee?.id !== updatedTask.assignee?.id) {
+            if (updatedTask.assignee) {
+                historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `assigned this task to ${updatedTask.assignee.name}` });
+            } else {
+                historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `unassigned this task` });
+            }
+        }
+        if (historyItems.length > 0) {
+            const itemsWithIds = historyItems.map(item => ({ ...item, id: crypto.randomUUID() }));
+            // FIX: Gracefully handle cases where the history table might be missing
+            try {
+                const { error: historyError } = await supabase.from('task_history').insert(itemsWithIds);
+                if (historyError) console.warn("Could not log task update history:", historyError.message || historyError);
+            } catch (error) {
+                console.warn("Error inserting into task_history:", error);
+            }
+        }
+    }
+
     // 1. Update the core task details
     const { error: taskUpdateError } = await supabase
       .from('tasks')
@@ -385,7 +497,10 @@ const sendChatMessage = async (projectId: string, text: string, authorId: string
         text: text,
         author_id: authorId,
     });
-    if (error) console.error("Error sending chat message:", error.message || error);
+    if (error) {
+        console.error("Error sending chat message:", error.message || error);
+        throw error;
+    }
 };
 
 export const api = {
@@ -398,7 +513,7 @@ export const api = {
     },
     data: {
         fetchInitialData,
-        subscribeToChanges,
+        subscribeToProjectChat,
         moveTask,
         updateTask,
         addSubtasks,

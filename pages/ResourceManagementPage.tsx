@@ -1,5 +1,3 @@
-
-
 import React, { useMemo } from 'react';
 import { Project, User } from '../types';
 import { UserAvatar } from '../components/UserAvatar';
@@ -40,35 +38,35 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
   return (
     <div>
         <h2 className="text-3xl font-bold mb-6">Resource Management</h2>
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md border border-slate-200 dark:border-slate-800 overflow-hidden">
             <table className="w-full text-left">
-                <thead className="bg-slate-50 dark:bg-slate-700/50">
-                    <tr>
-                        <th className="p-4 font-semibold">Team Member</th>
-                        <th className="p-4 font-semibold">Role</th>
-                        <th className="p-4 font-semibold">Assigned Tasks</th>
-                        <th className="p-4 font-semibold">Active Projects</th>
+                <thead className="bg-slate-50 dark:bg-slate-800">
+                    <tr className="text-sm">
+                        <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Team Member</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Role</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Assigned Tasks</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Active Projects</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                     {Object.values(users).map(user => (
-                        <tr key={user.id}>
-                            <td className="p-4 flex items-center gap-3">
-                                <UserAvatar user={user} className="w-10 h-10" />
+                        <tr key={user.id} className="text-sm">
+                            <td className="px-4 py-3 flex items-center gap-3">
+                                <UserAvatar user={user} className="w-8 h-8" />
                                 <span className="font-medium">{user.name}</span>
                             </td>
-                            <td className="p-4">
-                                <span className="text-sm font-medium bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-full">
+                            <td className="px-4 py-3">
+                                <span className="text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-full">
                                     {user.role}
                                 </span>
                             </td>
-                            <td className="p-4">
-                                <span className="text-lg font-semibold">{userWorkload[user.id]?.assignedTasks || 0}</span>
+                            <td className="px-4 py-3">
+                                <span className="text-base font-semibold">{userWorkload[user.id]?.assignedTasks || 0}</span>
                             </td>
-                            <td className="p-4">
+                            <td className="px-4 py-3">
                                 <div className="flex flex-wrap gap-2">
                                     {Array.from(userWorkload[user.id]?.projects || []).map(projectName => (
-                                        <span key={projectName} className="text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-full">
+                                        <span key={projectName} className="text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-full">
                                             {projectName}
                                         </span>
                                     ))}
