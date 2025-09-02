@@ -107,7 +107,11 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
                     ...t,
                     assignee: t.assignee,
                     tags: t.tags.map((tag: any) => tag.tags.name),
-                    comments: t.comments || [],
+                    comments: t.comments.map((cmt: any) => ({
+                        ...cmt,
+                        author: cmt.author,
+                        timestamp: cmt.created_at
+                    })) || [],
                     subtasks: t.subtasks || [],
                     createdAt: t.created_at,
                     creatorId: t.creator_id,
@@ -157,7 +161,8 @@ const moveTask = async (taskId: string, newColumnId: string, newPosition: number
 };
 
 const updateTask = async (updatedTask: Task) => {
-    const { error } = await supabase
+    // 1. Update the core task details
+    const { error: taskUpdateError } = await supabase
       .from('tasks')
       .update({
           title: updatedTask.title,
@@ -167,15 +172,101 @@ const updateTask = async (updatedTask: Task) => {
       })
       .eq('id', updatedTask.id);
       
-    if (error) console.error("Error updating task", error);
+    if (taskUpdateError) console.error("Error updating task", taskUpdateError);
 
-    // Handle subtasks
-    for (const subtask of updatedTask.subtasks) {
-        const { error: subtaskError } = await supabase
-          .from('subtasks')
-          .update({ completed: subtask.completed, title: subtask.title })
-          .eq('id', subtask.id);
-        if (subtaskError) console.error("Error updating subtask", subtaskError);
+    // 2. Sync subtasks (handle updates and deletes)
+    const { data: existingSubtasks, error: fetchSubtasksError } = await supabase
+        .from('subtasks')
+        .select('id')
+        .eq('task_id', updatedTask.id);
+
+    if (fetchSubtasksError) {
+        console.error("Error fetching subtasks for sync:", fetchSubtasksError);
+    } else {
+        const existingSubtaskIds = new Set(existingSubtasks.map(s => s.id));
+        const incomingSubtaskIds = new Set(updatedTask.subtasks.map(s => s.id));
+
+        // Find and delete subtasks that are no longer present
+        const subtasksToDelete = Array.from(existingSubtaskIds).filter(id => !incomingSubtaskIds.has(id));
+        if (subtasksToDelete.length > 0) {
+            const { error: deleteError } = await supabase
+                .from('subtasks')
+                .delete()
+                .in('id', subtasksToDelete);
+            if (deleteError) console.error("Error deleting subtasks:", deleteError);
+        }
+
+        // Update existing subtasks
+        for (const subtask of updatedTask.subtasks) {
+            if (existingSubtaskIds.has(subtask.id)) {
+                const { error: subtaskError } = await supabase
+                    .from('subtasks')
+                    .update({ completed: subtask.completed, title: subtask.title })
+                    .eq('id', subtask.id);
+                if (subtaskError) console.error("Error updating subtask", subtaskError);
+            }
+        }
+    }
+
+
+    // 3. Sync tags
+    const { data: existingTaskTags, error: fetchTagsError } = await supabase
+        .from('task_tags')
+        .select('tags(id, name)')
+        .eq('task_id', updatedTask.id);
+    
+    if (fetchTagsError) {
+        console.error("Error fetching existing tags:", fetchTagsError);
+        return;
+    }
+    
+    const existingTags = existingTaskTags.map((t: any) => t.tags.name);
+    const newTags = updatedTask.tags;
+
+    const tagsToAdd = newTags.filter(t => !existingTags.includes(t));
+    const tagsToRemove = existingTags.filter(t => !newTags.includes(t));
+
+    // Remove old tags
+    if (tagsToRemove.length > 0) {
+        const tagsToRemoveData = existingTaskTags
+            .filter((t: any) => tagsToRemove.includes(t.tags.name))
+            .map((t: any) => t.tags.id);
+
+        if (tagsToRemoveData.length > 0) {
+            const { error: deleteError } = await supabase
+                .from('task_tags')
+                .delete()
+                .eq('task_id', updatedTask.id)
+                .in('tag_id', tagsToRemoveData);
+            if (deleteError) console.error("Error removing tags from task", deleteError);
+        }
+    }
+    
+    // Add new tags
+    if (tagsToAdd.length > 0) {
+        const { data: upsertedTags, error: upsertError } = await supabase
+            .from('tags')
+            .upsert(tagsToAdd.map(name => ({ name })), { onConflict: 'name' })
+            .select('id, name');
+
+        if (upsertError) {
+            console.error("Error upserting new tags", upsertError);
+            return;
+        }
+
+        const taskTagRelations = upsertedTags
+            .filter(tag => tagsToAdd.includes(tag.name))
+            .map(tag => ({
+                task_id: updatedTask.id,
+                tag_id: tag.id
+            }));
+        
+        if (taskTagRelations.length > 0) {
+            const { error: insertError } = await supabase
+                .from('task_tags')
+                .insert(taskTagRelations);
+            if (insertError) console.error("Error adding tags to task", insertError);
+        }
     }
 };
 
