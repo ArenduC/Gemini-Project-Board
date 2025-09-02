@@ -32,7 +32,7 @@ export interface Comment {
     id: string;
     author: User;
     text: string;
-    timestamp: string;
+    createdAt: string;
 }
 
 export interface Task {

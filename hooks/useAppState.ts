@@ -24,8 +24,8 @@ export const useAppState = (userId?: string) => {
     try {
         const { projects, users, projectOrder } = await api.data.fetchInitialData(userId);
         setState({ projects, users, projectOrder });
-    } catch (error) {
-        console.error('Failed to fetch initial data:', error);
+    } catch (error: any) {
+        console.error('Failed to fetch initial data:', error.message || error);
         setState(initialState);
     } finally {
         setLoading(false);

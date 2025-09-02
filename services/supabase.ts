@@ -1,15 +1,16 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { UserRole } from '../types';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config';
 
+// Add a check to ensure credentials are configured, preventing a crash on startup.
+// FIX: Corrected placeholder strings to match the values in config.ts.
+if (!SUPABASE_URL || SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
+  throw new Error("Supabase credentials are not configured. Please update the `config.ts` file with your Supabase URL and Anon Key.");
+}
+
 // Use credentials from the central config file.
 const supabaseUrl = SUPABASE_URL;
 const supabaseAnonKey = SUPABASE_ANON_KEY;
-
-if (supabaseUrl === 'https://placeholder.supabase.co') {
-  console.warn('Supabase credentials are not configured. Please add your credentials to config.ts');
-}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

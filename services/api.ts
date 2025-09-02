@@ -26,7 +26,7 @@ const getUserProfile = async (userId: string): Promise<User | null> => {
         .eq('id', userId)
         .single();
     if (error) {
-        console.error("Error fetching user profile:", error);
+        console.error("Error fetching user profile:", error.message || error);
         return null;
     }
     return userProfile as User;
@@ -38,6 +38,20 @@ const signOut = async () => {
 
 const signInWithPassword = async ({ email, password }: { email: string, password: string }) => {
     return await supabase.auth.signInWithPassword({ email, password });
+};
+
+const signUp = async ({ email, password, name }: { email: string, password: string, name: string }) => {
+    return await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+            emailRedirectTo: window.location.origin,
+            data: {
+                name: name,
+                avatar_url: `https://i.pravatar.cc/150?u=${email}` // Default avatar
+            }
+        }
+    });
 };
 
 
@@ -110,7 +124,6 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
                     comments: t.comments.map((cmt: any) => ({
                         ...cmt,
                         author: cmt.author,
-                        timestamp: cmt.created_at
                     })) || [],
                     subtasks: t.subtasks || [],
                     createdAt: t.created_at,
@@ -157,7 +170,7 @@ const moveTask = async (taskId: string, newColumnId: string, newPosition: number
         new_column_id: newColumnId,
         new_position: newPosition
     });
-    if (error) console.error("Error moving task:", error);
+    if (error) console.error("Error moving task:", error.message || error);
 };
 
 const updateTask = async (updatedTask: Task) => {
@@ -172,7 +185,7 @@ const updateTask = async (updatedTask: Task) => {
       })
       .eq('id', updatedTask.id);
       
-    if (taskUpdateError) console.error("Error updating task", taskUpdateError);
+    if (taskUpdateError) console.error("Error updating task", taskUpdateError.message || taskUpdateError);
 
     // 2. Sync subtasks (handle updates and deletes)
     const { data: existingSubtasks, error: fetchSubtasksError } = await supabase
@@ -181,7 +194,7 @@ const updateTask = async (updatedTask: Task) => {
         .eq('task_id', updatedTask.id);
 
     if (fetchSubtasksError) {
-        console.error("Error fetching subtasks for sync:", fetchSubtasksError);
+        console.error("Error fetching subtasks for sync:", fetchSubtasksError.message || fetchSubtasksError);
     } else {
         const existingSubtaskIds = new Set(existingSubtasks.map(s => s.id));
         const incomingSubtaskIds = new Set(updatedTask.subtasks.map(s => s.id));
@@ -193,7 +206,7 @@ const updateTask = async (updatedTask: Task) => {
                 .from('subtasks')
                 .delete()
                 .in('id', subtasksToDelete);
-            if (deleteError) console.error("Error deleting subtasks:", deleteError);
+            if (deleteError) console.error("Error deleting subtasks:", deleteError.message || deleteError);
         }
 
         // Update existing subtasks
@@ -203,7 +216,7 @@ const updateTask = async (updatedTask: Task) => {
                     .from('subtasks')
                     .update({ completed: subtask.completed, title: subtask.title })
                     .eq('id', subtask.id);
-                if (subtaskError) console.error("Error updating subtask", subtaskError);
+                if (subtaskError) console.error("Error updating subtask", subtaskError.message || subtaskError);
             }
         }
     }
@@ -216,7 +229,7 @@ const updateTask = async (updatedTask: Task) => {
         .eq('task_id', updatedTask.id);
     
     if (fetchTagsError) {
-        console.error("Error fetching existing tags:", fetchTagsError);
+        console.error("Error fetching existing tags:", fetchTagsError.message || fetchTagsError);
         return;
     }
     
@@ -238,7 +251,7 @@ const updateTask = async (updatedTask: Task) => {
                 .delete()
                 .eq('task_id', updatedTask.id)
                 .in('tag_id', tagsToRemoveData);
-            if (deleteError) console.error("Error removing tags from task", deleteError);
+            if (deleteError) console.error("Error removing tags from task", deleteError.message || deleteError);
         }
     }
     
@@ -250,7 +263,7 @@ const updateTask = async (updatedTask: Task) => {
             .select('id, name');
 
         if (upsertError) {
-            console.error("Error upserting new tags", upsertError);
+            console.error("Error upserting new tags", upsertError.message || upsertError);
             return;
         }
 
@@ -265,7 +278,7 @@ const updateTask = async (updatedTask: Task) => {
             const { error: insertError } = await supabase
                 .from('task_tags')
                 .insert(taskTagRelations);
-            if (insertError) console.error("Error adding tags to task", insertError);
+            if (insertError) console.error("Error adding tags to task", insertError.message || insertError);
         }
     }
 };
@@ -279,7 +292,7 @@ const addSubtasks = async (taskId: string, newSubtasksData: { title:string }[], 
     }));
     
     const { error } = await supabase.from('subtasks').insert(subtasksToInsert);
-    if (error) console.error("Error adding subtasks", error);
+    if (error) console.error("Error adding subtasks", error.message || error);
 };
 
 const addComment = async (taskId: string, commentText: string, authorId: string) => {
@@ -288,7 +301,7 @@ const addComment = async (taskId: string, commentText: string, authorId: string)
       task_id: taskId,
       author_id: authorId,
     });
-    if (error) console.error("Error adding comment", error);
+    if (error) console.error("Error adding comment", error.message || error);
 };
 
 const addTask = async (taskData: NewTaskData, creatorId: string) => {
@@ -300,12 +313,12 @@ const addTask = async (taskData: NewTaskData, creatorId: string) => {
         creator_id: creatorId,
         assignee_id: taskData.assigneeId,
     });
-    if(error) console.error("Error adding task", error);
+    if(error) console.error("Error adding task", error.message || error);
 };
 
 const deleteTask = async (taskId: string) => {
     const { error } = await supabase.from('tasks').delete().eq('id', taskId);
-    if(error) console.error("Error deleting task", error);
+    if(error) console.error("Error deleting task", error.message || error);
 };
 
 const addColumn = async (projectId: string, title: string) => {
@@ -313,12 +326,12 @@ const addColumn = async (projectId: string, title: string) => {
         title: title,
         project_id: projectId,
     });
-    if(error) console.error("Error adding column", error);
+    if(error) console.error("Error adding column", error.message || error);
 };
 
 const deleteColumn = async (columnId: string) => {
     const { error } = await supabase.from('columns').delete().eq('id', columnId);
-    if(error) console.error("Error deleting column", error);
+    if(error) console.error("Error deleting column", error.message || error);
 };
 
 const addProject = async (name: string, description: string, creatorId: string) => {
@@ -328,7 +341,7 @@ const addProject = async (name: string, description: string, creatorId: string) 
         .select()
         .single();
     if (error) {
-        console.error("Error creating project", error);
+        console.error("Error creating project", error.message || error);
         return;
     }
 
@@ -336,7 +349,7 @@ const addProject = async (name: string, description: string, creatorId: string) 
     const { error: memberError } = await supabase
         .from('project_members')
         .insert({ project_id: project.id, user_id: creatorId });
-    if (memberError) console.error("Error adding creator to project", memberError);
+    if (memberError) console.error("Error adding creator to project", memberError.message || memberError);
     
     // Add default columns
     const columnsToAdd = [
@@ -345,18 +358,18 @@ const addProject = async (name: string, description: string, creatorId: string) 
         { project_id: project.id, title: 'Done', position: 3 },
     ];
     const { error: columnsError } = await supabase.from('columns').insert(columnsToAdd);
-    if (columnsError) console.error("Error adding default columns", columnsError);
+    if (columnsError) console.error("Error adding default columns", columnsError.message || columnsError);
 };
 
 const updateProjectMembers = async (projectId: string, memberIds: string[]) => {
     const { error: deleteError } = await supabase.from('project_members').delete().eq('project_id', projectId);
     if(deleteError) {
-        console.error("Error clearing project members", deleteError);
+        console.error("Error clearing project members", deleteError.message || deleteError);
         return;
     }
     const membersToInsert = memberIds.map(id => ({ project_id: projectId, user_id: id }));
     const { error: insertError } = await supabase.from('project_members').insert(membersToInsert);
-    if(insertError) console.error("Error inserting new project members", insertError);
+    if(insertError) console.error("Error inserting new project members", insertError.message || insertError);
 };
 
 
@@ -366,6 +379,7 @@ export const api = {
         getUserProfile,
         signOut,
         signInWithPassword,
+        signUp,
     },
     data: {
         fetchInitialData,

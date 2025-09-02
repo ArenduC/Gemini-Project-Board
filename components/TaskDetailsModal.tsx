@@ -96,7 +96,7 @@ const CommentSection: React.FC<{task: Task, onAddComment: (taskId: string, text:
                          <div className="flex-grow">
                             <div className="flex items-center gap-2">
                                 <span className="font-semibold">{comment.author.name}</span>
-                                <span className="text-xs text-slate-500 dark:text-slate-400">{new Date(comment.timestamp).toLocaleString()}</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400">{new Date(comment.createdAt).toLocaleString()}</span>
                             </div>
                             <p className="bg-slate-100 dark:bg-slate-700/50 p-3 rounded-lg mt-1">{comment.text}</p>
                          </div>
