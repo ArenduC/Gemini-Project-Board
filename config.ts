@@ -2,6 +2,6 @@
 // You can get your Supabase credentials from your project's API settings.
 // You can get your Gemini API key from Google AI Studio.
 
-export const SUPABASE_URL = "https://placeholder.supabase.co";
-export const SUPABASE_ANON_KEY = "placeholder-anon-key";
-export const GEMINI_API_KEY = "placeholder-gemini-api-key";
+export const SUPABASE_URL = "https://gusrrfpuzjpgowblvjkl.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1c3JyZnB1empwZ293Ymx2amtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3NDIxNTEsImV4cCI6MjA3MjMxODE1MX0.b6UTFeGlI7q-uDNW5j3PSxLiMFxwK4cwaogMY5WzHS0";
+export const GEMINI_API_KEY = "AIzaSyAaCwCfAcVzzeXefRvHTk0EIa3yIjUnp9c";
