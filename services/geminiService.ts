@@ -1,12 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { GEMINI_API_KEY } from '../config';
 
-// Add a check to ensure credentials are configured, preventing a crash.
-if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
-  throw new Error("Gemini API Key is not configured. Please update the `config.ts` file.");
+// FIX: Switched to using process.env.API_KEY and updated the credential check
+// to align with @google/genai guidelines. This resolves the original type error.
+if (!process.env.API_KEY) {
+  throw new Error("Gemini API Key is not configured. Please set the API_KEY environment variable.");
 }
 
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 interface SubtaskResponse {
     title: string;

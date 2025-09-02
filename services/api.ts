@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { User, Project, BoardData, NewTaskData, Task, AppState } from '../types';
+import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage } from '../types';
 import { Session } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
@@ -48,7 +48,6 @@ const signUp = async ({ email, password, name }: { email: string, password: stri
             emailRedirectTo: window.location.origin,
             data: {
                 name: name,
-                avatar_url: `https://i.pravatar.cc/150?u=${email}` // Default avatar
             }
         }
     });
@@ -82,6 +81,7 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
         .select(`
             *,
             members:project_members(user_id),
+            chat_messages:project_chats(*, author:users(*)),
             columns:columns(
                 *,
                 tasks(
@@ -98,7 +98,8 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
         `)
         .in('id', projectIds)
         .order('position', { foreignTable: 'columns' })
-        .order('position', { foreignTable: 'columns.tasks' });
+        .order('position', { foreignTable: 'columns.tasks' })
+        .order('created_at', { foreignTable: 'chat_messages' });
 
     if (projectsError) throw projectsError;
 
@@ -140,6 +141,12 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
             description: p.description,
             members: p.members.map((m: any) => m.user_id),
             board,
+            chatMessages: p.chat_messages.map((msg: any): ChatMessage => ({
+                id: msg.id,
+                text: msg.text,
+                createdAt: msg.created_at,
+                author: msg.author,
+            })) || [],
             creatorId: p.creator_id,
             createdAt: p.created_at,
         };
@@ -372,6 +379,14 @@ const updateProjectMembers = async (projectId: string, memberIds: string[]) => {
     if(insertError) console.error("Error inserting new project members", insertError.message || insertError);
 };
 
+const sendChatMessage = async (projectId: string, text: string, authorId: string) => {
+    const { error } = await supabase.from('project_chats').insert({
+        project_id: projectId,
+        text: text,
+        author_id: authorId,
+    });
+    if (error) console.error("Error sending chat message:", error.message || error);
+};
 
 export const api = {
     auth: {
@@ -393,6 +408,7 @@ export const api = {
         addColumn,
         deleteColumn,
         addProject,
-        updateProjectMembers
+        updateProjectMembers,
+        sendChatMessage,
     }
 }

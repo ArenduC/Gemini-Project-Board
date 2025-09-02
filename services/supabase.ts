@@ -3,7 +3,7 @@ import { UserRole } from '../types';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../config';
 
 // Add a check to ensure credentials are configured, preventing a crash on startup.
-// FIX: Corrected placeholder strings to match the values in config.ts.
+// FIX: The comparison type errors are fixed in config.ts by adding explicit string types.
 if (!SUPABASE_URL || SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
   throw new Error("Supabase credentials are not configured. Please update the `config.ts` file with your Supabase URL and Anon Key.");
 }

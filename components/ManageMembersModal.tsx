@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Project, User } from '../types';
 import { XIcon } from './Icons';
+import { UserAvatar } from './UserAvatar';
 
 interface ManageMembersModalProps {
   project: Project;
@@ -51,7 +52,7 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ project,
                   onChange={() => handleToggleMember(user.id)}
                   className="w-5 h-5 rounded text-indigo-600 bg-slate-300 dark:bg-slate-600 border-slate-400 dark:border-slate-500 focus:ring-indigo-500"
                 />
-                <img src={user.avatarUrl} alt={user.name} className="w-9 h-9 rounded-full" />
+                <UserAvatar user={user} className="w-9 h-9" />
                 <span className="font-medium">{user.name}</span>
               </label>
             ))}

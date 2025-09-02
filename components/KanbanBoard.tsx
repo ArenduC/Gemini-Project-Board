@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { DragDropContext, DropResult } from 'react-beautiful-dnd';
-import { Column as ColumnType, BoardData, Task, Subtask, User } from '../types';
+import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage } from '../types';
 import { Column } from './Column';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { Filters } from './Filters';
 import { PlusIcon } from './Icons';
+import { ProjectChat } from './ProjectChat';
 
 interface KanbanBoardProps {
   boardData: BoardData;
@@ -17,6 +18,10 @@ interface KanbanBoardProps {
   deleteTask: (taskId: string, columnId: string) => Promise<void>;
   addColumn: (title: string) => Promise<void>;
   deleteColumn: (columnId: string) => Promise<void>;
+  isChatOpen: boolean;
+  onCloseChat: () => void;
+  chatMessages: ChatMessage[];
+  onSendMessage: (text: string) => Promise<void>;
 }
 
 const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColumn }) => {
@@ -62,7 +67,7 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
   )
 }
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardData, currentUser, users, onDragEnd, updateTask, addSubtasks, addComment, deleteTask, addColumn, deleteColumn }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardData, currentUser, users, onDragEnd, updateTask, addSubtasks, addComment, deleteTask, addColumn, deleteColumn, isChatOpen, onCloseChat, chatMessages, onSendMessage }) => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('');
@@ -161,6 +166,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ boardData, currentUser
           onUpdateTask={updateTask}
           onAddSubtasks={(taskId, subtasks) => addSubtasks(taskId, subtasks, currentUser.id)}
           onAddComment={addComment}
+        />
+      )}
+       {isChatOpen && (
+        <ProjectChat 
+            messages={chatMessages}
+            currentUser={currentUser}
+            onClose={onCloseChat}
+            onSendMessage={onSendMessage}
         />
       )}
     </>

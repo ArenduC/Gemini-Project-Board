@@ -2,6 +2,7 @@ import React from 'react';
 import { Draggable } from 'react-beautiful-dnd';
 import { Task, TaskPriority } from '../types';
 import { CheckSquareIcon, TrashIcon } from './Icons';
+import { UserAvatar } from './UserAvatar';
 
 interface TaskCardProps {
   task: Task;
@@ -70,10 +71,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onDele
             </div>
 
             {task.assignee && (
-              <img
-                src={task.assignee.avatarUrl}
-                alt={task.assignee.name}
-                className="w-7 h-7 rounded-full ring-2 ring-white dark:ring-slate-800"
+              <UserAvatar 
+                user={task.assignee} 
+                className="w-7 h-7 ring-2 ring-white dark:ring-slate-800 text-xs"
                 title={`Assigned to ${task.assignee.name}`}
               />
             )}

@@ -3,6 +3,7 @@
 import React from 'react';
 import { Project, User } from '../types';
 import { UsersIcon } from './Icons';
+import { UserAvatar } from './UserAvatar';
 
 interface ProjectCardProps {
   project: Project;
@@ -32,12 +33,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onSele
         <div className="flex justify-between items-start mb-2">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white">{project.name}</h3>
             {creator && (
-                 <img
-                    src={creator.avatarUrl}
-                    alt={creator.name}
-                    className="w-8 h-8 rounded-full ring-2 ring-white dark:ring-slate-800"
+                 <UserAvatar 
+                    user={creator} 
+                    className="w-8 h-8 ring-2 ring-white dark:ring-slate-800 text-sm"
                     title={`Created by ${creator.name}`}
-                />
+                 />
             )}
         </div>
         <p className="text-slate-600 dark:text-slate-400 text-sm mb-4 h-10 overflow-hidden">{project.description}</p>
@@ -58,10 +58,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onSele
           <div className="flex justify-between items-center">
               <div className="flex items-center -space-x-2">
                   {project.members.slice(0, 4).map(memberId => users[memberId] && (
-                      <img
+                      <UserAvatar
                           key={memberId}
-                          src={users[memberId].avatarUrl}
-                          alt={users[memberId].name}
+                          user={users[memberId]}
                           className="w-8 h-8 rounded-full ring-2 ring-white dark:ring-slate-800"
                           title={users[memberId].name}
                       />

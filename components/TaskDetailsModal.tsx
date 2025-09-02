@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, FormEvent } from 'react';
 import { Task, Subtask, User, TaskPriority } from '../types';
 import { generateSubtasks as generateSubtasksFromApi } from '../services/geminiService';
 import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon, TrashIcon } from './Icons';
+import { UserAvatar } from './UserAvatar';
 
 interface TaskDetailsModalProps {
   task: Task;
@@ -73,7 +74,7 @@ const CommentSection: React.FC<{task: Task, onAddComment: (taskId: string, text:
         <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2"><MessageSquareIcon className="w-5 h-5" /> Activity</h3>
             <div className="flex items-start gap-3 mb-4">
-                <img src={currentUser.avatarUrl} alt={currentUser.name} className="w-9 h-9 rounded-full"/>
+                <UserAvatar user={currentUser} className="w-9 h-9 flex-shrink-0" />
                 <form onSubmit={handleSubmit} className="flex-grow">
                     <textarea 
                         value={newComment}
@@ -92,7 +93,7 @@ const CommentSection: React.FC<{task: Task, onAddComment: (taskId: string, text:
             <div className="space-y-4">
                 {task.comments.slice().reverse().map(comment => (
                     <div key={comment.id} className="flex items-start gap-3">
-                         <img src={comment.author.avatarUrl} alt={comment.author.name} className="w-9 h-9 rounded-full"/>
+                         <UserAvatar user={comment.author} className="w-9 h-9 flex-shrink-0" />
                          <div className="flex-grow">
                             <div className="flex items-center gap-2">
                                 <span className="font-semibold">{comment.author.name}</span>
@@ -226,7 +227,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                 <span>Created by</span>
                 {taskCreator ? (
                     <>
-                        <img src={taskCreator.avatarUrl} alt={taskCreator.name} className="w-6 h-6 rounded-full" />
+                        <UserAvatar user={taskCreator} className="w-6 h-6 text-xs" />
                         <span className="font-semibold text-slate-700 dark:text-slate-300">{taskCreator.name}</span>
                     </>
                 ) : (
@@ -320,11 +321,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                         <label htmlFor={subtask.id} className={`flex-grow ${subtask.completed ? 'line-through text-slate-500 dark:text-slate-400' : ''}`}>
                             {subtask.title}
                         </label>
-                        {subtaskCreator ? (
-                            <img src={subtaskCreator.avatarUrl} alt={subtaskCreator.name} className="w-6 h-6 rounded-full flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" title={`Added by ${subtaskCreator.name}`} />
-                        ) : (
-                            <div className="w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-600 flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" title="Added by an unknown user"></div>
-                        )}
+                        <UserAvatar 
+                          user={subtaskCreator} 
+                          className="w-6 h-6 text-xs flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" 
+                          title={`Added by ${subtaskCreator?.name || 'Unknown'}`}
+                        />
                         <button 
                             onClick={() => handleDeleteSubtask(subtask.id)}
                             className="ml-auto p-1 rounded-full text-slate-400 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"

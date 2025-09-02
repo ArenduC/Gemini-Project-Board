@@ -117,6 +117,10 @@ export const useAppState = (userId?: string) => {
   const updateProjectMembers = useCallback(async (projectId: string, memberIds: string[]) => {
       await api.data.updateProjectMembers(projectId, memberIds);
   }, []);
+  
+  const sendChatMessage = useCallback(async (projectId: string, text: string, authorId: string) => {
+    await api.data.sendChatMessage(projectId, text, authorId);
+  }, []);
 
-  return { state, loading, onDragEnd, updateTask, addSubtasks, addComment, addTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers };
+  return { state, loading, onDragEnd, updateTask, addSubtasks, addComment, addTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers, sendChatMessage };
 };

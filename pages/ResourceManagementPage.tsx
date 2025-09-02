@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { Project, User } from '../types';
+import { UserAvatar } from '../components/UserAvatar';
 
 interface ResourceManagementPageProps {
   projects: Record<string, Project>;
@@ -53,7 +54,7 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                     {Object.values(users).map(user => (
                         <tr key={user.id}>
                             <td className="p-4 flex items-center gap-3">
-                                <img src={user.avatarUrl} alt={user.name} className="w-10 h-10 rounded-full" />
+                                <UserAvatar user={user} className="w-10 h-10" />
                                 <span className="font-medium">{user.name}</span>
                             </td>
                             <td className="p-4">

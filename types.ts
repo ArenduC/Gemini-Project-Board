@@ -24,7 +24,7 @@ export enum TaskPriority {
 export interface User {
   id: string;
   name: string;
-  avatarUrl: string;
+  avatarUrl?: string;
   role: UserRole;
 }
 
@@ -68,6 +68,13 @@ export type NewTaskData = {
   assigneeId?: string;
 };
 
+export interface ChatMessage {
+  id: string;
+  author: User;
+  text: string;
+  createdAt: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -76,6 +83,7 @@ export interface Project {
   members: string[];
   creatorId: string;
   createdAt: string;
+  chatMessages: ChatMessage[];
 }
 
 export interface AppState {

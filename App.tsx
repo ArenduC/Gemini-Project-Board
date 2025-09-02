@@ -3,7 +3,7 @@ import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ManageMembersModal } from './components/ManageMembersModal';
-import { SunIcon, MoonIcon, BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon } from './components/Icons';
+import { SunIcon, MoonIcon, BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon } from './components/Icons';
 import { useAppState } from './hooks/useAppState';
 import { DashboardPage } from './pages/DashboardPage';
 import { ResourceManagementPage } from './pages/ResourceManagementPage';
@@ -11,6 +11,7 @@ import { LoginPage } from './pages/LoginPage';
 import { User } from './types';
 import { api } from './services/api';
 import { Session } from '@supabase/supabase-js';
+import { UserAvatar } from './components/UserAvatar';
 
 type View = 'dashboard' | 'project' | 'resources';
 
@@ -18,6 +19,7 @@ const App: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [view, setView] = useState<View>('dashboard');
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const [isCreateTaskModalOpen, setCreateTaskModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setCreateProjectModalOpen] = useState(false);
@@ -32,7 +34,7 @@ const App: React.FC = () => {
   const userMenuRef = useRef<HTMLDivElement>(null);
   
   const appState = useAppState(session?.user?.id);
-  const { state, loading: appStateLoading, onDragEnd, updateTask, addSubtasks, addComment, addTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers } = appState;
+  const { state, loading: appStateLoading, onDragEnd, updateTask, addSubtasks, addComment, addTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers, sendChatMessage } = appState;
 
   const activeProject = activeProjectId ? state.projects[activeProjectId] : null;
   const projectToManageMembers = projectForMemberManagementId ? state.projects[projectForMemberManagementId] : null;
@@ -92,6 +94,7 @@ const App: React.FC = () => {
   const handleBackToDashboard = () => {
     setActiveProjectId(null);
     setView('dashboard');
+    setIsChatOpen(false); // Close chat when leaving project
   };
 
   const handleOpenManageMembersModal = (projectId: string) => {
@@ -171,6 +174,15 @@ const App: React.FC = () => {
                 Create Task
               </button>
             )}
+            {view === 'project' && (
+              <button
+                onClick={() => setIsChatOpen(prev => !prev)}
+                className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 transition-all"
+                aria-label="Toggle project chat"
+              >
+                <MessageCircleIcon className="w-6 h-6" />
+              </button>
+            )}
             <button
               onClick={toggleTheme}
               className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 transition-all"
@@ -185,11 +197,7 @@ const App: React.FC = () => {
                 aria-haspopup="true"
                 aria-expanded={isUserMenuOpen}
               >
-                <img
-                  src={currentUser.avatarUrl}
-                  alt={currentUser.name}
-                  className="w-9 h-9 rounded-full ring-2 ring-white/50 dark:ring-slate-800/50"
-                />
+                <UserAvatar user={currentUser} className="w-9 h-9 ring-2 ring-white/50 dark:ring-slate-800/50" />
               </button>
               {isUserMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 py-1 z-30">
@@ -231,6 +239,10 @@ const App: React.FC = () => {
               deleteTask={(taskId, columnId) => deleteTask(activeProject.id, taskId, columnId)}
               addColumn={(title) => addColumn(activeProject.id, title)}
               deleteColumn={(columnId) => deleteColumn(activeProject.id, columnId)}
+              isChatOpen={isChatOpen}
+              onCloseChat={() => setIsChatOpen(false)}
+              chatMessages={activeProject.chatMessages}
+              onSendMessage={(text) => sendChatMessage(activeProject.id, text, currentUser.id)}
             />
           )}
           {view === 'resources' && (
