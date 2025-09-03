@@ -76,11 +76,11 @@ export const Filters: React.FC<FiltersProps> = ({
   return (
     <div className="space-y-4">
       <div>
-        <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2">Views</h4>
+        <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">Views</h4>
         <div className="flex items-center gap-2 flex-wrap">
           <button 
             onClick={() => onApplySegment('all')}
-            className={`px-3 py-1.5 text-sm font-semibold rounded-full transition-colors ${activeSegmentId === 'all' ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700'}`}
+            className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${activeSegmentId === 'all' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
           >
             All Tasks
           </button>
@@ -88,7 +88,7 @@ export const Filters: React.FC<FiltersProps> = ({
             <div key={segment.id} className="relative group flex-shrink-0">
               <button
                 onClick={() => onApplySegment(segment.id)}
-                className={`px-3 py-1.5 text-sm font-semibold rounded-full transition-colors pr-8 ${activeSegmentId === segment.id ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700'}`}
+                className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors pr-8 ${activeSegmentId === segment.id ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
               >
                 {segment.name}
               </button>
@@ -104,22 +104,22 @@ export const Filters: React.FC<FiltersProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap p-3 bg-slate-100 dark:bg-slate-900 rounded-lg">
+      <div className="flex items-center gap-2 flex-wrap p-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
         <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
             placeholder="Search tasks..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 w-48 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="pl-10 pr-4 py-2 w-48 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
           />
         </div>
         
         <select
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value)}
-          className="px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
         >
           <option value="">All Priorities</option>
           {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
@@ -128,7 +128,7 @@ export const Filters: React.FC<FiltersProps> = ({
         <select
           value={assigneeFilter}
           onChange={(e) => setAssigneeFilter(e.target.value)}
-          className="px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
         >
           <option value="">All Assignees</option>
           {assignees.map(a => <option key={a} value={a}>{a}</option>)}
@@ -138,7 +138,7 @@ export const Filters: React.FC<FiltersProps> = ({
              <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                 >
                 <option value="">All Statuses</option>
                 {statuses.map(s => <option key={s} value={s}>{s}</option>)}
@@ -148,7 +148,7 @@ export const Filters: React.FC<FiltersProps> = ({
         {hasActiveFilters && (
           <button 
             onClick={onClearFilters}
-            className="px-3 py-2 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 rounded-lg"
+            className="px-3 py-2 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/20 rounded-lg"
           >
             Clear Filters
           </button>
@@ -162,17 +162,17 @@ export const Filters: React.FC<FiltersProps> = ({
               value={newSegmentName}
               onChange={(e) => setNewSegmentName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-              className="px-3 py-2 w-48 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-3 py-2 w-48 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
               autoFocus
             />
             <button onClick={handleSave} className="px-3 py-2 bg-indigo-600 text-white font-semibold rounded-lg text-sm flex-shrink-0">Save</button>
-            <button onClick={() => setIsSaving(false)} className="px-3 py-2 text-sm text-slate-600 dark:text-slate-300 flex-shrink-0">Cancel</button>
+            <button onClick={() => setIsSaving(false)} className="px-3 py-2 text-sm text-gray-600 dark:text-gray-300 flex-shrink-0">Cancel</button>
           </div>
         ) : (
           hasActiveFilters && !isCurrentFilterSaved && (
             <button 
               onClick={handleStartSave}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="flex items-center gap-2 px-3 py-2 text-sm font-semibold bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600"
             >
               <BookmarkPlusIcon className="w-4 h-4" />
               Save View

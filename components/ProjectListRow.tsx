@@ -30,29 +30,29 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, 
   return (
     <div
       onClick={() => onSelect(project.id)}
-      className="grid grid-cols-12 gap-4 items-center bg-white dark:bg-slate-900 px-4 py-3 border-b border-slate-200 dark:border-slate-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors duration-200"
+      className="grid grid-cols-12 gap-4 items-center bg-white dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-200"
     >
       {/* Project Name & Description */}
       <div className="col-span-4">
-        <h3 className="font-bold text-slate-900 dark:text-white truncate text-sm">{project.name}</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{project.description}</p>
+        <h3 className="font-bold text-gray-900 dark:text-white truncate text-sm">{project.name}</h3>
+        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{project.description}</p>
       </div>
 
       {/* Progress Bar */}
       <div className="col-span-2">
-        <div className="flex justify-between items-center text-xs mb-1 text-slate-600 dark:text-slate-400">
+        <div className="flex justify-between items-center text-xs mb-1 text-gray-600 dark:text-gray-400">
             <span>Progress</span>
             <span className="font-semibold">{progress}%</span>
         </div>
-        <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-            <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${progress}%` }}></div>
+        <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-1.5">
+            <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${progress}%` }}></div>
         </div>
       </div>
 
       {/* Task Count */}
       <div className="col-span-2 text-center">
-        <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{completedTasks} / {totalTasks}</span>
-        <span className="block text-xs text-slate-500 dark:text-slate-400">Tasks Done</span>
+        <span className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{completedTasks} / {totalTasks}</span>
+        <span className="block text-xs text-gray-500 dark:text-gray-400">Tasks Done</span>
       </div>
 
       {/* Members */}
@@ -61,12 +61,12 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, 
           <UserAvatar
             key={memberId}
             user={users[memberId]}
-            className="w-8 h-8 rounded-full ring-2 ring-white dark:ring-slate-900"
+            className="w-8 h-8 rounded-full ring-2 ring-white dark:ring-gray-900"
             title={users[memberId].name}
           />
         ))}
         {project.members.length > 4 && (
-          <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-semibold ring-2 ring-white dark:ring-slate-900">
+          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs font-semibold ring-2 ring-white dark:ring-gray-900">
             +{project.members.length - 4}
           </div>
         )}

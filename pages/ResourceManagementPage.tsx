@@ -37,18 +37,18 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
 
   return (
     <div>
-        <h2 className="text-3xl font-bold mb-6">Resource Management</h2>
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-md border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <h2 className="text-2xl font-bold mb-6">Resource Management</h2>
+        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800 overflow-hidden">
             <table className="w-full text-left">
-                <thead className="bg-slate-50 dark:bg-slate-800">
-                    <tr className="text-sm">
-                        <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Team Member</th>
-                        <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Role</th>
-                        <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Assigned Tasks</th>
-                        <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Active Projects</th>
+                <thead className="bg-gray-100 dark:bg-gray-800/50">
+                    <tr className="text-xs">
+                        <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Team Member</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Role</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Assigned Tasks</th>
+                        <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Active Projects</th>
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
                     {Object.values(users).map(user => (
                         <tr key={user.id} className="text-sm">
                             <td className="px-4 py-3 flex items-center gap-3">
@@ -56,7 +56,7 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                                 <span className="font-medium">{user.name}</span>
                             </td>
                             <td className="px-4 py-3">
-                                <span className="text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-full">
+                                <span className="text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full">
                                     {user.role}
                                 </span>
                             </td>
@@ -66,12 +66,12 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                             <td className="px-4 py-3">
                                 <div className="flex flex-wrap gap-2">
                                     {Array.from(userWorkload[user.id]?.projects || []).map(projectName => (
-                                        <span key={projectName} className="text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-full">
+                                        <span key={projectName} className="text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full">
                                             {projectName}
                                         </span>
                                     ))}
                                     {(userWorkload[user.id]?.projects.size === 0) && (
-                                        <span className="text-xs text-slate-400">Not in any projects</span>
+                                        <span className="text-xs text-gray-400">Not in any projects</span>
                                     )}
                                 </div>
                             </td>

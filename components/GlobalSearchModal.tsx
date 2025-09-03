@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Project, Task, User } from '../types';
 import { performGlobalSearch, SearchResponse } from '../services/geminiService';
@@ -83,26 +84,26 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
             onClick={onClose}
         >
             <div 
-                className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[70vh] flex flex-col transform transition-all duration-300"
+                className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[70vh] flex flex-col transform transition-all duration-300"
                 onClick={(e) => e.stopPropagation()}
             >
-                <header className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-4">
-                    <SearchIcon className="w-6 h-6 text-slate-500 dark:text-slate-400" />
+                <header className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-4">
+                    <SearchIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
                     <input
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search tasks, projects, users..."
-                        className="w-full bg-transparent text-lg focus:outline-none"
+                        className="w-full bg-transparent text-base focus:outline-none"
                         autoFocus
                     />
-                    <button onClick={onClose} className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+                    <button onClick={onClose} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
                         <XIcon className="w-6 h-6" />
                     </button>
                 </header>
                 <div className="flex-grow overflow-y-auto custom-scrollbar p-2">
                     {isLoading && (
-                        <div className="p-6 flex items-center justify-center gap-3 text-slate-500 dark:text-slate-400">
+                        <div className="p-6 flex items-center justify-center gap-3 text-gray-500 dark:text-gray-400">
                             <LoaderCircleIcon className="w-6 h-6 animate-spin" />
                             <span>Searching with AI...</span>
                         </div>
@@ -114,24 +115,24 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                         </div>
                     )}
                     {!isLoading && !error && debouncedQuery && !hasResults && (
-                        <div className="p-6 text-center text-slate-500 dark:text-slate-400">
+                        <div className="p-6 text-center text-gray-500 dark:text-gray-400">
                             <p>No results found for "{debouncedQuery}"</p>
                         </div>
                     )}
                     {!isLoading && !error && !debouncedQuery && (
-                        <div className="p-10 flex flex-col items-center justify-center text-center text-slate-500 dark:text-slate-400">
+                        <div className="p-10 flex flex-col items-center justify-center text-center text-gray-500 dark:text-gray-400">
                             <BotMessageSquareIcon className="w-12 h-12 mb-4"/>
-                             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">AI-Powered Global Search</h3>
-                            <p className="max-w-md">Find anything across your projects. Try searching for a task ID, a project name, or ask a question like "urgent tasks assigned to Alice".</p>
+                             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">AI-Powered Global Search</h3>
+                            <p className="max-w-md text-sm">Find anything across your projects. Try searching for a task ID, a project name, or ask a question like "urgent tasks assigned to Alice".</p>
                         </div>
                     )}
                     {results && (
                         <div className="space-y-4 p-2">
                             {results.projects.length > 0 && (
                                 <div>
-                                    <h3 className="px-3 py-1 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-2"><LayoutDashboardIcon className="w-4 h-4" /> Projects</h3>
+                                    <h3 className="px-3 py-1 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 flex items-center gap-2"><LayoutDashboardIcon className="w-4 h-4" /> Projects</h3>
                                     {results.projects.map(id => projects[id] && (
-                                        <button key={id} onClick={() => onSelectProject(id)} className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800">
+                                        <button key={id} onClick={() => onSelectProject(id)} className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-sm">
                                             {projects[id].name}
                                         </button>
                                     ))}
@@ -139,9 +140,9 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                             )}
                             {results.tasks.length > 0 && (
                                 <div>
-                                    <h3 className="px-3 py-1 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-2"><CheckSquareIcon className="w-4 h-4" /> Tasks</h3>
+                                    <h3 className="px-3 py-1 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 flex items-center gap-2"><CheckSquareIcon className="w-4 h-4" /> Tasks</h3>
                                     {results.tasks.map(id => allTasks[id] && (
-                                        <button key={id} onClick={() => onSelectTask(allTasks[id])} className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800">
+                                        <button key={id} onClick={() => onSelectTask(allTasks[id])} className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-sm">
                                             {allTasks[id].title}
                                         </button>
                                     ))}
@@ -149,9 +150,9 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                             )}
                              {results.users.length > 0 && (
                                 <div>
-                                    <h3 className="px-3 py-1 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400 flex items-center gap-2"><UserIcon className="w-4 h-4" /> Users</h3>
+                                    <h3 className="px-3 py-1 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 flex items-center gap-2"><UserIcon className="w-4 h-4" /> Users</h3>
                                     {results.users.map(id => users[id] && (
-                                        <div key={id} className="flex items-center gap-3 px-3 py-2 rounded-md">
+                                        <div key={id} className="flex items-center gap-3 px-3 py-2 rounded-md text-sm">
                                             <UserAvatar user={users[id]} className="w-7 h-7" />
                                             <span>{users[id].name}</span>
                                         </div>

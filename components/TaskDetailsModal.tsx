@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, FormEvent, useMemo, useRef } from 'react';
 import { Task, Subtask, User, TaskPriority } from '../types';
 import { generateSubtasks as generateSubtasksFromApi } from '../services/geminiService';
@@ -58,7 +59,7 @@ const EditableField: React.FC<{value: string, onSave: (value: string) => void, i
         ? <textarea {...commonProps} rows={4} /> 
         : <input type="text" {...commonProps} />;
   }
-  return <div onClick={() => setIsEditing(true)} className={textClassName}>{value || <span className="text-slate-400">{placeholder}</span>}</div>;
+  return <div onClick={() => setIsEditing(true)} className={textClassName}>{value || <span className="text-gray-400">{placeholder}</span>}</div>;
 }
 
 interface ActivitySectionProps {
@@ -175,7 +176,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
 
     return (
         <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2"><MessageSquareIcon className="w-5 h-5" /> Activity</h3>
+            <h3 className="text-base font-semibold mb-3 flex items-center gap-2"><MessageSquareIcon className="w-5 h-5" /> Activity</h3>
             <div className="flex items-start gap-3 mb-4">
                 <UserAvatar user={currentUser} className="w-9 h-9 flex-shrink-0" />
                 <form onSubmit={handleSubmit} className="flex-grow">
@@ -186,21 +187,21 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
                             onChange={handleCommentChange}
                             onKeyDown={handleKeyDown}
                             placeholder="Add a comment... Type @ to mention a user."
-                            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-800"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-sm"
                             rows={2}
                         />
                         {showMentions && filteredMembers.length > 0 && (
-                            <div className="absolute z-10 w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-md shadow-lg mt-1 max-h-48 overflow-y-auto custom-scrollbar">
+                            <div className="absolute z-10 w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md shadow-lg mt-1 max-h-48 overflow-y-auto custom-scrollbar">
                                 <ul>
                                     {filteredMembers.map((user, index) => (
                                         <li 
                                             key={user.id}
                                             onClick={() => handleMentionSelect(user)}
                                             onMouseEnter={() => setActiveIndex(index)}
-                                            className={`px-3 py-2 cursor-pointer flex items-center gap-2 ${index === activeIndex ? 'bg-indigo-100 dark:bg-indigo-800' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                                            className={`px-3 py-2 cursor-pointer flex items-center gap-2 ${index === activeIndex ? 'bg-indigo-100 dark:bg-indigo-800' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                         >
                                             <UserAvatar user={user} className="w-6 h-6 text-xs flex-shrink-0" />
-                                            <span>{user.name}</span>
+                                            <span className="text-sm">{user.name}</span>
                                         </li>
                                     ))}
                                 </ul>
@@ -222,22 +223,22 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
                          {item.type === 'comment' ? (
                             <UserAvatar user={author} className="w-9 h-9 flex-shrink-0" />
                          ) : (
-                            <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-slate-200 dark:bg-slate-800 rounded-full">
-                                <HistoryIcon className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                            <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-gray-200 dark:bg-gray-800 rounded-full">
+                                <HistoryIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                             </div>
                          )}
                          <div className="flex-grow pt-1.5">
                             {item.type === 'comment' ? (
                                 <>
                                     <div className="flex items-center gap-2">
-                                        <span className="font-semibold">{author.name}</span>
-                                        <span className="text-xs text-slate-500 dark:text-slate-400">{new Date(item.createdAt).toLocaleString()}</span>
+                                        <span className="font-semibold text-sm">{author.name}</span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(item.createdAt).toLocaleString()}</span>
                                     </div>
-                                    <p className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg mt-1 whitespace-pre-wrap">{renderWithMentions(item.text)}</p>
+                                    <p className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg mt-1 whitespace-pre-wrap text-sm">{renderWithMentions(item.text)}</p>
                                 </>
                             ) : (
-                                <p className="text-sm text-slate-500 dark:text-slate-400">
-                                    <span className="font-semibold text-slate-700 dark:text-slate-300">{author.name}</span>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    <span className="font-semibold text-gray-700 dark:text-gray-300">{author.name}</span>
                                     {' '}
                                     {item.changeDescription}
                                     <span className="block text-xs mt-0.5">{new Date(item.createdAt).toLocaleString()}</span>
@@ -351,31 +352,31 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <header className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center flex-shrink-0">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <header className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center flex-shrink-0">
             <EditableField 
                 value={editedTask.title}
                 onSave={(newTitle) => handleUpdateField('title', newTitle)}
-                textClassName="text-xl font-bold w-full cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded p-1 -m-1"
-                inputClassName="text-xl font-bold p-1 rounded border-2 border-indigo-500 bg-white dark:bg-slate-800 focus:outline-none"
+                textClassName="text-lg font-bold w-full cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 rounded p-1 -m-1"
+                inputClassName="text-lg font-bold p-1 rounded border-2 border-indigo-500 bg-white dark:bg-gray-800 focus:outline-none"
                 placeholder="Enter a task title..."
             />
-          <button onClick={onClose} className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors ml-4">
+          <button onClick={onClose} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors ml-4">
             <XIcon className="w-6 h-6" />
           </button>
         </header>
         
         <div className="p-6 overflow-y-auto custom-scrollbar space-y-8">
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                 <UserIcon className="w-4 h-4" />
                 <span>Created by</span>
                 {taskCreator ? (
                     <>
                         <UserAvatar user={taskCreator} className="w-6 h-6 text-xs" />
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">{taskCreator.name}</span>
+                        <span className="font-semibold text-gray-700 dark:text-gray-300">{taskCreator.name}</span>
                     </>
                 ) : (
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">Unknown User</span>
+                    <span className="font-semibold text-gray-700 dark:text-gray-300">Unknown User</span>
                 )}
                 <span>on {new Date(task.createdAt).toLocaleDateString()}</span>
             </div>
@@ -384,31 +385,31 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                 value={editedTask.description}
                 onSave={(newDesc) => handleUpdateField('description', newDesc)}
                 isTextArea
-                textClassName="text-slate-600 dark:text-slate-300 w-full cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 rounded p-2 -m-2 min-h-[50px]"
-                inputClassName="p-2 rounded border-2 border-indigo-500 bg-white dark:bg-slate-800 focus:outline-none text-slate-600 dark:text-slate-300"
+                textClassName="text-sm text-gray-600 dark:text-gray-300 w-full cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 rounded p-2 -m-2 min-h-[50px]"
+                inputClassName="text-sm p-2 rounded border-2 border-indigo-500 bg-white dark:bg-gray-800 focus:outline-none text-gray-600 dark:text-gray-300"
                 placeholder="Add a more detailed description..."
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
-                    <label htmlFor="modal-assignee" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Assignee</label>
+                    <label htmlFor="modal-assignee" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assignee</label>
                     <select
                       id="modal-assignee"
                       value={editedTask.assignee?.id || ''}
                       onChange={handleAssigneeChange}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-slate-800"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-sm"
                     >
                       <option value="">Unassigned</option>
                       {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
                 </div>
                 <div>
-                    <label htmlFor="modal-priority" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Priority</label>
+                    <label htmlFor="modal-priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
                     <select
                       id="modal-priority"
                       value={editedTask.priority}
                       onChange={handlePriorityChange}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-slate-800"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-sm"
                     >
                       {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
@@ -416,12 +417,12 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
             </div>
 
              <div>
-                <h3 className="text-lg font-semibold mb-3 flex items-center gap-2"><TagIcon className="w-5 h-5" /> Tags</h3>
+                <h3 className="text-base font-semibold mb-3 flex items-center gap-2"><TagIcon className="w-5 h-5" /> Tags</h3>
                 <div className="flex flex-wrap gap-2 items-center">
                     {editedTask.tags.map(tag => (
-                        <span key={tag} className="flex items-center gap-1.5 text-sm font-medium bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-1 rounded-full">
+                        <span key={tag} className="flex items-center gap-1.5 text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2.5 py-1 rounded-full">
                             {tag}
-                            <button onClick={() => handleRemoveTag(tag)} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">
+                            <button onClick={() => handleRemoveTag(tag)} className="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
                                 <XIcon className="w-3 h-3"/>
                             </button>
                         </span>
@@ -438,15 +439,15 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
             </div>
           
           <div>
-            <h3 className="text-lg font-semibold mb-3 flex items-center gap-2"><CheckSquareIcon className="w-5 h-5" /> Subtasks</h3>
+            <h3 className="text-base font-semibold mb-3 flex items-center gap-2"><CheckSquareIcon className="w-5 h-5" /> Subtasks</h3>
             {totalSubtasks > 0 && (
                 <div className="mb-3">
-                    <div className="flex justify-between items-center text-sm mb-1.5">
-                        <span className="font-medium text-slate-600 dark:text-slate-300">Progress</span>
-                        <span className="font-semibold text-slate-700 dark:text-slate-200">{completedSubtasks} / {totalSubtasks}</span>
+                    <div className="flex justify-between items-center text-xs mb-1.5">
+                        <span className="font-medium text-gray-600 dark:text-gray-300">Progress</span>
+                        <span className="font-semibold text-gray-700 dark:text-gray-200">{completedSubtasks} / {totalSubtasks}</span>
                     </div>
-                    <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5">
-                        <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-in-out" style={{ width: `${progress}%` }}></div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div className="bg-indigo-600 h-2 rounded-full transition-all duration-300 ease-in-out" style={{ width: `${progress}%` }}></div>
                     </div>
                 </div>
             )}
@@ -454,15 +455,15 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
               {editedTask.subtasks.map(subtask => {
                 const subtaskCreator = users.find(u => u.id === subtask.creatorId);
                 return (
-                    <div key={subtask.id} className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 p-2 rounded-md group">
+                    <div key={subtask.id} className="flex items-center gap-3 bg-gray-100 dark:bg-gray-800 p-2 rounded-md group">
                         <input
                             type="checkbox"
                             id={subtask.id}
                             checked={subtask.completed}
                             onChange={() => handleSubtaskToggle(subtask.id)}
-                            className="w-5 h-5 rounded text-indigo-600 bg-slate-300 dark:bg-slate-600 border-slate-400 dark:border-slate-500 focus:ring-indigo-500 flex-shrink-0"
+                            className="w-4 h-4 rounded text-indigo-600 bg-gray-200 dark:bg-gray-600 border-gray-300 dark:border-gray-500 focus:ring-indigo-500 flex-shrink-0"
                         />
-                        <label htmlFor={subtask.id} className={`flex-grow ${subtask.completed ? 'line-through text-slate-500 dark:text-slate-400' : ''}`}>
+                        <label htmlFor={subtask.id} className={`flex-grow text-sm ${subtask.completed ? 'line-through text-gray-500 dark:text-gray-400' : ''}`}>
                             {subtask.title}
                         </label>
                         <UserAvatar 
@@ -472,7 +473,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                         />
                         <button 
                             onClick={() => handleDeleteSubtask(subtask.id)}
-                            className="ml-auto p-1 rounded-full text-slate-400 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="ml-auto p-1 rounded-full text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/50 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                             aria-label="Delete subtask"
                         >
                             <TrashIcon className="w-4 h-4" />
@@ -488,7 +489,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
                     placeholder="Add a new subtask..."
-                    className="flex-grow px-3 py-1.5 border border-slate-300 dark:border-slate-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-800"
+                    className="flex-grow px-3 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-sm"
                 />
                 <button type="submit" className="p-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700" aria-label="Add subtask">
                     <PlusIcon className="w-5 h-5"/>
@@ -496,17 +497,17 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
             </form>
 
             <div className="bg-indigo-50 dark:bg-indigo-950/30 p-4 rounded-lg mt-6">
-                <h4 className="text-md font-semibold mb-2 flex items-center gap-2 text-indigo-800 dark:text-indigo-200">
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2 text-indigo-800 dark:text-indigo-200">
                 <SparklesIcon className="w-5 h-5"/>
                 AI Assistant
                 </h4>
-                <p className="text-sm text-indigo-700 dark:text-indigo-300 mb-4">
+                <p className="text-xs text-indigo-700 dark:text-indigo-300 mb-4">
                 Let Gemini help you break this task into smaller, actionable subtasks.
                 </p>
                 <button
                 onClick={handleGenerateSubtasks}
                 disabled={aiState === 'loading'}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-all"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-all text-sm"
                 >
                 {aiState === 'loading' ? (
                     <>
@@ -524,7 +525,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
             </div>
           </div>
 
-          <hr className="border-slate-200 dark:border-slate-800" />
+          <hr className="border-gray-200 dark:border-gray-800" />
           
           <div className="p-6">
             <ActivitySection task={editedTask} onAddComment={onAddComment} currentUser={currentUser} projectMembers={projectMembers} users={users} />

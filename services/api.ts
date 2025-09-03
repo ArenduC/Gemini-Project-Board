@@ -568,7 +568,9 @@ const acceptInvite = async (token: string): Promise<Project> => {
     const { data, error } = await supabase.rpc('accept_project_invite', { invite_token: token });
     if (error) {
         console.error('Error accepting invite:', error.message || error);
-        throw new Error(error.message || 'Could not join project. The link may be invalid or expired.');
+        // FIX: The 'error' object from Supabase might be of an unknown type in some contexts.
+        // Casting to 'Error' allows safely accessing the 'message' property for the Error constructor.
+        throw new Error((error as Error).message || 'Could not join project. The link may be invalid or expired.');
     }
     // The RPC function is expected to return the full project data upon success.
     // This is a placeholder; a real implementation might need to fetch project details separately.

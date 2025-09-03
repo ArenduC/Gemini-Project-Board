@@ -315,11 +315,11 @@ const App: React.FC = () => {
     if (view === 'project' && activeProject) {
       return (
          <div className="flex items-center gap-3">
-            <button onClick={handleBackToDashboard} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
-                <ArrowLeftIcon className="w-6 h-6"/>
+            <button onClick={handleBackToDashboard} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
+                <ArrowLeftIcon className="w-5 h-5"/>
             </button>
-            <BotMessageSquareIcon className="w-8 h-8 text-indigo-500" />
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <BotMessageSquareIcon className="w-7 h-7 text-indigo-500" />
+            <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
               {activeProject.name}
             </h1>
           </div>
@@ -327,8 +327,8 @@ const App: React.FC = () => {
     }
      return (
         <div className="flex items-center gap-3">
-            <BotMessageSquareIcon className="w-8 h-8 text-indigo-500" />
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <BotMessageSquareIcon className="w-7 h-7 text-indigo-500" />
+            <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
               Gemini Project Board
             </h1>
         </div>
@@ -337,8 +337,8 @@ const App: React.FC = () => {
 
   if (authLoading) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950">
-            <LoaderCircleIcon className="w-12 h-12 animate-spin text-indigo-500"/>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
+            <LoaderCircleIcon className="w-10 h-10 animate-spin text-indigo-500"/>
         </div>
     );
   }
@@ -349,9 +349,9 @@ const App: React.FC = () => {
   
   if (appStateLoading) {
      return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-950">
-            <LoaderCircleIcon className="w-12 h-12 animate-spin text-indigo-500"/>
-            <p className="ml-4 text-lg font-semibold text-slate-700 dark:text-slate-300">Loading your board...</p>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
+            <LoaderCircleIcon className="w-10 h-10 animate-spin text-indigo-500"/>
+            <p className="ml-4 text-base font-semibold text-gray-700 dark:text-gray-300">Loading your board...</p>
         </div>
     );
   }
@@ -359,74 +359,74 @@ const App: React.FC = () => {
 
   return (
     <>
-      <div className="min-h-screen font-sans text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-950 transition-colors duration-300">
-        <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800 p-4 flex justify-between items-center sticky top-0 z-20 flex-wrap gap-4">
+      <div className="min-h-screen font-sans text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-black transition-colors duration-300">
+        <header className="bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 p-4 flex justify-between items-center sticky top-0 z-20 flex-wrap gap-4">
           <HeaderContent />
 
-          <nav className="flex items-center gap-2 px-3 py-1.5 bg-slate-200/70 dark:bg-slate-900 rounded-full">
-            <button onClick={() => setView('dashboard')} className={`px-3 py-1 text-sm font-semibold rounded-full flex items-center gap-2 ${view === 'dashboard' ? 'bg-white dark:bg-slate-800 shadow' : 'hover:bg-white/50 dark:hover:bg-slate-800/50'}`}><LayoutDashboardIcon className="w-4 h-4" /> Dashboard</button>
-            <button onClick={() => setView('tasks')} className={`px-3 py-1 text-sm font-semibold rounded-full flex items-center gap-2 ${view === 'tasks' ? 'bg-white dark:bg-slate-800 shadow' : 'hover:bg-white/50 dark:hover:bg-slate-800/50'}`}><ClipboardListIcon className="w-4 h-4" /> Tasks</button>
-            <button onClick={() => setView('resources')} className={`px-3 py-1 text-sm font-semibold rounded-full flex items-center gap-2 ${view === 'resources' ? 'bg-white dark:bg-slate-800 shadow' : 'hover:bg-white/50 dark:hover:bg-slate-800/50'}`}><UsersIcon className="w-4 h-4" /> Resources</button>
+          <nav className="flex items-center gap-2 px-2 py-1 bg-gray-200/70 dark:bg-gray-800 rounded-full">
+            <button onClick={() => setView('dashboard')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'dashboard' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}><LayoutDashboardIcon className="w-4 h-4" /> Dashboard</button>
+            <button onClick={() => setView('tasks')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'tasks' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}><ClipboardListIcon className="w-4 h-4" /> Tasks</button>
+            <button onClick={() => setView('resources')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'resources' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}><UsersIcon className="w-4 h-4" /> Resources</button>
           </nav>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             {view === 'project' && (
               <button
                 onClick={() => setCreateTaskModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
               >
-                <PlusIcon className="w-5 h-5" />
-                Create Task
+                <PlusIcon className="w-4 h-4" />
+                New Task
               </button>
             )}
             {view === 'project' && (
               <button
                 onClick={() => setIsChatOpen(prev => !prev)}
-                className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 transition-all"
+                className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
                 aria-label="Toggle project chat"
               >
-                <MessageCircleIcon className="w-6 h-6" />
+                <MessageCircleIcon className="w-5 h-5" />
               </button>
             )}
              <button
                 onClick={() => setVoiceAssistantModalOpen(true)}
-                className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 transition-all"
+                className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
                 aria-label="Voice Assistant"
             >
-                <MicrophoneIcon className="w-6 h-6" />
+                <MicrophoneIcon className="w-5 h-5" />
             </button>
              <button
                 onClick={() => setSearchModalOpen(true)}
-                className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 transition-all"
+                className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
                 aria-label="Global Search"
             >
-                <SearchIcon className="w-6 h-6" />
+                <SearchIcon className="w-5 h-5" />
             </button>
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-full text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 transition-all"
+              className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
               aria-label="Toggle theme"
             >
-              {isDarkMode ? <SunIcon className="w-6 h-6" /> : <MoonIcon className="w-6 h-6" />}
+              {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
             </button>
              <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setIsUserMenuOpen(prev => !prev)}
-                className="focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950 rounded-full"
+                className="focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 rounded-full"
                 aria-haspopup="true"
                 aria-expanded={isUserMenuOpen}
               >
-                <UserAvatar user={currentUser} className="w-9 h-9 ring-2 ring-white/50 dark:ring-slate-900/50" />
+                <UserAvatar user={currentUser} className="w-8 h-8 ring-2 ring-white/50 dark:ring-gray-900/50" />
               </button>
               {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 py-1 z-30">
-                  <div className="px-4 py-2 border-b border-slate-200 dark:border-slate-800">
-                    <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{currentUser.name}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{currentUser.role}</p>
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 py-1 z-30">
+                  <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{currentUser.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{currentUser.role}</p>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
                     Logout
                   </button>
@@ -435,7 +435,7 @@ const App: React.FC = () => {
             </div>
           </div>
         </header>
-        <main className="p-4 sm:p-6 lg:p-8">
+        <main className="p-4 sm:p-6">
           {view === 'dashboard' && (
             <DashboardPage 
               projects={Object.values(state.projects)}

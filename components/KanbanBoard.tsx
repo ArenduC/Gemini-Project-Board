@@ -43,7 +43,7 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
     return (
       <button
         onClick={() => setIsEditing(true)}
-        className="w-full flex items-center justify-start gap-2 p-3 rounded-xl bg-slate-200/50 dark:bg-slate-900 hover:bg-slate-300/70 dark:hover:bg-slate-800/70 text-slate-600 dark:text-slate-300 font-medium transition-colors"
+        className="w-full flex items-center justify-start gap-2 p-3 rounded-xl bg-gray-200/50 dark:bg-gray-800/60 hover:bg-gray-300/70 dark:hover:bg-gray-700/70 text-gray-600 dark:text-gray-300 font-medium transition-colors"
       >
         <PlusIcon className="w-5 h-5" />
         Add another column
@@ -52,7 +52,7 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
   }
 
   return (
-    <div className="p-2 bg-slate-200 dark:bg-slate-900 rounded-xl">
+    <div className="p-2 bg-gray-200 dark:bg-gray-800/80 rounded-xl">
       <input
         autoFocus
         value={title}
@@ -60,11 +60,11 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
         onBlur={handleSubmit}
         onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
         placeholder="Enter column title..."
-        className="w-full p-2 border-2 border-indigo-500 rounded-lg bg-white dark:bg-slate-800 focus:outline-none"
+        className="w-full p-2 border-2 border-indigo-500 rounded-lg bg-white dark:bg-gray-700 focus:outline-none"
       />
        <div className="mt-2 flex items-center gap-2">
         <button onClick={handleSubmit} className="px-4 py-1.5 bg-indigo-600 text-white font-semibold rounded-md text-sm hover:bg-indigo-700">Add column</button>
-        <button onClick={() => setIsEditing(false)} className="px-2 py-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-800 rounded-md">Cancel</button>
+        <button onClick={() => setIsEditing(false)} className="px-2 py-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700 rounded-md">Cancel</button>
       </div>
     </div>
   )
