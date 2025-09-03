@@ -477,7 +477,11 @@ const App: React.FC = () => {
               />
           )}
           {view === 'resources' && (
-              <ResourceManagementPage projects={state.projects} users={state.users} />
+              <ResourceManagementPage 
+                  projects={state.projects} 
+                  users={state.users} 
+                  onTaskClick={handleTaskClick}
+              />
           )}
         </main>
       </div>

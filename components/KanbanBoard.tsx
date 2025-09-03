@@ -1,11 +1,13 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { DragDropContext, DropResult } from 'react-beautiful-dnd';
 import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment } from '../types';
 import { Column } from './Column';
 import { Filters } from './Filters';
-import { PlusIcon } from './Icons';
+import { PlusIcon, LayoutDashboardIcon, GitBranchIcon } from './Icons';
 import { ProjectChat } from './ProjectChat';
 import { AiTaskCreator } from './AiTaskCreator';
+import { TaskGraphView } from './TaskGraphView';
 
 interface KanbanBoardProps {
   projectId: string;
@@ -75,6 +77,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, 
   const [priorityFilter, setPriorityFilter] = useState<string>('');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [projectView, setProjectView] = useState<'board' | 'graph'>('board');
 
   const [segments, setSegments] = useState<FilterSegment[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>('all');
@@ -247,7 +250,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, 
         <AiTaskCreator onGenerateTask={addAiTask} />
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <Filters
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
@@ -267,29 +270,55 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, 
             onApplySegment={handleApplySegment}
             onClearFilters={handleClearFilters}
           />
-      </div>
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
-          {filteredBoardData.columnOrder.map((columnId) => {
-            const column = filteredBoardData.columns[columnId];
-            if (!column) return null;
-            const tasks = column.taskIds.map((taskId) => filteredBoardData.tasks[taskId]).filter(Boolean); // filter(Boolean) to remove undefined tasks
-            return (
-              <Column 
-                key={column.id} 
-                column={column} 
-                tasks={tasks} 
-                onTaskClick={onTaskClick}
-                deleteTask={deleteTask}
-                deleteColumn={deleteColumn}
-              />
-            );
-          })}
-          <div className="min-w-[280px]">
-            <AddColumn onAddColumn={addColumn} />
-          </div>
+         <div className="flex-shrink-0">
+            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2 text-right">View</h4>
+            <div className="flex items-center p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
+                <button
+                    onClick={() => setProjectView('board')}
+                    className={`p-2 rounded-md ${projectView === 'board' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+                    aria-label="Board View"
+                    title="Board View"
+                >
+                    <LayoutDashboardIcon className="w-5 h-5" />
+                </button>
+                <button
+                    onClick={() => setProjectView('graph')}
+                    className={`p-2 rounded-md ${projectView === 'graph' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+                    aria-label="Graph View"
+                    title="Graph View"
+                >
+                    <GitBranchIcon className="w-5 h-5" />
+                </button>
+            </div>
         </div>
-      </DragDropContext>
+      </div>
+      
+      {projectView === 'board' ? (
+        <DragDropContext onDragEnd={onDragEnd}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
+            {filteredBoardData.columnOrder.map((columnId) => {
+                const column = filteredBoardData.columns[columnId];
+                if (!column) return null;
+                const tasks = column.taskIds.map((taskId) => filteredBoardData.tasks[taskId]).filter(Boolean); // filter(Boolean) to remove undefined tasks
+                return (
+                <Column 
+                    key={column.id} 
+                    column={column} 
+                    tasks={tasks} 
+                    onTaskClick={onTaskClick}
+                    deleteTask={deleteTask}
+                    deleteColumn={deleteColumn}
+                />
+                );
+            })}
+            <div className="min-w-[280px]">
+                <AddColumn onAddColumn={addColumn} />
+            </div>
+            </div>
+        </DragDropContext>
+      ) : (
+        <TaskGraphView boardData={filteredBoardData} users={Object.values(users)} onTaskClick={onTaskClick} />
+      )}
       
        {isChatOpen && (
         <ProjectChat 
