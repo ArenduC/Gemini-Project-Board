@@ -43,11 +43,11 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
   return (
     <div>
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-            <h2 className="text-2xl font-bold">Team Activity</h2>
-             <div className="flex items-center p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
+            <h2 className="text-2xl font-bold text-white">Team Activity</h2>
+             <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
                 <button
                     onClick={() => setView('table')}
-                    className={`p-2 rounded-md ${view === 'table' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+                    className={`p-2 rounded-md ${view === 'table' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:bg-gray-800/50'}`}
                     aria-label="Table View"
                     title="Table View"
                 >
@@ -55,7 +55,7 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                 </button>
                 <button
                     onClick={() => setView('graph')}
-                    className={`p-2 rounded-md ${view === 'graph' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+                    className={`p-2 rounded-md ${view === 'graph' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:bg-gray-800/50'}`}
                     aria-label="Graph View"
                     title="Graph View"
                 >
@@ -67,25 +67,25 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
         {view === 'graph' ? (
             <UserActivityGraph projects={projects} users={users} onlineUsers={onlineUsers} onTaskClick={onTaskClick} />
         ) : (
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="bg-[#131C1B] rounded-xl shadow-md border border-gray-800 overflow-hidden">
                 <table className="w-full text-left">
-                    <thead className="bg-gray-100 dark:bg-gray-800/50">
+                    <thead className="bg-[#1C2326]/50">
                         <tr className="text-xs">
-                            <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Team Member</th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Role</th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Assigned Tasks</th>
-                            <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">Active Projects</th>
+                            <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Team Member</th>
+                            <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Role</th>
+                            <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Assigned Tasks</th>
+                            <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Active Projects</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                    <tbody className="divide-y divide-gray-800">
                         {Object.values(users).map(user => (
-                            <tr key={user.id} className="text-sm">
+                            <tr key={user.id} className="text-sm text-white">
                                 <td className="px-4 py-3 flex items-center gap-3">
                                     <UserAvatar user={user} className="w-8 h-8" isOnline={onlineUsers.has(user.id)} />
                                     <span className="font-medium">{user.name}</span>
                                 </td>
                                 <td className="px-4 py-3">
-                                    <span className="text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full">
+                                    <span className="text-xs font-medium bg-gray-800 text-gray-400 px-2 py-1 rounded-full">
                                         {user.role}
                                     </span>
                                 </td>
@@ -95,12 +95,12 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                                 <td className="px-4 py-3">
                                     <div className="flex flex-wrap gap-2">
                                         {Array.from(userWorkload[user.id]?.projects || []).map(projectName => (
-                                            <span key={projectName} className="text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-full">
+                                            <span key={projectName} className="text-xs font-medium bg-gray-800 text-gray-400 px-2 py-1 rounded-full">
                                                 {projectName}
                                             </span>
                                         ))}
                                         {(userWorkload[user.id]?.projects.size === 0) && (
-                                            <span className="text-xs text-gray-400">Not in any projects</span>
+                                            <span className="text-xs text-gray-500">Not in any projects</span>
                                         )}
                                     </div>
                                 </td>

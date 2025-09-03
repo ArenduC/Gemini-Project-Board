@@ -1,11 +1,10 @@
 
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ManageMembersModal } from './components/ManageMembersModal';
-import { SunIcon, MoonIcon, BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon } from './components/Icons';
+import { BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon } from './components/Icons';
 import { useAppState } from './hooks/useAppState';
 import { DashboardPage } from './pages/DashboardPage';
 import { ResourceManagementPage } from './pages/ResourceManagementPage';
@@ -28,7 +27,6 @@ import { NotificationToast } from './components/NotificationToast';
 type View = 'dashboard' | 'project' | 'resources' | 'tasks';
 
 const App: React.FC = () => {
-  const [isDarkMode, setIsDarkMode] = useState(true);
   const [view, setView] = useState<View>('dashboard');
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -73,7 +71,8 @@ const App: React.FC = () => {
   const activeProjectIdRef = useRef<string | null>(null);
 
   const appState = useAppState(session?.user?.id, activeProjectId);
-  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers, sendChatMessage, updateUserProfile, deleteProject } = appState;
+  // FIX: Destructure sendChatMessage and updateProjectMembers from appState to resolve reference errors.
+  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateUserProfile, deleteProject, sendChatMessage, updateProjectMembers } = appState;
 
   const activeProject = activeProjectId ? state.projects[activeProjectId] : null;
   const projectToManageMembers = projectForMemberManagementId ? state.projects[projectForMemberManagementId] : null;
@@ -187,15 +186,6 @@ const App: React.FC = () => {
         handleInvite();
     }, [currentUser, fetchData]);
 
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
-
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
@@ -219,8 +209,6 @@ const App: React.FC = () => {
           }
       }
   }, [state.projects, selectedTask]);
-
-  const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
   const handleLogout = async () => {
     await api.auth.signOut();
@@ -400,11 +388,11 @@ const App: React.FC = () => {
     if (view === 'project' && activeProject) {
       return (
          <div className="flex items-center gap-3">
-            <button onClick={handleBackToDashboard} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
+            <button onClick={handleBackToDashboard} className="p-2 rounded-full hover:bg-gray-800 transition-colors">
                 <ArrowLeftIcon className="w-5 h-5"/>
             </button>
-            <BotMessageSquareIcon className="w-7 h-7 text-indigo-500" />
-            <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+            <BotMessageSquareIcon className="w-7 h-7 text-gray-400" />
+            <h1 className="text-xl font-bold tracking-tight text-white">
               {activeProject.name}
             </h1>
           </div>
@@ -412,8 +400,8 @@ const App: React.FC = () => {
     }
      return (
         <div className="flex items-center gap-3">
-            <BotMessageSquareIcon className="w-7 h-7 text-indigo-500" />
-            <h1 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+            <BotMessageSquareIcon className="w-7 h-7 text-gray-400" />
+            <h1 className="text-xl font-bold tracking-tight text-white">
               Gemini Project Board
             </h1>
         </div>
@@ -422,8 +410,8 @@ const App: React.FC = () => {
 
   if (authLoading) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
-            <LoaderCircleIcon className="w-10 h-10 animate-spin text-indigo-500"/>
+        <div className="min-h-screen flex items-center justify-center bg-[#1C2326]">
+            <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
         </div>
     );
   }
@@ -434,9 +422,9 @@ const App: React.FC = () => {
   
   if (appStateLoading) {
      return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
-            <LoaderCircleIcon className="w-10 h-10 animate-spin text-indigo-500"/>
-            <p className="ml-4 text-base font-semibold text-gray-700 dark:text-gray-300">Loading your board...</p>
+        <div className="min-h-screen flex items-center justify-center bg-[#1C2326]">
+            <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
+            <p className="ml-4 text-base font-semibold text-gray-400">Loading your board...</p>
         </div>
     );
   }
@@ -444,21 +432,21 @@ const App: React.FC = () => {
 
   return (
     <>
-      <div className="min-h-screen font-sans text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-black transition-colors duration-300">
-        <header className="bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800 p-4 flex justify-between items-center sticky top-0 z-20 flex-wrap gap-4">
+      <div className="min-h-screen font-sans text-gray-300 bg-[#1C2326] transition-colors duration-300">
+        <header className="bg-[#131C1B]/80 backdrop-blur-sm border-b border-gray-800 p-4 flex justify-between items-center sticky top-0 z-20 flex-wrap gap-4">
           <HeaderContent />
 
-          <nav className="flex items-center gap-2 px-2 py-1 bg-gray-200/70 dark:bg-gray-800 rounded-full">
-            <button onClick={() => setView('dashboard')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'dashboard' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}><LayoutDashboardIcon className="w-4 h-4" /> Dashboard</button>
-            <button onClick={() => setView('tasks')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'tasks' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}><ClipboardListIcon className="w-4 h-4" /> Tasks</button>
-            <button onClick={() => setView('resources')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'resources' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}><UsersIcon className="w-4 h-4" /> Resources</button>
+          <nav className="flex items-center gap-2 px-2 py-1 bg-[#1C2326] rounded-full">
+            <button onClick={() => setView('dashboard')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'dashboard' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><LayoutDashboardIcon className="w-4 h-4" /> Dashboard</button>
+            <button onClick={() => setView('tasks')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'tasks' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><ClipboardListIcon className="w-4 h-4" /> Tasks</button>
+            <button onClick={() => setView('resources')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'resources' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><UsersIcon className="w-4 h-4" /> Resources</button>
           </nav>
           
           <div className="flex items-center gap-2">
             {view === 'project' && (
               <button
                 onClick={() => setCreateTaskModalOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-300 text-black text-sm font-semibold rounded-lg shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
               >
                 <PlusIcon className="w-4 h-4" />
                 New Task
@@ -467,7 +455,7 @@ const App: React.FC = () => {
             {view === 'project' && (
               <button
                 onClick={() => setIsChatOpen(prev => !prev)}
-                className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
+                className="p-2 rounded-full text-gray-400 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
                 aria-label="Toggle project chat"
               >
                 <MessageCircleIcon className="w-5 h-5" />
@@ -476,7 +464,7 @@ const App: React.FC = () => {
             {featureFlags.voice && (
              <button
                 onClick={() => setVoiceAssistantModalOpen(true)}
-                className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
+                className="p-2 rounded-full text-gray-400 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
                 aria-label="Voice Assistant"
             >
                 <MicrophoneIcon className="w-5 h-5" />
@@ -484,49 +472,42 @@ const App: React.FC = () => {
             )}
              <button
                 onClick={() => setSearchModalOpen(true)}
-                className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
+                className="p-2 rounded-full text-gray-400 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
                 aria-label="Global Search"
             >
                 <SearchIcon className="w-5 h-5" />
             </button>
              <button
                 onClick={() => setSettingsModalOpen(true)}
-                className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
+                className="p-2 rounded-full text-gray-400 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
                 aria-label="Settings"
             >
                 <SettingsIcon className="w-5 h-5" />
             </button>
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
-              aria-label="Toggle theme"
-            >
-              {isDarkMode ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
-            </button>
              <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setIsUserMenuOpen(prev => !prev)}
-                className="focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 rounded-full"
+                className="focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] rounded-full"
                 aria-haspopup="true"
                 aria-expanded={isUserMenuOpen}
               >
-                <UserAvatar user={currentUser} className="w-8 h-8 ring-2 ring-white/50 dark:ring-gray-900/50" isOnline={onlineUsers.has(currentUser.id)}/>
+                <UserAvatar user={currentUser} className="w-8 h-8 ring-2 ring-white/20" isOnline={onlineUsers.has(currentUser.id)}/>
               </button>
               {isUserMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 py-1 z-30">
-                  <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{currentUser.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{currentUser.role}</p>
+                <div className="absolute right-0 mt-2 w-48 bg-[#131C1B] rounded-md shadow-lg ring-1 ring-black ring-opacity-5 py-1 z-30">
+                  <div className="px-4 py-2 border-b border-gray-800">
+                    <p className="text-sm font-medium text-white truncate">{currentUser.name}</p>
+                    <p className="text-xs text-gray-400">{currentUser.role}</p>
                   </div>
                    <button
                     onClick={() => { setSettingsModalOpen(true); setIsUserMenuOpen(false); }}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-800"
                   >
                     Settings
                   </button>
                   <button
                     onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-800"
                   >
                     Logout
                   </button>
@@ -595,8 +576,6 @@ const App: React.FC = () => {
           onClose={() => setSettingsModalOpen(false)}
           currentUser={currentUser}
           onUpdateUser={updateUserProfile}
-          isDarkMode={isDarkMode}
-          onToggleTheme={toggleTheme}
           featureFlags={featureFlags}
           onFlagsChange={handleFlagsChange}
           projects={Object.values(state.projects)}

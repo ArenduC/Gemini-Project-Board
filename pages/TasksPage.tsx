@@ -157,19 +157,19 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   return (
     <div>
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-        <h2 className="text-2xl font-bold">Tasks</h2>
+        <h2 className="text-2xl font-bold text-white">Tasks</h2>
         <div className="flex items-center gap-2">
           {/* View Toggle */}
-          <div className="flex items-center p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
+          <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
             <button
               onClick={() => setViewMode('all')}
-              className={`px-3 py-1.5 text-sm font-semibold rounded-md ${viewMode === 'all' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+              className={`px-3 py-1.5 text-sm font-semibold rounded-md ${viewMode === 'all' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50 text-white'}`}
             >
               All Tasks
             </button>
             <button
               onClick={() => setViewMode('my')}
-              className={`px-3 py-1.5 text-sm font-semibold rounded-md ${viewMode === 'my' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+              className={`px-3 py-1.5 text-sm font-semibold rounded-md ${viewMode === 'my' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50 text-white'}`}
             >
               My Tasks
             </button>
@@ -177,7 +177,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
           {/* Export Button */}
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-sm"
+            className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 text-white font-semibold rounded-lg shadow-sm hover:bg-gray-700 transition-all text-sm"
           >
             <DownloadIcon className="w-4 h-4" />
             <span>Export</span>
@@ -207,14 +207,14 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
           />
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="bg-[#131C1B] rounded-lg shadow-md border border-gray-800 overflow-hidden">
         {/* List Header */}
-        <div className="grid grid-cols-12 gap-4 items-center px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800/50">
-          <div className="col-span-4 font-semibold text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Task</div>
-          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Project</div>
-          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Priority</div>
-          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Status</div>
-          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 text-right">Assignee</div>
+        <div className="grid grid-cols-12 gap-4 items-center px-4 py-2 border-b border-gray-800 bg-[#1C2326]/50">
+          <div className="col-span-4 font-semibold text-xs uppercase tracking-wider text-gray-400">Task</div>
+          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Project</div>
+          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Priority</div>
+          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Status</div>
+          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-right">Assignee</div>
         </div>
         {filteredTasks.length > 0 ? (
             filteredTasks.map(task => (
@@ -226,7 +226,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
                 />
             ))
         ) : (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+            <div className="p-8 text-center text-gray-400">
                 No tasks found for this view.
             </div>
         )}

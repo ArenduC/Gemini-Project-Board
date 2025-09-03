@@ -13,7 +13,7 @@ interface ProjectChatProps {
 
 const ChatBubble: React.FC<{ message: ChatMessage, isCurrentUser: boolean, isOnline: boolean }> = ({ message, isCurrentUser, isOnline }) => {
     const alignment = isCurrentUser ? 'items-end' : 'items-start';
-    const bubbleColor = isCurrentUser ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-800';
+    const bubbleColor = isCurrentUser ? 'bg-gray-300 text-black' : 'bg-gray-800 text-white';
 
     return (
         <div className={`flex flex-col ${alignment}`}>
@@ -25,7 +25,7 @@ const ChatBubble: React.FC<{ message: ChatMessage, isCurrentUser: boolean, isOnl
                     <p className="text-sm">{message.text}</p>
                 </div>
             </div>
-             <div className={`flex gap-2 items-center text-xs text-gray-500 dark:text-gray-400 mt-1 ${isCurrentUser ? 'mr-1' : 'ml-9'}`}>
+             <div className={`flex gap-2 items-center text-xs text-gray-500 mt-1 ${isCurrentUser ? 'mr-1' : 'ml-9'}`}>
                 <span>{message.author.name.split(' ')[0]}</span>
                 <span>·</span>
                 <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -56,10 +56,10 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ messages, currentUser,
     };
 
     return (
-        <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-900 shadow-2xl z-30 flex flex-col transform transition-transform duration-300 ease-in-out">
-             <header className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center flex-shrink-0">
-                <h3 className="text-lg font-bold">Project Chat</h3>
-                <button onClick={onClose} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
+        <div className="fixed top-0 right-0 h-full w-full max-w-md bg-[#131C1B] shadow-2xl z-30 flex flex-col transform transition-transform duration-300 ease-in-out">
+             <header className="p-4 border-b border-gray-800 flex justify-between items-center flex-shrink-0">
+                <h3 className="text-lg font-bold text-white">Project Chat</h3>
+                <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
                     <XIcon className="w-6 h-6" />
                 </button>
             </header>
@@ -74,16 +74,16 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ messages, currentUser,
                 ))}
                 <div ref={messagesEndRef} />
             </div>
-            <footer className="p-4 border-t border-gray-200 dark:border-gray-800 flex-shrink-0">
+            <footer className="p-4 border-t border-gray-800 flex-shrink-0">
                 <form onSubmit={handleSubmit} className="flex items-center gap-2">
                      <input
                         type="text"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         placeholder="Type a message..."
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-sm"
+                        className="w-full px-4 py-2 border border-gray-800 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 bg-[#1C2326] text-sm text-white"
                     />
-                    <button type="submit" className="p-2.5 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 disabled:bg-indigo-400 flex-shrink-0" disabled={!newMessage.trim()} aria-label="Send message">
+                    <button type="submit" className="p-2.5 bg-gray-300 text-black rounded-full hover:bg-gray-400 disabled:bg-gray-500 flex-shrink-0" disabled={!newMessage.trim()} aria-label="Send message">
                         <SendIcon className="w-5 h-5"/>
                     </button>
                 </form>

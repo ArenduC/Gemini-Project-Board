@@ -9,27 +9,24 @@ interface UserAvatarProps {
 }
 
 const colors = [
-  'bg-red-500', 'bg-orange-500', 'bg-amber-500', 'bg-yellow-500', 
-  'bg-lime-500', 'bg-green-500', 'bg-emerald-500', 'bg-teal-500', 
-  'bg-cyan-500', 'bg-sky-500', 'bg-blue-500', 'bg-indigo-500', 
-  'bg-violet-500', 'bg-purple-500', 'bg-fuchsia-500', 'bg-pink-500', 'bg-rose-500'
+  'bg-[#A56F5A]', // Muted Terracotta
+  'bg-[#5A8DA5]', // Muted Slate Blue
+  'bg-[#5AA58A]', // Muted Teal
+  'bg-[#A5A05A]', // Muted Gold/Green
+  'bg-[#8A5AA5]', // Muted Plum
+  'bg-[#A55A73]', // Muted Rose
 ];
 
-// Simple hash function to get a consistent color for a user
-const getColorFromString = (str: string): string => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const index = Math.abs(hash % colors.length);
-  return colors[index];
+const getColor = (name: string): string => {
+  const charCodeSum = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return colors[charCodeSum % colors.length];
 };
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ user, className, title, isOnline = false }) => {
   if (!user) {
     return (
       <div
-        className={`flex items-center justify-center rounded-full bg-slate-300 dark:bg-slate-600 text-white font-bold ${className}`}
+        className={`flex items-center justify-center rounded-full bg-gray-700 text-white font-bold ${className}`}
         title={title || "Unassigned"}
       >
         ?
@@ -38,7 +35,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ user, className, title, 
   }
 
   const initial = user.name ? user.name.charAt(0).toUpperCase() : '?';
-  const color = getColorFromString(user.name || '');
+  const color = getColor(user.name);
   
   return (
     <div
@@ -47,7 +44,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ user, className, title, 
     >
       {initial}
       {isOnline && (
-        <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-800" title="Online"></span>
+        <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-[#131C1B]" title="Online"></span>
       )}
     </div>
   );

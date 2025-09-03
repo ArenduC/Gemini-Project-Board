@@ -12,11 +12,11 @@ interface TaskCardProps {
   onDelete: () => Promise<void>;
 }
 
-const priorityStyles: Record<TaskPriority, { bg: string, text: string, dot: string }> = {
-  [TaskPriority.LOW]: { bg: 'bg-green-100 dark:bg-green-900/50', text: 'text-green-700 dark:text-green-300', dot: 'bg-green-500' },
-  [TaskPriority.MEDIUM]: { bg: 'bg-yellow-100 dark:bg-yellow-900/50', text: 'text-yellow-700 dark:text-yellow-300', dot: 'bg-yellow-500' },
-  [TaskPriority.HIGH]: { bg: 'bg-orange-100 dark:bg-orange-900/50', text: 'text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
-  [TaskPriority.URGENT]: { bg: 'bg-red-100 dark:bg-red-900/50', text: 'text-red-700 dark:text-red-300', dot: 'bg-red-500' },
+const priorityStyles: Record<TaskPriority, string> = {
+  [TaskPriority.URGENT]: 'bg-gray-200 text-black font-bold',
+  [TaskPriority.HIGH]: 'bg-gray-400 text-black',
+  [TaskPriority.MEDIUM]: 'bg-gray-600 text-white',
+  [TaskPriority.LOW]: 'bg-gray-800 text-gray-400',
 };
 
 export const TaskCard: React.FC<TaskCardProps> = ({ task, index, isOnline, onClick, onDelete }) => {
@@ -35,33 +35,32 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, index, isOnline, onCli
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={onClick}
-          className={`relative group bg-white dark:bg-gray-800 rounded-lg shadow-sm dark:shadow-md border border-gray-200 dark:border-gray-700 mb-4 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 transform hover:-translate-y-1 ${
-            snapshot.isDragging ? 'shadow-xl dark:shadow-2xl scale-105' : ''
+          className={`relative group bg-[#131C1B] rounded-lg shadow-md border border-transparent mb-4 p-4 cursor-pointer hover:bg-gray-800 transition-all duration-200 transform hover:-translate-y-1 ${
+            snapshot.isDragging ? 'shadow-2xl scale-105 ring-2 ring-gray-500' : ''
           }`}
         >
           <button
             onClick={handleDelete}
-            className="absolute top-2 right-2 p-1.5 rounded-full text-gray-400 bg-white/50 dark:bg-gray-800/50 hover:bg-red-100 dark:hover:bg-red-900/70 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all z-10"
+            className="absolute top-2 right-2 p-1.5 rounded-full text-gray-400 bg-gray-800/50 hover:bg-gray-700 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all z-10"
             aria-label="Delete task"
           >
             <TrashIcon className="w-4 h-4"/>
           </button>
 
           <div className="flex justify-between items-start mb-2">
-            <h4 className="font-semibold text-sm text-gray-800 dark:text-gray-100 leading-snug pr-8">{task.title}</h4>
+            <h4 className="font-semibold text-sm text-white leading-snug pr-8">{task.title}</h4>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap mb-4">
-            <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${priorityStyles[task.priority].bg} ${priorityStyles[task.priority].text}`}>
-              <span className={`w-2 h-2 rounded-full ${priorityStyles[task.priority].dot}`}></span>
+            <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${priorityStyles[task.priority]}`}>
               {task.priority}
             </div>
             {task.tags.map(tag => (
-              <span key={tag} className="text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">{tag}</span>
+              <span key={tag} className="text-xs font-medium bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full">{tag}</span>
             ))}
           </div>
           
-          <div className="flex justify-between items-center text-gray-500 dark:text-gray-400">
+          <div className="flex justify-between items-center text-gray-400">
             <div className="flex items-center gap-3">
               {task.subtasks.length > 0 && (
                 <div className="flex items-center gap-1 text-xs" title={`${completedSubtasks}/${task.subtasks.length} subtasks completed`}>
@@ -75,7 +74,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, index, isOnline, onCli
               <UserAvatar 
                 user={task.assignee} 
                 isOnline={isOnline}
-                className="w-7 h-7 ring-2 ring-white dark:ring-gray-800 text-xs"
+                className="w-7 h-7 ring-2 ring-[#131C1B] text-xs"
                 title={`Assigned to ${task.assignee.name}`}
               />
             )}

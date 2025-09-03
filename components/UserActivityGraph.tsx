@@ -1,14 +1,12 @@
-
-
 import React, { useMemo } from 'react';
 import { Project, User, Task, BoardData } from '../types';
 import { UserAvatar } from './UserAvatar';
 
 const statusColors: Record<string, { dot: string, text: string }> = {
-    'To Do': { dot: 'bg-gray-400 dark:bg-gray-500', text: 'text-gray-500 dark:text-gray-400' },
-    'In Progress': { dot: 'bg-blue-500', text: 'text-blue-500 dark:text-blue-400' },
-    'Done': { dot: 'bg-green-500', text: 'text-green-600 dark:text-green-400' },
-    'default': { dot: 'bg-gray-400 dark:bg-gray-500', text: 'text-gray-500 dark:text-gray-400' },
+    'To Do': { dot: 'bg-gray-500', text: 'text-gray-400' },
+    'In Progress': { dot: 'bg-blue-500', text: 'text-blue-400' },
+    'Done': { dot: 'bg-green-500', text: 'text-green-400' },
+    'default': { dot: 'bg-gray-500', text: 'text-gray-400' },
 };
 
 const getTaskStatus = (task: Task, board: BoardData): { name: string; colorInfo: { dot: string, text: string } } => {
@@ -50,13 +48,13 @@ export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, 
     return (
         <div className="space-y-8">
             {userWorkloads.map(({ user, projectWorkload }) => (
-                <div key={user.id} className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
+                <div key={user.id} className="p-4 bg-[#131C1B] rounded-xl border border-gray-800">
                     {/* User Node */}
                     <div className="flex items-center gap-4 mb-4">
                         <UserAvatar user={user} className="w-12 h-12 text-xl" isOnline={onlineUsers.has(user.id)} />
                         <div>
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{user.name}</h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">{user.role}</p>
+                            <h3 className="text-lg font-bold text-white">{user.name}</h3>
+                            <p className="text-sm text-gray-400">{user.role}</p>
                         </div>
                     </div>
                     
@@ -64,36 +62,36 @@ export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, 
                     {projectWorkload.length > 0 ? (
                         <ul className="relative pl-6">
                              {/* The main vertical connector line */}
-                            <span className="absolute left-[2px] top-4 bottom-4 w-0.5 bg-gray-300 dark:bg-gray-600" aria-hidden="true"></span>
+                            <span className="absolute left-[2px] top-4 bottom-4 w-0.5 bg-gray-800" aria-hidden="true"></span>
                             {projectWorkload.map(({ project, tasks }) => (
                                 <li key={project.id} className="relative py-2">
                                      {/* The horizontal connector line */}
-                                    <span className="absolute left-[-22px] top-4 -translate-y-1/2 w-6 h-0.5 bg-gray-300 dark:bg-gray-600" aria-hidden="true"></span>
+                                    <span className="absolute left-[-22px] top-4 -translate-y-1/2 w-6 h-0.5 bg-gray-800" aria-hidden="true"></span>
                                     {/* Connector dot */}
-                                    <span className="absolute left-[2px] top-4 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-gray-600" aria-hidden="true"></span>
+                                    <span className="absolute left-[2px] top-4 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-gray-800" aria-hidden="true"></span>
                                     
                                     {/* Project Node */}
                                     <div className="mb-2">
-                                        <h4 className="font-semibold text-gray-700 dark:text-gray-300">{project.name}</h4>
+                                        <h4 className="font-semibold text-white">{project.name}</h4>
                                     </div>
                                     
                                     {/* Tasks List */}
                                     <ul className="relative pt-2 pl-9">
-                                        <span className="absolute left-[11px] top-0 bottom-4 w-0.5 bg-gray-200 dark:bg-gray-700" aria-hidden="true"></span>
+                                        <span className="absolute left-[11px] top-0 bottom-4 w-0.5 bg-gray-800/50" aria-hidden="true"></span>
                                         {tasks.map(task => {
                                             const { name: statusName, colorInfo } = getTaskStatus(task, project.board);
                                             return (
                                                 <li key={task.id} className="relative py-1.5">
-                                                     <span className="absolute left-[-25px] top-1/2 -translate-y-1/2 w-6 h-0.5 bg-gray-200 dark:bg-gray-700" aria-hidden="true"></span>
-                                                     <span className="absolute left-[-2px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700" aria-hidden="true"></span>
+                                                     <span className="absolute left-[-25px] top-1/2 -translate-y-1/2 w-6 h-0.5 bg-gray-800/50" aria-hidden="true"></span>
+                                                     <span className="absolute left-[-2px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-gray-800/50" aria-hidden="true"></span>
                                                     <div 
-                                                        className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800/60 p-2 rounded-md border border-gray-200 dark:border-gray-700/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/80 transition-colors"
+                                                        className="flex items-center gap-4 bg-[#1C2326]/60 p-2 rounded-md border border-gray-800/50 cursor-pointer hover:bg-[#1C2326] transition-colors"
                                                         onClick={() => onTaskClick(task)}
                                                     >
-                                                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0">
+                                                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-800 flex-shrink-0">
                                                             <div className={`w-2.5 h-2.5 rounded-full ${colorInfo.dot}`}></div>
                                                         </div>
-                                                        <p className="flex-grow text-sm text-gray-800 dark:text-gray-200">{task.title}</p>
+                                                        <p className="flex-grow text-sm text-white">{task.title}</p>
                                                         <p className={`text-xs font-medium ${colorInfo.text}`}>{statusName}</p>
                                                     </div>
                                                 </li>
@@ -104,7 +102,7 @@ export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, 
                             ))}
                         </ul>
                     ) : (
-                        <div className="pl-6 text-sm text-gray-500 dark:text-gray-400">No tasks assigned to this user.</div>
+                        <div className="pl-6 text-sm text-gray-500">No tasks assigned to this user.</div>
                     )}
                 </div>
             ))}

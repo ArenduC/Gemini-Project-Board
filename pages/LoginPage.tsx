@@ -52,22 +52,22 @@ export const LoginPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen font-sans bg-gray-50 dark:bg-black flex flex-col items-center justify-center p-4">
+        <div className="min-h-screen font-sans bg-[#1C2326] flex flex-col items-center justify-center p-4">
              <div className="w-full max-w-sm">
                 <div className="flex flex-col items-center mb-6">
-                    <BotMessageSquareIcon className="w-12 h-12 text-indigo-500" />
-                    <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mt-2">
+                    <BotMessageSquareIcon className="w-12 h-12 text-gray-400" />
+                    <h1 className="text-2xl font-bold tracking-tight text-white mt-2">
                         Gemini Project Board
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">
+                    <p className="text-gray-400 mt-1 text-sm">
                         {mode === 'signIn' ? 'Sign in to your account' : 'Create a new account'}
                     </p>
                 </div>
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+                <div className="bg-[#131C1B] rounded-xl shadow-lg p-8">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {mode === 'signUp' && (
                              <div>
-                                <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                <label htmlFor="name" className="block text-sm font-medium text-white">
                                     Full Name
                                 </label>
                                 <div className="mt-1">
@@ -79,13 +79,13 @@ export const LoginPage: React.FC = () => {
                                         required
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                        className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
                                     />
                                 </div>
                             </div>
                         )}
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <label htmlFor="email" className="block text-sm font-medium text-white">
                                 Email Address
                             </label>
                             <div className="mt-1">
@@ -97,13 +97,13 @@ export const LoginPage: React.FC = () => {
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                    className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <label htmlFor="password" className="block text-sm font-medium text-white">
                                 Password
                             </label>
                             <div className="mt-1">
@@ -115,7 +115,7 @@ export const LoginPage: React.FC = () => {
                                     required
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                    className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
                                 />
                             </div>
                         </div>
@@ -127,25 +127,25 @@ export const LoginPage: React.FC = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 dark:focus:ring-offset-gray-900 disabled:bg-indigo-400"
+                                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-black bg-gray-300 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-[#131C1B] disabled:bg-gray-500"
                             >
-                                {loading ? <LoaderCircleIcon className="animate-spin h-5 w-5 text-white" /> : (mode === 'signIn' ? 'Sign in' : 'Sign up')}
+                                {loading ? <LoaderCircleIcon className="animate-spin h-5 w-5" /> : (mode === 'signIn' ? 'Sign in' : 'Sign up')}
                             </button>
                         </div>
                     </form>
-                     <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
+                     <p className="mt-6 text-center text-sm text-gray-400">
                         {mode === 'signIn' ? "Don't have an account?" : "Already have an account?"}{' '}
-                        <button onClick={toggleMode} className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500">
+                        <button onClick={toggleMode} className="font-medium text-white hover:text-gray-300">
                             {mode === 'signIn' ? 'Sign Up' : 'Sign In'}
                         </button>
                     </p>
                 </div>
-                 <div className="mt-6 bg-gray-100 dark:bg-gray-800 p-4 rounded-lg">
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2"><UsersIcon className="w-4 h-4"/> Available Demo Users</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">You can log in as any of these users. The password for all is `password123`.</p>
+                 <div className="mt-6 bg-[#131C1B] p-4 rounded-lg">
+                    <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2"><UsersIcon className="w-4 h-4"/> Available Demo Users</h3>
+                    <p className="text-xs text-gray-400 mb-3">You can log in as any of these users. The password for all is `password123`.</p>
                     <div className="flex flex-wrap gap-2">
                         {demoUsers.map(user => (
-                            <button key={user.email} onClick={() => {setEmail(user.email); setMode('signIn');}} className="text-xs font-medium bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-200 px-2 py-1 rounded-full hover:bg-indigo-200 dark:hover:bg-indigo-700">
+                            <button key={user.email} onClick={() => {setEmail(user.email); setMode('signIn');}} className="text-xs font-medium bg-gray-700 text-white px-2 py-1 rounded-full hover:bg-gray-600">
                                 {user.name}
                             </button>
                         ))}

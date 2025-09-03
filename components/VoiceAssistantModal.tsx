@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { XIcon, MicrophoneIcon, LoaderCircleIcon, BotMessageSquareIcon } from './Icons';
 
@@ -139,51 +137,51 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({ isOpen
             onClick={onClose}
         >
             <div 
-                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg flex flex-col transform transition-all duration-300"
+                className="bg-[#131C1B] rounded-2xl shadow-2xl w-full max-w-lg flex flex-col transform transition-all duration-300"
                 onClick={(e) => e.stopPropagation()}
             >
-                <header className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <header className="p-4 border-b border-gray-800 flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                        <BotMessageSquareIcon className="w-7 h-7 text-indigo-500" />
-                        <h2 className="text-lg font-bold">Voice Assistant</h2>
+                        <BotMessageSquareIcon className="w-7 h-7 text-gray-400" />
+                        <h2 className="text-lg font-bold text-white">Voice Assistant</h2>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
                         <XIcon className="w-6 h-6" />
                     </button>
                 </header>
 
                 <div className="p-6 text-center space-y-4 min-h-[250px] flex flex-col justify-between">
                     <div>
-                        <p className="text-base font-medium text-gray-800 dark:text-gray-200">{feedback}</p>
+                        <p className="text-base font-medium text-white">{feedback}</p>
                         {transcript && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 h-6">"{transcript}"</p>
+                            <p className="text-sm text-gray-400 mt-2 h-6">"{transcript}"</p>
                         )}
                     </div>
                     <div className="flex flex-col items-center">
                         <button
                             onClick={toggleListening}
                             className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-colors duration-300
-                                ${status === 'listening' ? 'bg-red-500 hover:bg-red-600' : 'bg-indigo-600 hover:bg-indigo-700'}
-                                focus:outline-none focus:ring-4 focus:ring-indigo-500/50`}
+                                ${status === 'listening' ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-300 hover:bg-gray-400'}
+                                focus:outline-none focus:ring-4 focus:ring-gray-500/50`}
                             aria-label={status === 'listening' ? 'Stop listening' : 'Start listening'}
                         >
                             {status === 'processing' && (
-                                <LoaderCircleIcon className="w-10 h-10 text-white animate-spin" />
+                                <LoaderCircleIcon className="w-10 h-10 text-black animate-spin" />
                             )}
                             {status !== 'processing' && (
-                                <MicrophoneIcon className="w-10 h-10 text-white" />
+                                <MicrophoneIcon className="w-10 h-10 text-black" />
                             )}
                             {status === 'listening' && (
                                 <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-75"></span>
                             )}
                         </button>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
+                        <p className="text-sm text-gray-400 mt-4">
                             {status === 'listening' ? 'Listening...' : 'Tap the mic to speak'}
                         </p>
                     </div>
                 </div>
-                 <footer className="p-4 border-t border-gray-200 dark:border-gray-700 text-center">
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                 <footer className="p-4 border-t border-gray-800 text-center">
+                    <p className="text-xs text-gray-500/70">
                         Try saying: "Create a task to design the new homepage" or "Move task 'Finalize report' to Done".
                     </p>
                 </footer>

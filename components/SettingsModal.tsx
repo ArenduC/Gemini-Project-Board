@@ -7,8 +7,6 @@ interface SettingsModalProps {
   onClose: () => void;
   currentUser: User;
   onUpdateUser: (updates: { name: string }) => Promise<void>;
-  isDarkMode: boolean;
-  onToggleTheme: () => void;
   featureFlags: { ai: boolean, voice: boolean };
   onFlagsChange: (flags: { ai: boolean, voice: boolean }) => void;
   projects: Project[];
@@ -19,13 +17,13 @@ type Tab = 'general' | 'profile' | 'projects';
 
 const ToggleSwitch: React.FC<{ label: string, enabled: boolean, onChange: (enabled: boolean) => void }> = ({ label, enabled, onChange }) => (
     <div className="flex items-center justify-between">
-        <span className="font-medium text-gray-800 dark:text-gray-200">{label}</span>
+        <span className="font-medium text-white">{label}</span>
         <button
             type="button"
             role="switch"
             aria-checked={enabled}
             onClick={() => onChange(!enabled)}
-            className={`${enabled ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900`}
+            className={`${enabled ? 'bg-gray-600' : 'bg-gray-800'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B]`}
         >
             <span
                 aria-hidden="true"
@@ -46,13 +44,13 @@ const ProjectDangerZone: React.FC<{ project: Project; onDelete: () => Promise<vo
     }
 
     return (
-        <div className="mt-4 p-4 border border-red-500/50 bg-red-50 dark:bg-red-900/10 rounded-lg">
-            <h4 className="font-bold text-red-700 dark:text-red-400">Danger Zone</h4>
-            <p className="text-xs text-red-600 dark:text-red-400/80 mt-1">
+        <div className="mt-4 p-4 border border-red-500/50 bg-red-900/10 rounded-lg">
+            <h4 className="font-bold text-red-400">Danger Zone</h4>
+            <p className="text-xs text-red-400/80 mt-1">
                 Deleting a project is irreversible. It will permanently remove all associated tasks, columns, and data.
             </p>
             <div className="mt-3">
-                <label htmlFor={`delete-${project.id}`} className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label htmlFor={`delete-${project.id}`} className="block text-sm font-medium text-white">
                     To confirm, type "<b>{project.name}</b>"
                 </label>
                 <input
@@ -60,7 +58,7 @@ const ProjectDangerZone: React.FC<{ project: Project; onDelete: () => Promise<vo
                     type="text"
                     value={confirmText}
                     onChange={(e) => setConfirmText(e.target.value)}
-                    className="mt-1 w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                    className="mt-1 w-full px-3 py-1.5 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 bg-[#1C2326] text-white text-sm"
                 />
             </div>
             <button
@@ -75,7 +73,7 @@ const ProjectDangerZone: React.FC<{ project: Project; onDelete: () => Promise<vo
 };
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
-  isOpen, onClose, currentUser, onUpdateUser, isDarkMode, onToggleTheme,
+  isOpen, onClose, currentUser, onUpdateUser,
   featureFlags, onFlagsChange, projects, onDeleteProject
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>('general');
@@ -95,7 +93,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const TabButton: React.FC<{ tabName: Tab; icon: React.ReactNode; children: React.ReactNode }> = ({ tabName, icon, children }) => (
     <button
       onClick={() => setActiveTab(tabName)}
-      className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === tabName ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-700/50'}`}
+      className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === tabName ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
     >
       {icon}
       {children}
@@ -104,10 +102,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex" onClick={(e) => e.stopPropagation()}>
         {/* Sidebar */}
-        <aside className="w-1/4 p-4 border-r border-gray-200 dark:border-gray-700 flex flex-col">
-          <h2 className="text-lg font-bold mb-6">Settings</h2>
+        <aside className="w-1/4 p-4 border-r border-gray-800 flex flex-col">
+          <h2 className="text-lg font-bold mb-6 text-white">Settings</h2>
           <nav className="space-y-2">
             <TabButton tabName="general" icon={<SettingsIcon className="w-5 h-5" />}>General</TabButton>
             <TabButton tabName="profile" icon={<UserIcon className="w-5 h-5" />}>Profile</TabButton>
@@ -117,8 +115,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Main Content */}
         <main className="w-3/4 flex flex-col">
-          <header className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-end items-center flex-shrink-0">
-            <button onClick={onClose} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+          <header className="p-4 border-b border-gray-800 flex justify-end items-center flex-shrink-0">
+            <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
               <XIcon className="w-6 h-6" />
             </button>
           </header>
@@ -126,9 +124,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="p-6 overflow-y-auto custom-scrollbar flex-grow">
             {activeTab === 'general' && (
               <div className="space-y-6">
-                 <h3 className="text-xl font-bold">General Settings</h3>
-                 <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-4">
-                    <ToggleSwitch label="Dark Mode" enabled={isDarkMode} onChange={onToggleTheme} />
+                 <h3 className="text-xl font-bold text-white">General Settings</h3>
+                 <div className="p-4 bg-gray-800/50 rounded-lg space-y-4">
+                    <div className="flex items-center justify-between"><span className="font-medium text-white">Theme</span><span className="text-gray-400">Dark</span></div>
                     <ToggleSwitch label="Enable AI Features" enabled={featureFlags.ai} onChange={enabled => onFlagsChange({...featureFlags, ai: enabled})} />
                     <ToggleSwitch label="Enable Voice Assistant" enabled={featureFlags.voice} onChange={enabled => onFlagsChange({...featureFlags, voice: enabled})} />
                  </div>
@@ -137,20 +135,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             
             {activeTab === 'profile' && (
               <div className="space-y-6">
-                <h3 className="text-xl font-bold">Profile</h3>
-                 <form onSubmit={handleProfileSave} className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-4">
+                <h3 className="text-xl font-bold text-white">Profile</h3>
+                 <form onSubmit={handleProfileSave} className="p-4 bg-gray-800/50 rounded-lg space-y-4">
                     <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</label>
+                        <label htmlFor="name" className="block text-sm font-medium text-white">Full Name</label>
                         <input
                             id="name"
                             type="text"
                             value={userName}
                             onChange={(e) => setUserName(e.target.value)}
-                            className="mt-1 w-full max-w-sm px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                            className="mt-1 w-full max-w-sm px-3 py-2 border border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
                         />
                     </div>
                      <div className="flex justify-start">
-                        <button type="submit" disabled={isSavingProfile || userName === currentUser.name} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-indigo-400 text-sm">
+                        <button type="submit" disabled={isSavingProfile || userName === currentUser.name} className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:bg-gray-500 disabled:cursor-not-allowed text-sm">
                             {isSavingProfile ? 'Saving...' : 'Save Changes'}
                         </button>
                     </div>
@@ -160,12 +158,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
              {activeTab === 'projects' && (
               <div className="space-y-6">
-                <h3 className="text-xl font-bold">Project Management</h3>
+                <h3 className="text-xl font-bold text-white">Project Management</h3>
                 <div className="space-y-4">
                     {projects.map(project => (
-                        <div key={project.id} className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                            <h4 className="font-semibold">{project.name}</h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">{project.description}</p>
+                        <div key={project.id} className="p-4 bg-gray-800/50 rounded-lg">
+                            <h4 className="font-semibold text-white">{project.name}</h4>
+                            <p className="text-sm text-gray-400">{project.description}</p>
                             <ProjectDangerZone project={project} onDelete={() => onDeleteProject(project.id)} />
                         </div>
                     ))}

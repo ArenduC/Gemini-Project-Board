@@ -25,20 +25,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
   return (
     <div>
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-            <h2 className="text-2xl font-bold">Projects Dashboard</h2>
+            <h2 className="text-2xl font-bold text-white">Projects Dashboard</h2>
             <div className="flex items-center gap-2">
                  {/* View Toggle */}
-                <div className="flex items-center p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
+                <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
                     <button
                         onClick={() => setView('grid')}
-                        className={`p-2 rounded-md ${view === 'grid' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+                        className={`p-2 rounded-md ${view === 'grid' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:bg-gray-800/50'}`}
                         aria-label="Grid View"
                     >
                         <GridIcon className="w-5 h-5" />
                     </button>
                     <button
                         onClick={() => setView('list')}
-                        className={`p-2 rounded-md ${view === 'list' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+                        className={`p-2 rounded-md ${view === 'list' ? 'bg-gray-700 text-white shadow-sm' : 'text-gray-400 hover:bg-gray-800/50'}`}
                         aria-label="List View"
                     >
                         <ListIcon className="w-5 h-5" />
@@ -48,7 +48,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                 {/* Export Button */}
                 <button
                   onClick={handleExport}
-                  className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-sm"
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 text-white font-semibold rounded-lg shadow-sm hover:bg-gray-700 transition-all text-sm"
                 >
                     <DownloadIcon className="w-4 h-4"/>
                     <span>Export</span>
@@ -57,7 +57,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                 {/* Create Project Button */}
                 <button
                   onClick={onCreateProject}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all text-sm"
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all text-sm"
                 >
                   <PlusIcon className="w-4 h-4" />
                   New Project
@@ -81,13 +81,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                 ))}
             </div>
         ) : (
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="bg-[#131C1B] rounded-lg shadow-md border border-gray-800 overflow-hidden">
                 {/* List Header */}
-                 <div className="grid grid-cols-12 gap-4 items-center px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800/50">
-                    <div className="col-span-4 font-semibold text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Project</div>
-                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Progress</div>
-                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 text-center">Status</div>
-                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400 text-right">Members</div>
+                 <div className="grid grid-cols-12 gap-4 items-center px-4 py-2 border-b border-gray-800 bg-[#1C2326]/50">
+                    <div className="col-span-4 font-semibold text-xs uppercase tracking-wider text-gray-400">Project</div>
+                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Progress</div>
+                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-center">Status</div>
+                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-right">Members</div>
                     <div className="col-span-2"></div>
                 </div>
                 {projects.map(project => (

@@ -16,7 +16,7 @@ const ToggleSwitch: React.FC<{ checked: boolean; onChange: (checked: boolean) =>
             role="switch"
             aria-checked={checked}
             onClick={() => !disabled && onChange(!checked)}
-            className={`${checked ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-700'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`${checked ? 'bg-gray-600' : 'bg-gray-800'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] disabled:opacity-50 disabled:cursor-not-allowed`}
             disabled={disabled}
         >
             <span
@@ -95,38 +95,38 @@ export const ManageInviteLinksModal: React.FC<ManageInviteLinksModalProps> = ({ 
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
-                <header className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <header className="p-4 border-b border-gray-800 flex justify-between items-center">
                     <div>
-                        <h2 className="text-lg font-bold">Share Project</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{project.name}</p>
+                        <h2 className="text-lg font-bold text-white">Share Project</h2>
+                        <p className="text-sm text-gray-400">{project.name}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
                         <XIcon className="w-6 h-6" />
                     </button>
                 </header>
 
                 <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar space-y-6">
                     {/* Create Link Form */}
-                    <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg">
-                        <h3 className="text-base font-semibold mb-3">Create a new invite link</h3>
+                    <div className="bg-[#1C2326]/50 p-4 rounded-lg">
+                        <h3 className="text-base font-semibold mb-3 text-white">Create a new invite link</h3>
                         <form onSubmit={handleCreateLink} className="flex flex-wrap items-end gap-4 text-sm">
                             <div>
-                                <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Role</label>
-                                <select id="role" value={newLinkRole} onChange={e => setNewLinkRole(e.target.value as UserRole)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <label htmlFor="role" className="block text-sm font-medium text-white mb-1">Default Role</label>
+                                <select id="role" value={newLinkRole} onChange={e => setNewLinkRole(e.target.value as UserRole)} className="px-3 py-2 border border-gray-800 rounded-md bg-[#1C2326] text-white focus:outline-none focus:ring-2 focus:ring-gray-500">
                                     {Object.values(UserRole).map(role => <option key={role} value={role}>{role}</option>)}
                                 </select>
                             </div>
                             <div>
-                                <label htmlFor="expires" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Expires After</label>
-                                <select id="expires" value={expiresIn} onChange={e => setExpiresIn(e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <label htmlFor="expires" className="block text-sm font-medium text-white mb-1">Expires After</label>
+                                <select id="expires" value={expiresIn} onChange={e => setExpiresIn(e.target.value)} className="px-3 py-2 border border-gray-800 rounded-md bg-[#1C2326] text-white focus:outline-none focus:ring-2 focus:ring-gray-500">
                                     <option value="never">Never</option>
                                     <option value="1">1 Day</option>
                                     <option value="7">7 Days</option>
                                     <option value="30">30 Days</option>
                                 </select>
                             </div>
-                            <button type="submit" disabled={isCreating} className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-indigo-400 flex items-center gap-2">
+                            <button type="submit" disabled={isCreating} className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center gap-2">
                                 {isCreating ? <LoaderCircleIcon className="w-5 h-5 animate-spin" /> : <PlusIcon className="w-5 h-5" />}
                                 Generate Link
                             </button>
@@ -135,36 +135,36 @@ export const ManageInviteLinksModal: React.FC<ManageInviteLinksModalProps> = ({ 
 
                     {/* Existing Links */}
                     <div>
-                        <h3 className="text-base font-semibold mb-3">Existing Links</h3>
-                        {isLoading ? <div className="text-center p-4">Loading...</div> : null}
+                        <h3 className="text-base font-semibold mb-3 text-white">Existing Links</h3>
+                        {isLoading ? <div className="text-center p-4 text-white">Loading...</div> : null}
                         {error ? <div className="text-center p-4 text-red-500">{error}</div> : null}
                         {!isLoading && !error && links.length === 0 && (
-                            <div className="text-center p-4 text-gray-500 dark:text-gray-400">No invite links created yet.</div>
+                            <div className="text-center p-4 text-gray-400">No invite links created yet.</div>
                         )}
                         <div className="space-y-3">
                             {links.map(link => (
-                                <div key={link.id} className="p-3 bg-gray-100 dark:bg-gray-700 rounded-md flex flex-wrap items-center justify-between gap-4">
+                                <div key={link.id} className="p-3 bg-gray-800 rounded-md flex flex-wrap items-center justify-between gap-4">
                                     <div className="flex-grow">
                                         <div className="flex items-center gap-2">
                                             <input
                                                 type="text"
                                                 readOnly
                                                 value={`${window.location.origin}/invite/${link.token}`}
-                                                className="w-full sm:w-auto flex-grow px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100"
+                                                className="w-full sm:w-auto flex-grow px-2 py-1 text-sm bg-gray-900 border border-gray-700 rounded-md text-white"
                                             />
-                                            <button onClick={() => handleCopyLink(link.token)} className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md">
+                                            <button onClick={() => handleCopyLink(link.token)} className="p-2 text-white hover:bg-gray-700 rounded-md">
                                                 <CopyIcon className="w-4 h-4" />
                                             </button>
-                                            {copiedToken === link.token && <span className="text-sm text-green-600">Copied!</span>}
+                                            {copiedToken === link.token && <span className="text-sm text-green-500">Copied!</span>}
                                         </div>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        <p className="text-xs text-gray-400 mt-1">
                                             Role: <strong>{link.role}</strong>
                                             <span className="mx-2">|</span>
                                             Expires: {link.expires_at ? new Date(link.expires_at).toLocaleDateString() : 'Never'}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className={`text-sm font-medium ${link.is_active ? 'text-green-600' : 'text-gray-500'}`}>
+                                        <span className={`text-sm font-medium ${link.is_active ? 'text-green-500' : 'text-gray-500'}`}>
                                             {link.is_active ? 'Active' : 'Inactive'}
                                         </span>
                                         <ToggleSwitch checked={link.is_active} onChange={() => handleToggleLink(link)} />
@@ -175,8 +175,8 @@ export const ManageInviteLinksModal: React.FC<ManageInviteLinksModalProps> = ({ 
                     </div>
                 </div>
 
-                <footer className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
-                    <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 text-sm">
+                <footer className="p-4 border-t border-gray-800 flex justify-end gap-3">
+                    <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 text-sm">
                         Done
                     </button>
                 </footer>

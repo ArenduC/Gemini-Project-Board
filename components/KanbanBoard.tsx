@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { DragDropContext, DropResult } from 'react-beautiful-dnd';
 import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment } from '../types';
@@ -48,7 +46,7 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
     return (
       <button
         onClick={() => setIsEditing(true)}
-        className="w-full flex items-center justify-start gap-2 p-3 rounded-xl bg-gray-200/50 dark:bg-gray-800/60 hover:bg-gray-300/70 dark:hover:bg-gray-700/70 text-gray-600 dark:text-gray-300 font-medium transition-colors"
+        className="w-full flex items-center justify-start gap-2 p-3 rounded-xl bg-gray-800/60 hover:bg-gray-800 text-white font-medium transition-colors"
       >
         <PlusIcon className="w-5 h-5" />
         Add another column
@@ -57,7 +55,7 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
   }
 
   return (
-    <div className="p-2 bg-gray-200 dark:bg-gray-800/80 rounded-xl">
+    <div className="p-2 bg-gray-900 rounded-xl">
       <input
         autoFocus
         value={title}
@@ -65,11 +63,11 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
         onBlur={handleSubmit}
         onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
         placeholder="Enter column title..."
-        className="w-full p-2 border-2 border-indigo-500 rounded-lg bg-white dark:bg-gray-700 focus:outline-none"
+        className="w-full p-2 border-2 border-gray-600 rounded-lg bg-[#131C1B] focus:outline-none text-white"
       />
        <div className="mt-2 flex items-center gap-2">
-        <button onClick={handleSubmit} className="px-4 py-1.5 bg-indigo-600 text-white font-semibold rounded-md text-sm hover:bg-indigo-700">Add column</button>
-        <button onClick={() => setIsEditing(false)} className="px-2 py-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-700 rounded-md">Cancel</button>
+        <button onClick={handleSubmit} className="px-4 py-1.5 bg-gray-300 text-black font-semibold rounded-md text-sm hover:bg-gray-400">Add column</button>
+        <button onClick={() => setIsEditing(false)} className="px-2 py-1.5 text-gray-400 hover:bg-gray-800 rounded-md">Cancel</button>
       </div>
     </div>
   )
@@ -276,11 +274,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, 
             onClearFilters={handleClearFilters}
           />
          <div className="flex-shrink-0">
-            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2 text-right">View</h4>
-            <div className="flex items-center p-1 bg-gray-200 dark:bg-gray-800 rounded-lg">
+            <h4 className="text-sm font-semibold text-gray-400 mb-2 text-right">View</h4>
+            <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
                 <button
                     onClick={() => setProjectView('board')}
-                    className={`p-2 rounded-md ${projectView === 'board' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+                    className={`p-2 rounded-md ${projectView === 'board' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
                     aria-label="Board View"
                     title="Board View"
                 >
@@ -288,7 +286,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, 
                 </button>
                 <button
                     onClick={() => setProjectView('graph')}
-                    className={`p-2 rounded-md ${projectView === 'graph' ? 'bg-white dark:bg-gray-700 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'}`}
+                    className={`p-2 rounded-md ${projectView === 'graph' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
                     aria-label="Graph View"
                     title="Graph View"
                 >
