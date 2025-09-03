@@ -189,7 +189,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
                             onChange={handleCommentChange}
                             onKeyDown={handleKeyDown}
                             placeholder="Add a comment... Type @ to mention a user."
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-sm"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
                             rows={2}
                         />
                         {showMentions && filteredMembers.length > 0 && (
@@ -360,7 +360,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                 value={editedTask.title}
                 onSave={(newTitle) => handleUpdateField('title', newTitle)}
                 textClassName="text-lg font-bold w-full cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 rounded p-1 -m-1"
-                inputClassName="text-lg font-bold p-1 rounded border-2 border-indigo-500 bg-white dark:bg-gray-800 focus:outline-none"
+                inputClassName="text-lg font-bold p-1 rounded border-2 border-indigo-500 bg-white dark:bg-gray-800 focus:outline-none text-gray-900 dark:text-gray-100"
                 placeholder="Enter a task title..."
             />
           <button onClick={onClose} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors ml-4">
@@ -399,7 +399,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                       id="modal-assignee"
                       value={editedTask.assignee?.id || ''}
                       onChange={handleAssigneeChange}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
                     >
                       <option value="">Unassigned</option>
                       {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -411,7 +411,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                       id="modal-priority"
                       value={editedTask.priority}
                       onChange={handlePriorityChange}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
                     >
                       {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
@@ -435,7 +435,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                         onChange={(e) => setNewTag(e.target.value)}
                         onKeyDown={handleAddTag}
                         placeholder="Add tag..."
-                        className="flex-grow px-2 py-1 text-sm border-b-2 border-transparent focus:border-indigo-500 bg-transparent focus:outline-none"
+                        className="flex-grow px-2 py-1 text-sm border-b-2 border-transparent focus:border-indigo-500 bg-transparent focus:outline-none text-gray-900 dark:text-gray-100"
                     />
                 </div>
             </div>
@@ -492,7 +492,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
                     placeholder="Add a new subtask..."
-                    className="flex-grow px-3 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-sm"
+                    className="flex-grow px-3 py-1.5 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
                 />
                 <button type="submit" className="p-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700" aria-label="Add subtask">
                     <PlusIcon className="w-5 h-5"/>

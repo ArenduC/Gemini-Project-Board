@@ -94,7 +94,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search tasks, projects, users..."
-                        className="w-full bg-transparent text-base focus:outline-none"
+                        className="w-full bg-transparent text-base focus:outline-none text-gray-900 dark:text-gray-100"
                         autoFocus
                     />
                     <button onClick={onClose} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">

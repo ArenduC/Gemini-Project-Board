@@ -43,7 +43,7 @@ export const AiTaskCreator: React.FC<AiTaskCreatorProps> = ({ onGenerateTask }) 
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
           placeholder="e.g., 'Draft a blog post about the new feature launch'"
-          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
           disabled={isLoading}
         />
         <button
