@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { DragDropContext, DropResult } from 'react-beautiful-dnd';
 import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment } from '../types';
 import { Column } from './Column';
@@ -33,6 +34,8 @@ interface KanbanBoardProps {
 const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColumn }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState('');
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = () => {
     if (title.trim()) {
@@ -41,34 +44,51 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
       setIsEditing(false);
     }
   };
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isEditing &&
+        formRef.current &&
+        !formRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setIsEditing(false);
+        setTitle('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isEditing]);
 
-  if (!isEditing) {
-    return (
-      <button
-        onClick={() => setIsEditing(true)}
-        className="w-full flex items-center justify-start gap-2 p-3 rounded-xl bg-gray-800/60 hover:bg-gray-800 text-white font-medium transition-colors"
-      >
-        <PlusIcon className="w-5 h-5" />
-        Add another column
-      </button>
-    );
-  }
 
   return (
-    <div className="p-2 bg-gray-900 rounded-xl">
-      <input
-        autoFocus
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onBlur={handleSubmit}
-        onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-        placeholder="Enter column title..."
-        className="w-full p-2 border-2 border-gray-600 rounded-lg bg-[#131C1B] focus:outline-none text-white"
-      />
-       <div className="mt-2 flex items-center gap-2">
-        <button onClick={handleSubmit} className="px-4 py-1.5 bg-gray-300 text-black font-semibold rounded-md text-sm hover:bg-gray-400">Add column</button>
-        <button onClick={() => setIsEditing(false)} className="px-2 py-1.5 text-gray-400 hover:bg-gray-800 rounded-md">Cancel</button>
-      </div>
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        onClick={() => setIsEditing(true)}
+        className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
+      >
+        <PlusIcon className="w-4 h-4" />
+        Add Column
+      </button>
+      {isEditing && (
+        <div ref={formRef} className="absolute top-full right-0 mt-2 p-2 bg-[#131C1B] border border-gray-800 rounded-xl shadow-lg z-10 w-64">
+          <input
+            autoFocus
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+            placeholder="Enter column title..."
+            className="w-full p-2 border-2 border-gray-600 rounded-lg bg-[#1C2326] focus:outline-none text-white text-sm"
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <button onClick={handleSubmit} className="px-4 py-1.5 bg-gray-300 text-black font-semibold rounded-md text-sm hover:bg-gray-400">Add</button>
+            <button onClick={() => setIsEditing(false)} className="px-2 py-1.5 text-gray-400 hover:bg-gray-800 rounded-md text-sm">Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -273,51 +293,56 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, 
             onApplySegment={handleApplySegment}
             onClearFilters={handleClearFilters}
           />
-         <div className="flex-shrink-0">
-            <h4 className="text-sm font-semibold text-gray-400 mb-2 text-right">View</h4>
-            <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
-                <button
-                    onClick={() => setProjectView('board')}
-                    className={`p-2 rounded-md ${projectView === 'board' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
-                    aria-label="Board View"
-                    title="Board View"
-                >
-                    <LayoutDashboardIcon className="w-5 h-5" />
-                </button>
-                <button
-                    onClick={() => setProjectView('graph')}
-                    className={`p-2 rounded-md ${projectView === 'graph' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
-                    aria-label="Graph View"
-                    title="Graph View"
-                >
-                    <GitBranchIcon className="w-5 h-5" />
-                </button>
+         <div className="flex items-center gap-4">
+            <div className="flex-shrink-0">
+                <h4 className="text-sm font-semibold text-gray-400 mb-2 text-right">View</h4>
+                <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
+                    <button
+                        onClick={() => setProjectView('board')}
+                        className={`p-2 rounded-md ${projectView === 'board' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
+                        aria-label="Board View"
+                        title="Board View"
+                    >
+                        <LayoutDashboardIcon className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={() => setProjectView('graph')}
+                        className={`p-2 rounded-md ${projectView === 'graph' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
+                        aria-label="Graph View"
+                        title="Graph View"
+                    >
+                        <GitBranchIcon className="w-5 h-5" />
+                    </button>
+                </div>
             </div>
+            {projectView === 'board' && (
+                <div className="self-end">
+                    <AddColumn onAddColumn={addColumn} />
+                </div>
+            )}
         </div>
       </div>
       
       {projectView === 'board' ? (
         <DragDropContext onDragEnd={onDragEnd}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
+            <div className="flex gap-6 items-start pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto custom-scrollbar">
             {filteredBoardData.columnOrder.map((columnId) => {
                 const column = filteredBoardData.columns[columnId];
                 if (!column) return null;
                 const tasks = column.taskIds.map((taskId) => filteredBoardData.tasks[taskId]).filter(Boolean); // filter(Boolean) to remove undefined tasks
                 return (
-                <Column 
-                    key={column.id} 
-                    column={column} 
-                    tasks={tasks}
-                    onlineUsers={onlineUsers}
-                    onTaskClick={onTaskClick}
-                    deleteTask={deleteTask}
-                    deleteColumn={deleteColumn}
-                />
+                <div key={column.id} className="w-72 flex-shrink-0">
+                    <Column 
+                        column={column} 
+                        tasks={tasks}
+                        onlineUsers={onlineUsers}
+                        onTaskClick={onTaskClick}
+                        deleteTask={deleteTask}
+                        deleteColumn={deleteColumn}
+                    />
+                </div>
                 );
             })}
-            <div className="min-w-[280px]">
-                <AddColumn onAddColumn={addColumn} />
-            </div>
             </div>
         </DragDropContext>
       ) : (
