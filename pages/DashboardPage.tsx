@@ -11,9 +11,10 @@ interface DashboardPageProps {
   onSelectProject: (projectId: string) => void;
   onCreateProject: () => void;
   onManageMembers: (projectId: string) => void;
+  onShareProject: (project: Project) => void;
 }
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, onSelectProject, onCreateProject, onManageMembers }) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, onSelectProject, onCreateProject, onManageMembers, onShareProject }) => {
   const [view, setView] = useState<'grid' | 'list'>('grid');
 
   const handleExport = () => {
@@ -72,7 +73,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                         project={project} 
                         users={users}
                         onSelect={onSelectProject}
-                        onManageMembers={onManageMembers} 
+                        onManageMembers={onManageMembers}
+                        onShare={() => onShareProject(project)} 
                     />
                 ))}
             </div>
@@ -81,10 +83,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                 {/* List Header */}
                  <div className="grid grid-cols-12 gap-4 items-center px-4 py-2 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
                     <div className="col-span-4 font-semibold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Project</div>
-                    <div className="col-span-3 font-semibold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Progress</div>
+                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">Progress</div>
                     <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 text-center">Status</div>
                     <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Members</div>
-                    <div className="col-span-1"></div>
+                    <div className="col-span-2"></div>
                 </div>
                 {projects.map(project => (
                     <ProjectListRow
@@ -93,6 +95,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                         users={users}
                         onSelect={onSelectProject}
                         onManageMembers={onManageMembers}
+                        onShare={() => onShareProject(project)}
                     />
                 ))}
             </div>

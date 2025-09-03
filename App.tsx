@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
@@ -11,7 +11,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ResourceManagementPage } from './pages/ResourceManagementPage';
 import { TasksPage } from './pages/TasksPage';
 import { LoginPage } from './pages/LoginPage';
-import { User, Task, TaskPriority, NewTaskData } from './types';
+import { User, Task, TaskPriority, NewTaskData, Project } from './types';
 import { api } from './services/api';
 import { Session } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
@@ -20,6 +20,8 @@ import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { VoiceAssistantModal } from './components/VoiceAssistantModal';
 import { interpretVoiceCommand, VoiceCommandAction } from './services/geminiService';
 import { DropResult } from 'react-beautiful-dnd';
+import { ManageInviteLinksModal } from './components/ManageInviteLinksModal';
+
 
 type View = 'dashboard' | 'project' | 'resources' | 'tasks';
 
@@ -33,6 +35,8 @@ const App: React.FC = () => {
   const [isCreateProjectModalOpen, setCreateProjectModalOpen] = useState(false);
   const [isManageMembersModalOpen, setManageMembersModalOpen] = useState(false);
   const [projectForMemberManagementId, setProjectForMemberManagementId] = useState<string | null>(null);
+  const [isInviteModalOpen, setInviteModalOpen] = useState(false);
+  const [projectForInvite, setProjectForInvite] = useState<Project | null>(null);
   
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
@@ -47,28 +51,57 @@ const App: React.FC = () => {
   const [isVoiceAssistantModalOpen, setVoiceAssistantModalOpen] = useState(false);
 
   const appState = useAppState(session?.user?.id, activeProjectId);
-  const { state, loading: appStateLoading, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers, sendChatMessage } = appState;
+  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers, sendChatMessage } = appState;
 
   const activeProject = activeProjectId ? state.projects[activeProjectId] : null;
   const projectToManageMembers = projectForMemberManagementId ? state.projects[projectForMemberManagementId] : null;
 
-  useEffect(() => {
-    setAuthLoading(true);
-    const subscription = api.auth.onAuthStateChange(async (session) => {
-        setSession(session);
-        if (session?.user) {
-            const userProfile = await api.auth.getUserProfile(session.user.id);
-            setCurrentUser(userProfile);
-        } else {
-            setCurrentUser(null);
-        }
-        setAuthLoading(false);
-    });
+    useEffect(() => {
+        setAuthLoading(true);
+        const subscription = api.auth.onAuthStateChange(async (session) => {
+            setSession(session);
+            if (session?.user) {
+                const userProfile = await api.auth.getUserProfile(session.user.id);
+                setCurrentUser(userProfile);
+            } else {
+                setCurrentUser(null);
+            }
+            setAuthLoading(false);
+        });
 
-    return () => {
-        subscription.unsubscribe();
-    };
-}, []);
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, []);
+
+    // Effect to handle invite link from URL
+    useEffect(() => {
+        const handleInvite = async () => {
+            const token = localStorage.getItem('project_invite_token') || (window.location.pathname.startsWith('/invite/') ? window.location.pathname.split('/invite/')[1] : null);
+
+            if (token && currentUser) {
+                localStorage.removeItem('project_invite_token'); // Clear token from storage
+                try {
+                    const joinedProject = await api.data.acceptInvite(token);
+                    alert(`Successfully joined project: ${joinedProject.name}`);
+                    await fetchData(); // Refresh data to include the new project
+                    handleSelectProject(joinedProject.id);
+                } catch (error) {
+                    alert(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                } finally {
+                    if (window.location.pathname.startsWith('/invite/')) {
+                        window.history.replaceState({}, document.title, window.location.origin);
+                    }
+                }
+            } else if (token && !currentUser) {
+                // Not logged in, store token and wait for login
+                localStorage.setItem('project_invite_token', token);
+            }
+        };
+
+        handleInvite();
+    }, [currentUser, fetchData]);
+
 
   useEffect(() => {
     if (isDarkMode) {
@@ -111,16 +144,18 @@ const App: React.FC = () => {
     setActiveProjectId(null);
   };
 
-  const handleSelectProject = (projectId: string) => {
+  const handleSelectProject = useCallback((projectId: string) => {
     setActiveProjectId(projectId);
     setView('project');
-  };
+  }, []);
 
-  const handleBackToDashboard = () => {
+
+  const handleBackToDashboard = useCallback(() => {
     setActiveProjectId(null);
     setView('dashboard');
     setIsChatOpen(false); // Close chat when leaving project
-  };
+  }, []);
+
 
   const handleOpenManageMembersModal = (projectId: string) => {
     setProjectForMemberManagementId(projectId);
@@ -130,6 +165,16 @@ const App: React.FC = () => {
   const handleCloseManageMembersModal = () => {
     setProjectForMemberManagementId(null);
     setManageMembersModalOpen(false);
+  };
+
+  const handleOpenInviteModal = (project: Project) => {
+    setProjectForInvite(project);
+    setInviteModalOpen(true);
+  };
+
+  const handleCloseInviteModal = () => {
+    setProjectForInvite(null);
+    setInviteModalOpen(false);
   };
 
   const handleTaskClick = (task: Task) => {
@@ -398,6 +443,7 @@ const App: React.FC = () => {
               onSelectProject={handleSelectProject}
               onCreateProject={() => setCreateProjectModalOpen(true)}
               onManageMembers={handleOpenManageMembersModal}
+              onShareProject={handleOpenInviteModal}
             />
           )}
           {view === 'project' && activeProject && (
@@ -464,6 +510,13 @@ const App: React.FC = () => {
                 await updateProjectMembers(projectToManageMembers.id, memberIds);
                 handleCloseManageMembersModal();
             }}
+        />
+      )}
+       {isInviteModalOpen && projectForInvite && (
+        <ManageInviteLinksModal
+            project={projectForInvite}
+            currentUser={currentUser}
+            onClose={handleCloseInviteModal}
         />
       )}
       {selectedTask && (

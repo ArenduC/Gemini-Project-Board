@@ -1,6 +1,6 @@
 import React from 'react';
 import { Project, User } from '../types';
-import { UsersIcon } from './Icons';
+import { UsersIcon, Share2Icon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 
 interface ProjectListRowProps {
@@ -8,9 +8,10 @@ interface ProjectListRowProps {
   users: Record<string, User>;
   onSelect: (projectId: string) => void;
   onManageMembers: (projectId: string) => void;
+  onShare: () => void;
 }
 
-export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, onSelect, onManageMembers }) => {
+export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, onSelect, onManageMembers, onShare }) => {
   const totalTasks = Object.keys(project.board.tasks).length;
   const doneColumn = Object.values(project.board.columns).find(c => c.title.toLowerCase() === 'done');
   const completedTasks = doneColumn ? doneColumn.taskIds.length : 0;
@@ -19,6 +20,11 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, 
   const handleManageClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onManageMembers(project.id);
+  };
+
+  const handleShareClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onShare();
   };
 
   return (
@@ -33,7 +39,7 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, 
       </div>
 
       {/* Progress Bar */}
-      <div className="col-span-3">
+      <div className="col-span-2">
         <div className="flex justify-between items-center text-xs mb-1 text-slate-600 dark:text-slate-400">
             <span>Progress</span>
             <span className="font-semibold">{progress}%</span>
@@ -66,8 +72,12 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, 
         )}
       </div>
 
-      {/* Manage Button */}
-      <div className="col-span-1 text-right">
+      {/* Action Buttons */}
+      <div className="col-span-2 flex items-center justify-end gap-3">
+        <button onClick={handleShareClick} className="flex items-center gap-1.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+          <Share2Icon className="w-4 h-4" />
+          Share
+        </button>
         <button onClick={handleManageClick} className="flex items-center gap-1.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
           <UsersIcon className="w-4 h-4" />
           Manage

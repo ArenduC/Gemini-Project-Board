@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Project, User } from '../types';
-import { UsersIcon } from './Icons';
+import { UsersIcon, Share2Icon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 
 interface ProjectCardProps {
@@ -10,9 +10,10 @@ interface ProjectCardProps {
   users: Record<string, User>;
   onSelect: (projectId: string) => void;
   onManageMembers: (projectId: string) => void;
+  onShare: () => void;
 }
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onSelect, onManageMembers }) => {
+export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onSelect, onManageMembers, onShare }) => {
   const totalTasks = Object.keys(project.board.tasks).length;
   const doneColumn = Object.values(project.board.columns).find(c => c.title.toLowerCase() === 'done');
   const completedTasks = doneColumn ? doneColumn.taskIds.length : 0;
@@ -23,6 +24,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onSele
     e.stopPropagation(); // prevent card click from firing
     onManageMembers(project.id);
   };
+
+  const handleShareClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onShare();
+  };
+
 
   return (
     <div 
@@ -71,10 +78,16 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onSele
                       </div>
                   )}
               </div>
-              <button onClick={handleManageClick} className="flex items-center gap-1.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
-                  <UsersIcon className="w-4 h-4" />
-                  Manage
-              </button>
+               <div className="flex items-center gap-4">
+                  <button onClick={handleShareClick} className="flex items-center gap-1.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                      <Share2Icon className="w-4 h-4" />
+                      Share
+                  </button>
+                  <button onClick={handleManageClick} className="flex items-center gap-1.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                      <UsersIcon className="w-4 h-4" />
+                      Manage
+                  </button>
+              </div>
           </div>
       </div>
     </div>

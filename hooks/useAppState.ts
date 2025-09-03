@@ -275,5 +275,5 @@ export const useAppState = (userId?: string, activeProjectId?: string | null) =>
     }
   }, []);
 
-  return { state, loading, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers, sendChatMessage };
+  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers, sendChatMessage };
 };

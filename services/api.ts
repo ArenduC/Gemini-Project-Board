@@ -1,7 +1,8 @@
 
 
+
 import { supabase } from './supabase';
-import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory } from '../types';
+import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType } from '../types';
 import { Session } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
@@ -503,6 +504,81 @@ const sendChatMessage = async (projectId: string, text: string, authorId: string
     }
 };
 
+const getInviteLinksForProject = async (projectId: string): Promise<ProjectInviteLink[]> => {
+    const { data, error } = await supabase
+        .from('project_invites')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+    if (error) {
+        console.error("Error fetching invite links:", error.message || error);
+        throw error;
+    }
+    return data as ProjectInviteLink[];
+};
+
+const createInviteLink = async (
+    projectId: string, 
+    creatorId: string, 
+    role: UserRole, 
+    expiresInDays: number | null
+): Promise<ProjectInviteLink> => {
+    
+    const expires_at = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString() : null;
+
+    const { data, error } = await supabase
+        .from('project_invites')
+        .insert({
+            project_id: projectId,
+            created_by: creatorId,
+            token: crypto.randomUUID(),
+            role,
+            expires_at,
+            access_type: InviteAccessType.OPEN,
+            is_active: true,
+        })
+        .select()
+        .single();
+    
+    if (error) {
+        console.error("Error creating invite link:", error.message || error);
+        throw error;
+    }
+    return data as ProjectInviteLink;
+};
+
+const updateInviteLink = async (linkId: string, updates: Partial<{ is_active: boolean }>): Promise<ProjectInviteLink> => {
+    const { data, error } = await supabase
+        .from('project_invites')
+        .update(updates)
+        .eq('id', linkId)
+        .select()
+        .single();
+    if (error) {
+        console.error("Error updating invite link:", error.message || error);
+        throw error;
+    }
+    return data as ProjectInviteLink;
+};
+
+const acceptInvite = async (token: string): Promise<Project> => {
+    // This calls a Supabase RPC function that should handle the invite logic atomically.
+    // The RPC function finds the invite, validates it, adds the user to the project,
+    // increments usage, and returns the joined project's data.
+    const { data, error } = await supabase.rpc('accept_project_invite', { invite_token: token });
+    if (error) {
+        console.error('Error accepting invite:', error.message || error);
+        throw new Error(error.message || 'Could not join project. The link may be invalid or expired.');
+    }
+    // The RPC function is expected to return the full project data upon success.
+    // This is a placeholder; a real implementation might need to fetch project details separately.
+    if (!data || !data.id || !data.name) {
+      throw new Error("Joined project but could not retrieve its details.");
+    }
+    return data as Project;
+};
+
+
 export const api = {
     auth: {
         onAuthStateChange,
@@ -525,5 +601,9 @@ export const api = {
         addProject,
         updateProjectMembers,
         sendChatMessage,
+        getInviteLinksForProject,
+        createInviteLink,
+        updateInviteLink,
+        acceptInvite,
     }
 }

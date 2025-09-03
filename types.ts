@@ -115,3 +115,21 @@ export interface AugmentedTask extends Task {
   columnId: string;
   columnName: string;
 }
+
+export enum InviteAccessType {
+    OPEN = 'open',
+}
+
+export interface ProjectInviteLink {
+  id: string;
+  project_id: string;
+  token: string;
+  created_by: string;
+  created_at: string;
+  role: UserRole;
+  access_type: InviteAccessType;
+  expires_at: string | null;
+  max_uses: number | null;
+  current_uses: number;
+  is_active: boolean;
+}
