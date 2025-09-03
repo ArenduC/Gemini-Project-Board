@@ -74,7 +74,7 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
         Add Column
       </button>
       {isEditing && (
-        <div ref={formRef} className="absolute top-full right-0 mt-2 p-2 bg-[#131C1B] border border-gray-800 rounded-xl shadow-lg z-10 w-64">
+        <div ref={formRef} className="absolute top-full right-0 mt-2 p-2 bg-[#131C1B] border border-gray-800 rounded-xl shadow-lg z-20 w-64">
           <input
             autoFocus
             value={title}
