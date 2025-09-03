@@ -7,10 +7,11 @@ import { UserActivityGraph } from '../components/UserActivityGraph';
 interface ResourceManagementPageProps {
   projects: Record<string, Project>;
   users: Record<string, User>;
+  onlineUsers: Set<string>;
   onTaskClick: (task: Task) => void;
 }
 
-export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ projects, users, onTaskClick }) => {
+export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ projects, users, onlineUsers, onTaskClick }) => {
     const [view, setView] = useState<'table' | 'graph'>('table');
     
     const userWorkload = useMemo(() => {
@@ -64,7 +65,7 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
         </div>
 
         {view === 'graph' ? (
-            <UserActivityGraph projects={projects} users={users} onTaskClick={onTaskClick} />
+            <UserActivityGraph projects={projects} users={users} onlineUsers={onlineUsers} onTaskClick={onTaskClick} />
         ) : (
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-md border border-gray-200 dark:border-gray-800 overflow-hidden">
                 <table className="w-full text-left">
@@ -80,7 +81,7 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                         {Object.values(users).map(user => (
                             <tr key={user.id} className="text-sm">
                                 <td className="px-4 py-3 flex items-center gap-3">
-                                    <UserAvatar user={user} className="w-8 h-8" />
+                                    <UserAvatar user={user} className="w-8 h-8" isOnline={onlineUsers.has(user.id)} />
                                     <span className="font-medium">{user.name}</span>
                                 </td>
                                 <td className="px-4 py-3">

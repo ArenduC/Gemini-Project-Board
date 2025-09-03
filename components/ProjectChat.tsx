@@ -6,11 +6,12 @@ import { UserAvatar } from './UserAvatar';
 interface ProjectChatProps {
     messages: ChatMessage[];
     currentUser: User;
+    onlineUsers: Set<string>;
     onClose: () => void;
     onSendMessage: (text: string) => Promise<void>;
 }
 
-const ChatBubble: React.FC<{ message: ChatMessage, isCurrentUser: boolean }> = ({ message, isCurrentUser }) => {
+const ChatBubble: React.FC<{ message: ChatMessage, isCurrentUser: boolean, isOnline: boolean }> = ({ message, isCurrentUser, isOnline }) => {
     const alignment = isCurrentUser ? 'items-end' : 'items-start';
     const bubbleColor = isCurrentUser ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-800';
 
@@ -18,7 +19,7 @@ const ChatBubble: React.FC<{ message: ChatMessage, isCurrentUser: boolean }> = (
         <div className={`flex flex-col ${alignment}`}>
             <div className="flex items-end gap-2 max-w-xs sm:max-w-md">
                 {!isCurrentUser && (
-                    <UserAvatar user={message.author} className="w-7 h-7 flex-shrink-0 text-xs" />
+                    <UserAvatar user={message.author} className="w-7 h-7 flex-shrink-0 text-xs" isOnline={isOnline} />
                 )}
                 <div className={`px-4 py-2 rounded-2xl ${bubbleColor}`}>
                     <p className="text-sm">{message.text}</p>
@@ -34,7 +35,7 @@ const ChatBubble: React.FC<{ message: ChatMessage, isCurrentUser: boolean }> = (
 };
 
 
-export const ProjectChat: React.FC<ProjectChatProps> = ({ messages, currentUser, onClose, onSendMessage }) => {
+export const ProjectChat: React.FC<ProjectChatProps> = ({ messages, currentUser, onlineUsers, onClose, onSendMessage }) => {
     const [newMessage, setNewMessage] = useState('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -64,7 +65,12 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ messages, currentUser,
             </header>
             <div className="flex-grow p-4 overflow-y-auto custom-scrollbar space-y-4">
                 {messages.map(msg => (
-                    <ChatBubble key={msg.id} message={msg} isCurrentUser={msg.author.id === currentUser.id} />
+                    <ChatBubble 
+                        key={msg.id} 
+                        message={msg} 
+                        isCurrentUser={msg.author.id === currentUser.id} 
+                        isOnline={onlineUsers.has(msg.author.id)}
+                    />
                 ))}
                 <div ref={messagesEndRef} />
             </div>

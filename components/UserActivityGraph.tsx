@@ -1,4 +1,5 @@
 
+
 import React, { useMemo } from 'react';
 import { Project, User, Task, BoardData } from '../types';
 import { UserAvatar } from './UserAvatar';
@@ -20,6 +21,7 @@ const getTaskStatus = (task: Task, board: BoardData): { name: string; colorInfo:
 interface UserActivityGraphProps {
     projects: Record<string, Project>;
     users: Record<string, User>;
+    onlineUsers: Set<string>;
     onTaskClick: (task: Task) => void;
 }
 
@@ -31,7 +33,7 @@ interface UserWorkload {
     }[];
 }
 
-export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, users, onTaskClick }) => {
+export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, users, onlineUsers, onTaskClick }) => {
     const userWorkloads = useMemo((): UserWorkload[] => {
         return Object.values(users).map(user => {
             const projectWorkload = Object.values(projects)
@@ -51,7 +53,7 @@ export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, 
                 <div key={user.id} className="p-4 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
                     {/* User Node */}
                     <div className="flex items-center gap-4 mb-4">
-                        <UserAvatar user={user} className="w-12 h-12 text-xl" />
+                        <UserAvatar user={user} className="w-12 h-12 text-xl" isOnline={onlineUsers.has(user.id)} />
                         <div>
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white">{user.name}</h3>
                             <p className="text-sm text-gray-500 dark:text-gray-400">{user.role}</p>

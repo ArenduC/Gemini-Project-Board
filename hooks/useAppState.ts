@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DropResult } from 'react-beautiful-dnd';
-import { AppState, Task, NewTaskData, User, ChatMessage, TaskPriority } from '../types';
+import { AppState, Task, NewTaskData, User, ChatMessage, TaskPriority, Project } from '../types';
 import { api } from '../services/api';
 import { generateTaskFromPrompt } from '../services/geminiService';
 
@@ -223,6 +223,17 @@ export const useAppState = (userId?: string, activeProjectId?: string | null) =>
     await fetchData();
   }, [fetchData]);
 
+  const deleteProject = useCallback(async (projectId: string) => {
+    await api.data.deleteProject(projectId);
+    await fetchData();
+  }, [fetchData]);
+
+  const updateUserProfile = useCallback(async (updates: { name: string }) => {
+    if (!userId) return;
+    await api.auth.updateUserProfile(userId, updates);
+    await fetchData(); // Refresh all data to ensure consistency
+  }, [fetchData, userId]);
+
   const updateProjectMembers = useCallback(async (projectId: string, memberIds: string[]) => {
       await api.data.updateProjectMembers(projectId, memberIds);
       await fetchData();
@@ -275,5 +286,5 @@ export const useAppState = (userId?: string, activeProjectId?: string | null) =>
     }
   }, []);
 
-  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers, sendChatMessage };
+  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage };
 };

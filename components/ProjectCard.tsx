@@ -8,12 +8,13 @@ import { UserAvatar } from './UserAvatar';
 interface ProjectCardProps {
   project: Project;
   users: Record<string, User>;
+  onlineUsers: Set<string>;
   onSelect: (projectId: string) => void;
   onManageMembers: (projectId: string) => void;
   onShare: () => void;
 }
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onSelect, onManageMembers, onShare }) => {
+export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onlineUsers, onSelect, onManageMembers, onShare }) => {
   const totalTasks = Object.keys(project.board.tasks).length;
   const doneColumn = Object.values(project.board.columns).find(c => c.title.toLowerCase() === 'done');
   const completedTasks = doneColumn ? doneColumn.taskIds.length : 0;
@@ -42,6 +43,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onSele
             {creator && (
                  <UserAvatar 
                     user={creator} 
+                    isOnline={onlineUsers.has(creator.id)}
                     className="w-8 h-8 ring-2 ring-white dark:ring-gray-900 text-sm"
                     title={`Created by ${creator.name}`}
                  />
@@ -68,6 +70,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onSele
                       <UserAvatar
                           key={memberId}
                           user={users[memberId]}
+                          isOnline={onlineUsers.has(memberId)}
                           className="w-8 h-8 rounded-full ring-2 ring-white dark:ring-gray-900"
                           title={users[memberId].name}
                       />

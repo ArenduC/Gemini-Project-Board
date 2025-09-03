@@ -6,11 +6,12 @@ import { UserAvatar } from './UserAvatar';
 interface ManageMembersModalProps {
   project: Project;
   allUsers: User[];
+  onlineUsers: Set<string>;
   onClose: () => void;
   onSave: (memberIds: string[]) => Promise<void>;
 }
 
-export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ project, allUsers, onClose, onSave }) => {
+export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ project, allUsers, onlineUsers, onClose, onSave }) => {
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set(project.members));
 
   const handleToggleMember = (userId: string) => {
@@ -52,7 +53,7 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ project,
                   onChange={() => handleToggleMember(user.id)}
                   className="w-4 h-4 rounded text-indigo-600 bg-gray-200 dark:bg-gray-600 border-gray-300 dark:border-gray-500 focus:ring-indigo-500"
                 />
-                <UserAvatar user={user} className="w-9 h-9" />
+                <UserAvatar user={user} className="w-9 h-9" isOnline={onlineUsers.has(user.id)} />
                 <span className="font-medium text-sm">{user.name}</span>
               </label>
             ))}

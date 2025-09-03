@@ -5,6 +5,7 @@ interface UserAvatarProps {
   user?: User | null;
   className?: string;
   title?: string;
+  isOnline?: boolean;
 }
 
 const colors = [
@@ -24,7 +25,7 @@ const getColorFromString = (str: string): string => {
   return colors[index];
 };
 
-export const UserAvatar: React.FC<UserAvatarProps> = ({ user, className, title }) => {
+export const UserAvatar: React.FC<UserAvatarProps> = ({ user, className, title, isOnline = false }) => {
   if (!user) {
     return (
       <div
@@ -41,10 +42,13 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ user, className, title }
   
   return (
     <div
-      className={`flex items-center justify-center rounded-full text-white font-bold ${color} ${className}`}
+      className={`relative flex items-center justify-center rounded-full text-white font-bold ${color} ${className}`}
       title={title || user.name}
     >
       {initial}
+      {isOnline && (
+        <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-800" title="Online"></span>
+      )}
     </div>
   );
 };

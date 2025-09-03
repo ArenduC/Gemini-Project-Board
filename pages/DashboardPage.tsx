@@ -8,13 +8,14 @@ import { exportTasksToCsv } from '../utils/export';
 interface DashboardPageProps {
   projects: Project[];
   users: Record<string, User>;
+  onlineUsers: Set<string>;
   onSelectProject: (projectId: string) => void;
   onCreateProject: () => void;
   onManageMembers: (projectId: string) => void;
   onShareProject: (project: Project) => void;
 }
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, onSelectProject, onCreateProject, onManageMembers, onShareProject }) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, onlineUsers, onSelectProject, onCreateProject, onManageMembers, onShareProject }) => {
   const [view, setView] = useState<'grid' | 'list'>('grid');
 
   const handleExport = () => {
@@ -72,6 +73,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                         key={project.id} 
                         project={project} 
                         users={users}
+                        onlineUsers={onlineUsers}
                         onSelect={onSelectProject}
                         onManageMembers={onManageMembers}
                         onShare={() => onShareProject(project)} 
@@ -93,6 +95,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                         key={project.id}
                         project={project}
                         users={users}
+                        onlineUsers={onlineUsers}
                         onSelect={onSelectProject}
                         onManageMembers={onManageMembers}
                         onShare={() => onShareProject(project)}

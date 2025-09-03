@@ -1,9 +1,10 @@
 
 
 
+
 import { supabase } from './supabase';
 import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType } from '../types';
-import { Session } from '@supabase/supabase-js';
+import { Session, RealtimeChannel } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
 const arrayToRecord = <T extends { id: string }>(arr: T[]): Record<string, T> => {
@@ -35,6 +36,20 @@ const getUserProfile = async (userId: string): Promise<User | null> => {
     return userProfile as User;
 };
 
+const updateUserProfile = async (userId: string, updates: { name: string }): Promise<User> => {
+    const { data, error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', userId)
+        .select()
+        .single();
+    if (error) {
+        console.error("Error updating user profile:", error.message || error);
+        throw error;
+    }
+    return data as User;
+};
+
 const signOut = async () => {
     return await supabase.auth.signOut();
 };
@@ -56,6 +71,23 @@ const signUp = async ({ email, password, name }: { email: string, password: stri
     });
 };
 
+// --- REALTIME ---
+// FIX: Renamed function to match its export key in the `api` object.
+const isConfigured = () => supabase.realtime !== null;
+
+const getPresenceChannel = () => {
+    return supabase.channel('online-users', {
+      config: {
+        presence: {
+          key: '', // a key is not needed for simple presence tracking
+        },
+      },
+    });
+};
+
+const removeChannel = (channel: RealtimeChannel) => {
+    supabase.removeChannel(channel);
+};
 
 // --- DATA FETCHING ---
 
@@ -481,6 +513,15 @@ const addProject = async (name: string, description: string, creatorId: string) 
     if (columnsError) console.error("Error adding default columns", columnsError.message || columnsError);
 };
 
+const deleteProject = async (projectId: string) => {
+    // Assumes RLS and cascading deletes are set up in Supabase
+    const { error } = await supabase.from('projects').delete().eq('id', projectId);
+    if (error) {
+        console.error("Error deleting project:", error.message || error);
+        throw error;
+    }
+};
+
 const updateProjectMembers = async (projectId: string, memberIds: string[]) => {
     const { error: deleteError } = await supabase.from('project_members').delete().eq('project_id', projectId);
     if(deleteError) {
@@ -585,9 +626,15 @@ export const api = {
     auth: {
         onAuthStateChange,
         getUserProfile,
+        updateUserProfile,
         signOut,
         signInWithPassword,
         signUp,
+    },
+    realtime: {
+        isConfigured,
+        getPresenceChannel,
+        removeChannel,
     },
     data: {
         fetchInitialData,
@@ -601,6 +648,7 @@ export const api = {
         addColumn,
         deleteColumn,
         addProject,
+        deleteProject,
         updateProjectMembers,
         sendChatMessage,
         getInviteLinksForProject,

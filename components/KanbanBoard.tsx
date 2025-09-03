@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { DragDropContext, DropResult } from 'react-beautiful-dnd';
 import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment } from '../types';
@@ -14,6 +15,8 @@ interface KanbanBoardProps {
   boardData: BoardData;
   currentUser: User;
   users: User[];
+  onlineUsers: Set<string>;
+  aiFeaturesEnabled: boolean;
   onDragEnd: (result: DropResult) => Promise<void>;
   updateTask: (task: Task) => Promise<void>;
   addSubtasks: (taskId: string, subtasks: { title: string }[], creatorId: string) => Promise<void>;
@@ -72,7 +75,7 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
   )
 }
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, currentUser, users, onDragEnd, updateTask, addSubtasks, addComment, addAiTask, deleteTask, addColumn, deleteColumn, isChatOpen, onCloseChat, chatMessages, onSendMessage, onTaskClick }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, currentUser, users, onlineUsers, aiFeaturesEnabled, onDragEnd, updateTask, addSubtasks, addComment, addAiTask, deleteTask, addColumn, deleteColumn, isChatOpen, onCloseChat, chatMessages, onSendMessage, onTaskClick }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('');
@@ -246,9 +249,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, 
   
   return (
     <>
+      {aiFeaturesEnabled && (
       <div className="mb-6">
         <AiTaskCreator onGenerateTask={addAiTask} />
       </div>
+      )}
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <Filters
@@ -304,7 +309,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, 
                 <Column 
                     key={column.id} 
                     column={column} 
-                    tasks={tasks} 
+                    tasks={tasks}
+                    onlineUsers={onlineUsers}
                     onTaskClick={onTaskClick}
                     deleteTask={deleteTask}
                     deleteColumn={deleteColumn}
@@ -324,6 +330,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, 
         <ProjectChat 
             messages={chatMessages}
             currentUser={currentUser}
+            onlineUsers={onlineUsers}
             onClose={onCloseChat}
             onSendMessage={onSendMessage}
         />

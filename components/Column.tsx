@@ -7,12 +7,13 @@ import { TrashIcon } from './Icons';
 interface ColumnProps {
   column: ColumnType;
   tasks: Task[];
+  onlineUsers: Set<string>;
   onTaskClick: (task: Task) => void;
   deleteTask: (taskId: string, columnId: string) => Promise<void>;
   deleteColumn: (columnId: string) => Promise<void>;
 }
 
-export const Column: React.FC<ColumnProps> = ({ column, tasks, onTaskClick, deleteTask, deleteColumn }) => {
+export const Column: React.FC<ColumnProps> = ({ column, tasks, onlineUsers, onTaskClick, deleteTask, deleteColumn }) => {
   return (
     <div className="bg-gray-100 dark:bg-gray-900 rounded-xl flex flex-col max-h-[calc(100vh-12rem)]">
       <div className="p-4 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-gray-100 dark:bg-gray-900 backdrop-blur-sm rounded-t-xl z-10">
@@ -46,6 +47,7 @@ export const Column: React.FC<ColumnProps> = ({ column, tasks, onTaskClick, dele
                 key={task.id} 
                 task={task} 
                 index={index} 
+                isOnline={task.assignee ? onlineUsers.has(task.assignee.id) : false}
                 onClick={() => onTaskClick(task)}
                 onDelete={() => deleteTask(task.id, column.id)}
               />

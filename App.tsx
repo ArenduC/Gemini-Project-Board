@@ -5,15 +5,15 @@ import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ManageMembersModal } from './components/ManageMembersModal';
-import { SunIcon, MoonIcon, BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon } from './components/Icons';
+import { SunIcon, MoonIcon, BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon } from './components/Icons';
 import { useAppState } from './hooks/useAppState';
 import { DashboardPage } from './pages/DashboardPage';
 import { ResourceManagementPage } from './pages/ResourceManagementPage';
 import { TasksPage } from './pages/TasksPage';
 import { LoginPage } from './pages/LoginPage';
-import { User, Task, TaskPriority, NewTaskData, Project } from './types';
+import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage } from './types';
 import { api } from './services/api';
-import { Session } from '@supabase/supabase-js';
+import { Session, RealtimeChannel } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
@@ -21,6 +21,8 @@ import { VoiceAssistantModal } from './components/VoiceAssistantModal';
 import { interpretVoiceCommand, VoiceCommandAction } from './services/geminiService';
 import { DropResult } from 'react-beautiful-dnd';
 import { ManageInviteLinksModal } from './components/ManageInviteLinksModal';
+import { SettingsModal } from './components/SettingsModal';
+import { NotificationToast } from './components/NotificationToast';
 
 
 type View = 'dashboard' | 'project' | 'resources' | 'tasks';
@@ -49,9 +51,29 @@ const App: React.FC = () => {
   
   const [isSearchModalOpen, setSearchModalOpen] = useState(false);
   const [isVoiceAssistantModalOpen, setVoiceAssistantModalOpen] = useState(false);
+  const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
+
+  // Feature Flags
+  const [featureFlags, setFeatureFlags] = useState({
+    ai: localStorage.getItem('aiFeaturesEnabled') !== 'false',
+    voice: localStorage.getItem('voiceAssistantEnabled') !== 'false',
+  });
+
+  const handleFlagsChange = (newFlags: { ai: boolean, voice: boolean }) => {
+    setFeatureFlags(newFlags);
+    localStorage.setItem('aiFeaturesEnabled', String(newFlags.ai));
+    localStorage.setItem('voiceAssistantEnabled', String(newFlags.voice));
+  };
+  
+  // Real-time features
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const presenceChannelRef = useRef<RealtimeChannel | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const chatMessagesRef = useRef<ChatMessage[]>([]);
+  const activeProjectIdRef = useRef<string | null>(null);
 
   const appState = useAppState(session?.user?.id, activeProjectId);
-  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers, sendChatMessage } = appState;
+  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateProjectMembers, sendChatMessage, updateUserProfile, deleteProject } = appState;
 
   const activeProject = activeProjectId ? state.projects[activeProjectId] : null;
   const projectToManageMembers = projectForMemberManagementId ? state.projects[projectForMemberManagementId] : null;
@@ -73,6 +95,69 @@ const App: React.FC = () => {
             subscription.unsubscribe();
         };
     }, []);
+
+    // Effect for Supabase Presence
+    useEffect(() => {
+      if (session?.user && api.realtime.isConfigured()) {
+        const channel = api.realtime.getPresenceChannel();
+        presenceChannelRef.current = channel;
+
+        channel.on('presence', { event: 'sync' }, () => {
+          const presenceState = channel.presenceState();
+          // FIX: Type assertion to handle potential mismatch in Supabase presence state type inference.
+          const userIds = Object.keys(presenceState).map(key => (presenceState[key][0] as any).user_id);
+          setOnlineUsers(new Set(userIds));
+        });
+
+        channel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await channel.track({ user_id: session.user.id, online_at: new Date().toISOString() });
+          }
+        });
+
+        return () => {
+          if (presenceChannelRef.current) {
+            api.realtime.removeChannel(presenceChannelRef.current);
+            presenceChannelRef.current = null;
+          }
+        };
+      }
+    }, [session]);
+    
+    // Effect for Chat Notifications
+    const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
+      const id = Date.now().toString();
+      setNotifications(prev => [...prev, { ...notification, id }]);
+      setTimeout(() => {
+        setNotifications(prev => prev.filter(n => n.id !== id));
+      }, 5000);
+    }, []);
+
+    useEffect(() => {
+      if (activeProject && currentUser && isChatOpen === false) {
+          if (activeProjectIdRef.current !== activeProject.id) {
+              chatMessagesRef.current = activeProject.chatMessages;
+              activeProjectIdRef.current = activeProject.id;
+              return;
+          }
+
+          const previousMessages = chatMessagesRef.current;
+          const currentMessages = activeProject.chatMessages;
+
+          if (currentMessages.length > previousMessages.length) {
+              const newMessage = currentMessages[currentMessages.length - 1];
+              if (newMessage.author.id !== currentUser.id && !previousMessages.some(m => m.id === newMessage.id)) {
+                  addNotification({
+                      author: newMessage.author,
+                      message: newMessage.text,
+                      project: activeProject
+                  });
+              }
+          }
+          chatMessagesRef.current = currentMessages;
+      }
+    }, [activeProject, currentUser, isChatOpen, addNotification]);
+
 
     // Effect to handle invite link from URL
     useEffect(() => {
@@ -388,6 +473,7 @@ const App: React.FC = () => {
                 <MessageCircleIcon className="w-5 h-5" />
               </button>
             )}
+            {featureFlags.voice && (
              <button
                 onClick={() => setVoiceAssistantModalOpen(true)}
                 className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
@@ -395,12 +481,20 @@ const App: React.FC = () => {
             >
                 <MicrophoneIcon className="w-5 h-5" />
             </button>
+            )}
              <button
                 onClick={() => setSearchModalOpen(true)}
                 className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
                 aria-label="Global Search"
             >
                 <SearchIcon className="w-5 h-5" />
+            </button>
+             <button
+                onClick={() => setSettingsModalOpen(true)}
+                className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-950 transition-all"
+                aria-label="Settings"
+            >
+                <SettingsIcon className="w-5 h-5" />
             </button>
             <button
               onClick={toggleTheme}
@@ -416,7 +510,7 @@ const App: React.FC = () => {
                 aria-haspopup="true"
                 aria-expanded={isUserMenuOpen}
               >
-                <UserAvatar user={currentUser} className="w-8 h-8 ring-2 ring-white/50 dark:ring-gray-900/50" />
+                <UserAvatar user={currentUser} className="w-8 h-8 ring-2 ring-white/50 dark:ring-gray-900/50" isOnline={onlineUsers.has(currentUser.id)}/>
               </button>
               {isUserMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 py-1 z-30">
@@ -424,6 +518,12 @@ const App: React.FC = () => {
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{currentUser.name}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">{currentUser.role}</p>
                   </div>
+                   <button
+                    onClick={() => { setSettingsModalOpen(true); setIsUserMenuOpen(false); }}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
+                    Settings
+                  </button>
                   <button
                     onClick={handleLogout}
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -440,6 +540,7 @@ const App: React.FC = () => {
             <DashboardPage 
               projects={Object.values(state.projects)}
               users={state.users}
+              onlineUsers={onlineUsers}
               onSelectProject={handleSelectProject}
               onCreateProject={() => setCreateProjectModalOpen(true)}
               onManageMembers={handleOpenManageMembersModal}
@@ -453,6 +554,8 @@ const App: React.FC = () => {
               boardData={activeProject.board}
               currentUser={currentUser}
               users={Object.values(state.users)}
+              onlineUsers={onlineUsers}
+              aiFeaturesEnabled={featureFlags.ai}
               onTaskClick={handleTaskClick}
               onDragEnd={(result) => onDragEnd(activeProject.id, result)}
               updateTask={(task) => updateTask(activeProject.id, task)}
@@ -480,11 +583,31 @@ const App: React.FC = () => {
               <ResourceManagementPage 
                   projects={state.projects} 
                   users={state.users} 
+                  onlineUsers={onlineUsers}
                   onTaskClick={handleTaskClick}
               />
           )}
         </main>
       </div>
+       {isSettingsModalOpen && (
+        <SettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={() => setSettingsModalOpen(false)}
+          currentUser={currentUser}
+          onUpdateUser={updateUserProfile}
+          isDarkMode={isDarkMode}
+          onToggleTheme={toggleTheme}
+          featureFlags={featureFlags}
+          onFlagsChange={handleFlagsChange}
+          projects={Object.values(state.projects)}
+          onDeleteProject={async (projectId) => {
+            await deleteProject(projectId);
+            if (activeProjectId === projectId) {
+              handleBackToDashboard();
+            }
+          }}
+        />
+      )}
       {isCreateTaskModalOpen && activeProject && (
         <CreateTaskModal
           columns={Object.values(activeProject.board.columns)}
@@ -509,6 +632,7 @@ const App: React.FC = () => {
         <ManageMembersModal
             project={projectToManageMembers}
             allUsers={Object.values(state.users)}
+            onlineUsers={onlineUsers}
             onClose={handleCloseManageMembersModal}
             onSave={async (memberIds) => {
                 await updateProjectMembers(projectToManageMembers.id, memberIds);
@@ -529,6 +653,7 @@ const App: React.FC = () => {
           currentUser={currentUser}
           users={Object.values(state.users)}
           projectMembers={projectMembersForModal}
+          onlineUsers={onlineUsers}
           onClose={handleCloseTaskModal}
           onUpdateTask={handleUpdateTask}
           onAddSubtasks={handleAddSubtasks}
@@ -551,13 +676,18 @@ const App: React.FC = () => {
             }}
         />
       )}
-      {isVoiceAssistantModalOpen && (
+      {featureFlags.voice && isVoiceAssistantModalOpen && (
           <VoiceAssistantModal
             isOpen={isVoiceAssistantModalOpen}
             onClose={() => setVoiceAssistantModalOpen(false)}
             onCommand={handleVoiceCommand}
           />
       )}
+      <div className="fixed bottom-4 right-4 z-50 space-y-2">
+        {notifications.map(notification => (
+          <NotificationToast key={notification.id} notification={notification} />
+        ))}
+      </div>
     </>
   );
 };

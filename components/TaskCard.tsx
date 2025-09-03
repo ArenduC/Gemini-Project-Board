@@ -7,6 +7,7 @@ import { UserAvatar } from './UserAvatar';
 interface TaskCardProps {
   task: Task;
   index: number;
+  isOnline: boolean;
   onClick: () => void;
   onDelete: () => Promise<void>;
 }
@@ -18,7 +19,7 @@ const priorityStyles: Record<TaskPriority, { bg: string, text: string, dot: stri
   [TaskPriority.URGENT]: { bg: 'bg-red-100 dark:bg-red-900/50', text: 'text-red-700 dark:text-red-300', dot: 'bg-red-500' },
 };
 
-export const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onDelete }) => {
+export const TaskCard: React.FC<TaskCardProps> = ({ task, index, isOnline, onClick, onDelete }) => {
   const completedSubtasks = task.subtasks.filter(st => st.completed).length;
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -73,6 +74,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, index, onClick, onDele
             {task.assignee && (
               <UserAvatar 
                 user={task.assignee} 
+                isOnline={isOnline}
                 className="w-7 h-7 ring-2 ring-white dark:ring-gray-800 text-xs"
                 title={`Assigned to ${task.assignee.name}`}
               />

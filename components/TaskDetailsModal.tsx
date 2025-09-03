@@ -11,6 +11,7 @@ interface TaskDetailsModalProps {
   currentUser: User;
   users: User[];
   projectMembers: User[];
+  onlineUsers: Set<string>;
   onClose: () => void;
   onUpdateTask: (task: Task) => Promise<void>;
   onAddSubtasks: (taskId: string, subtasks: { title: string }[]) => Promise<void>;
@@ -67,10 +68,11 @@ interface ActivitySectionProps {
     onAddComment: (taskId: string, text: string) => Promise<void>;
     currentUser: User;
     projectMembers: User[];
+    onlineUsers: Set<string>;
     users: User[];
 }
 
-const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, currentUser, projectMembers, users }) => {
+const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, currentUser, projectMembers, onlineUsers, users }) => {
     const [newComment, setNewComment] = useState("");
     const [showMentions, setShowMentions] = useState(false);
     const [mentionSearch, setMentionSearch] = useState('');
@@ -178,7 +180,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
         <div>
             <h3 className="text-base font-semibold mb-3 flex items-center gap-2"><MessageSquareIcon className="w-5 h-5" /> Activity</h3>
             <div className="flex items-start gap-3 mb-4">
-                <UserAvatar user={currentUser} className="w-9 h-9 flex-shrink-0" />
+                <UserAvatar user={currentUser} className="w-9 h-9 flex-shrink-0" isOnline={onlineUsers.has(currentUser.id)}/>
                 <form onSubmit={handleSubmit} className="flex-grow">
                     <div className="relative">
                         <textarea 
@@ -200,7 +202,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
                                             onMouseEnter={() => setActiveIndex(index)}
                                             className={`px-3 py-2 cursor-pointer flex items-center gap-2 ${index === activeIndex ? 'bg-indigo-100 dark:bg-indigo-800' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                                         >
-                                            <UserAvatar user={user} className="w-6 h-6 text-xs flex-shrink-0" />
+                                            <UserAvatar user={user} className="w-6 h-6 text-xs flex-shrink-0" isOnline={onlineUsers.has(user.id)} />
                                             <span className="text-sm">{user.name}</span>
                                         </li>
                                     ))}
@@ -221,7 +223,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
                   return (
                     <div key={`${item.type}-${item.id}`} className="flex items-start gap-3">
                          {item.type === 'comment' ? (
-                            <UserAvatar user={author} className="w-9 h-9 flex-shrink-0" />
+                            <UserAvatar user={author} className="w-9 h-9 flex-shrink-0" isOnline={onlineUsers.has(author.id)}/>
                          ) : (
                             <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-gray-200 dark:bg-gray-800 rounded-full">
                                 <HistoryIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
@@ -254,7 +256,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
 }
 
 
-export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, currentUser, users, projectMembers, onClose, onUpdateTask, onAddSubtasks, onAddComment }) => {
+export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, currentUser, users, projectMembers, onlineUsers, onClose, onUpdateTask, onAddSubtasks, onAddComment }) => {
   const [editedTask, setEditedTask] = useState<Task>(task);
   const [aiState, setAiState] = useState<AIGenerationState>('idle');
   const [aiError, setAiError] = useState<string | null>(null);
@@ -372,7 +374,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                 <span>Created by</span>
                 {taskCreator ? (
                     <>
-                        <UserAvatar user={taskCreator} className="w-6 h-6 text-xs" />
+                        <UserAvatar user={taskCreator} className="w-6 h-6 text-xs" isOnline={onlineUsers.has(taskCreator.id)} />
                         <span className="font-semibold text-gray-700 dark:text-gray-300">{taskCreator.name}</span>
                     </>
                 ) : (
@@ -470,6 +472,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                           user={subtaskCreator} 
                           className="w-6 h-6 text-xs flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" 
                           title={`Added by ${subtaskCreator?.name || 'Unknown'}`}
+                          isOnline={subtaskCreator ? onlineUsers.has(subtaskCreator.id) : false}
                         />
                         <button 
                             onClick={() => handleDeleteSubtask(subtask.id)}
@@ -528,7 +531,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
           <hr className="border-gray-200 dark:border-gray-800" />
           
           <div className="p-6">
-            <ActivitySection task={editedTask} onAddComment={onAddComment} currentUser={currentUser} projectMembers={projectMembers} users={users} />
+            <ActivitySection task={editedTask} onAddComment={onAddComment} currentUser={currentUser} projectMembers={projectMembers} onlineUsers={onlineUsers} users={users} />
           </div>
         </div>
       </div>

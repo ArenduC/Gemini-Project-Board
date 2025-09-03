@@ -133,3 +133,10 @@ export interface ProjectInviteLink {
   current_uses: number;
   is_active: boolean;
 }
+
+export interface Notification {
+  id: string;
+  author: User;
+  message: string;
+  project: Project;
+}
