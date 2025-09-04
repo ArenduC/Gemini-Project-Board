@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
@@ -44,8 +45,9 @@ const App: React.FC = () => {
 
   const [session, setSession] = useState<Session | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -53,6 +55,8 @@ const App: React.FC = () => {
   const [isSearchModalOpen, setSearchModalOpen] = useState(false);
   const [isVoiceAssistantModalOpen, setVoiceAssistantModalOpen] = useState(false);
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [isAppReady, setIsAppReady] = useState(false);
+
 
   // Navigation function using hash
   const navigate = (path: string) => {
@@ -113,63 +117,48 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        // On initial app load (e.g., after a refresh), force redirect to the dashboard.
-        // This simplifies the initial data loading sequence and ensures the app
-        // always starts from a known, stable state, resolving the refresh issue.
-        if (window.location.hash && window.location.hash !== '#/' && window.location.hash !== '#') {
-            window.location.hash = '/';
-        }
-    }, []); // Empty dependency array ensures this runs only once on mount.
+        // This effect helps prevent race conditions and issues with third-party libraries
+        // like react-beautiful-dnd on initial load by ensuring the app is "settled"
+        // before rendering complex, stateful components.
+        const timer = setTimeout(() => setIsAppReady(true), 50); // Small delay is sufficient
+        return () => clearTimeout(timer);
+    }, []);
 
     useEffect(() => {
-        setAuthLoading(true);
         const { data: { subscription } } = api.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
             try {
                 if (_event === 'PASSWORD_RECOVERY') {
                     setIsResettingPassword(true);
-                    // No further processing needed, the ResetPasswordPage will be shown.
                     return; 
                 }
                 
-                // Clear password reset state on other events.
                 if (isResettingPassword) {
                     setIsResettingPassword(false);
                 }
 
-                // If a session exists, validate it by fetching the user profile.
-                // This is the crucial step to catch invalid refresh tokens.
                 if (session?.user) {
-                    // api.auth.getUserProfile will now throw on auth errors
                     let userProfile = await api.auth.getUserProfile(session.user.id);
-
-                    // If profile doesn't exist for a valid user, create it (self-healing).
                     if (!userProfile) {
                         userProfile = await api.auth.createUserProfile(session.user);
                     }
-
-                    // Success: session is valid, profile exists.
                     setSession(session);
                     setCurrentUser(userProfile);
                 } else {
-                    // No session means we are logged out.
                     setSession(null);
                     setCurrentUser(null);
                 }
             } catch (error) {
-                console.warn("Auth state change handler failed, likely due to an invalid session. Signing out.", error);
-                // If any part of the session validation fails, the token is bad.
-                // Sign out to clear the corrupted token from storage.
-                await api.auth.signOut();
+                console.warn("Auth state change handler failed, likely due to an invalid session.", error);
                 setSession(null);
                 setCurrentUser(null);
             } finally {
-                // Always hide the initial auth loader.
-                setAuthLoading(false);
+                // This is crucial: it marks that the initial session check is complete.
+                setIsAuthLoading(false);
             }
         });
 
         return () => subscription.unsubscribe();
-    }, []);
+    }, [isResettingPassword]);
 
 
     // Effect for Supabase Presence
@@ -488,7 +477,7 @@ const App: React.FC = () => {
           </div>
       );
     }
-    if (view === 'privacy') {
+    if (view === 'privacy' && currentUser) {
         return (
             <div className="flex items-center gap-3">
                 <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-gray-800 transition-colors" aria-label="Back to dashboard">
@@ -509,6 +498,16 @@ const App: React.FC = () => {
         </div>
      )
   };
+  
+  // This state prevents the login page from flashing on refresh for logged-in users.
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#1C2326]">
+        <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
+        <p className="ml-4 text-base font-semibold text-gray-400">Restoring your session...</p>
+      </div>
+    );
+  }
 
   if (window.location.pathname === '/callback') {
     return <CallbackPage />;
@@ -518,17 +517,7 @@ const App: React.FC = () => {
     return <ResetPasswordPage onResetSuccess={handleResetSuccess} />;
   }
 
-  if (authLoading) {
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-[#1C2326]">
-            <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
-        </div>
-    );
-  }
-
   if (!session || !currentUser) {
-    // If the path is an invite link, the effect will handle login/redirect.
-    // Show a simple loader until that happens.
     if (window.location.pathname.startsWith('/invite/')) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#1C2326]">
@@ -648,7 +637,7 @@ const App: React.FC = () => {
                   addProjectFromPlan={addProjectFromPlan}
                 />
               )}
-              {view === 'project' && activeProject && (
+              {view === 'project' && activeProject && isAppReady && (
                 <KanbanBoard
                   key={activeProject.id}
                   project={activeProject}
@@ -690,7 +679,7 @@ const App: React.FC = () => {
                 />
               )}
               {view === 'privacy' && (
-                  <PrivacyPolicyPage onBack={() => navigate('/')} isEmbedded={true} />
+                  <PrivacyPolicyPage isEmbedded={true} />
               )}
               {view === 'project' && !activeProject && (
                 <div className="text-center pt-20 text-gray-400">

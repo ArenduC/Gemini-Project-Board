@@ -1,9 +1,10 @@
 
+
 import React from 'react';
 import { ArrowLeftIcon, BotMessageSquareIcon } from '../components/Icons';
 
 interface PrivacyPolicyPageProps {
-  onBack: () => void;
+  onBack?: () => void;
   isEmbedded?: boolean;
 }
 
@@ -77,10 +78,12 @@ export const PrivacyPolicyPage: React.FC<PrivacyPolicyPageProps> = ({ onBack, is
     <div className="min-h-screen font-sans bg-[#1C2326] text-gray-300 p-4 sm:p-8 custom-scrollbar">
       <div className="max-w-4xl mx-auto">
         <header className="sticky top-0 bg-[#1C2326]/80 backdrop-blur-sm -mx-4 sm:-mx-6 px-4 sm:px-6 py-4 mb-4 z-10">
-            <button onClick={onBack} className="flex items-center gap-2 text-sm font-semibold text-white hover:text-gray-300">
-                <ArrowLeftIcon className="w-5 h-5" />
-                Back
-            </button>
+            {onBack && (
+                <button onClick={onBack} className="flex items-center gap-2 text-sm font-semibold text-white hover:text-gray-300">
+                    <ArrowLeftIcon className="w-5 h-5" />
+                    Back
+                </button>
+            )}
         </header>
         <PrivacyPolicyContent />
       </div>
