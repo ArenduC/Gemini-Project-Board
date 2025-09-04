@@ -61,7 +61,7 @@ const signUp = async ({ email, password, name }: { email: string, password: stri
         email,
         password,
         options: {
-            emailRedirectTo:"https://geminiprojectboard.vercel.app/callback",
+            emailRedirectTo: `${window.location.origin}/callback`,
             data: {
                 name: name,
             }

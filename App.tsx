@@ -82,14 +82,17 @@ const App: React.FC = () => {
     useEffect(() => {
         setAuthLoading(true);
         const subscription = api.auth.onAuthStateChange(async (session) => {
+            // Handle email confirmation redirect
+            if (session?.user && window.location.pathname === '/callback') {
+                // Redirect to the dashboard. Using replace to avoid adding the callback page to history.
+                window.location.replace('/');
+                return; // Stop processing to allow redirect to happen
+            }
+            
             setSession(session);
             if (session?.user) {
                 const userProfile = await api.auth.getUserProfile(session.user.id);
                 setCurrentUser(userProfile);
-                if (window.location.pathname === '/callback') {
-                    // Redirect to dashboard after session is confirmed
-                    window.history.replaceState({}, document.title, window.location.origin);
-                }
             } else {
                 setCurrentUser(null);
             }
