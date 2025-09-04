@@ -11,6 +11,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { TasksPage } from './pages/TasksPage';
 import { ResourceManagementPage } from './pages/ResourceManagementPage';
 import { LoginPage } from './pages/LoginPage';
+import CallbackPage from './pages/CallbackPage';
 import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage, ProjectLink } from './types';
 import { api } from './services/api';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
@@ -85,6 +86,10 @@ const App: React.FC = () => {
             if (session?.user) {
                 const userProfile = await api.auth.getUserProfile(session.user.id);
                 setCurrentUser(userProfile);
+                if (window.location.pathname === '/callback') {
+                    // Redirect to dashboard after session is confirmed
+                    window.history.replaceState({}, document.title, window.location.origin);
+                }
             } else {
                 setCurrentUser(null);
             }
@@ -419,6 +424,10 @@ const App: React.FC = () => {
         </div>
      )
   };
+
+  if (window.location.pathname === '/callback') {
+    return <CallbackPage />;
+  }
 
   if (authLoading) {
     return (

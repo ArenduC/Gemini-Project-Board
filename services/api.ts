@@ -1,4 +1,5 @@
 
+
 import { supabase } from './supabase';
 import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink } from '../types';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
@@ -60,7 +61,7 @@ const signUp = async ({ email, password, name }: { email: string, password: stri
         email,
         password,
         options: {
-            emailRedirectTo:"https://geminiprojectboard.vercel.app/",
+            emailRedirectTo:"https://geminiprojectboard.vercel.app/callback",
             data: {
                 name: name,
             }
