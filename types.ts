@@ -81,6 +81,15 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+export interface ProjectLink {
+  id: string;
+  title: string;
+  url: string;
+  projectId: string;
+  creatorId: string;
+  createdAt: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -90,6 +99,7 @@ export interface Project {
   creatorId: string;
   createdAt: string;
   chatMessages: ChatMessage[];
+  links: ProjectLink[];
 }
 
 export interface AppState {

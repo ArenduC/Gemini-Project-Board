@@ -287,7 +287,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
 
   const handleAssigneeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const assigneeId = e.target.value;
-    const assignee = users.find(u => u.id === assigneeId);
+    const assignee = projectMembers.find(u => u.id === assigneeId);
     handleUpdateField('assignee', assignee);
   };
 
@@ -400,7 +400,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                       className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
                     >
                       <option value="">Unassigned</option>
-                      {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                      {projectMembers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
                 </div>
                 <div>

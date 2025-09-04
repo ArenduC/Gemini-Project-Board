@@ -1,9 +1,6 @@
 
-
-
-
 import { supabase } from './supabase';
-import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType } from '../types';
+import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink } from '../types';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
@@ -92,31 +89,50 @@ const removeChannel = (channel: RealtimeChannel) => {
 // --- DATA FETCHING ---
 
 const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'projectOrder'> & {projectOrder: string[]}> => {
-    // Fetch all users first
-    const { data: usersData, error: usersError } = await supabase.from('users').select('*');
-    if (usersError) throw usersError;
-    const usersRecord = arrayToRecord(usersData as User[]);
-
-    // Fetch projects the user is a member of
+    // Fetch project IDs for projects the user is a member of
     const { data: projectMembers, error: projectMembersError } = await supabase
         .from('project_members')
         .select('project_id')
         .eq('user_id', userId);
-
     if (projectMembersError) throw projectMembersError;
-
     const projectIds = projectMembers.map(pm => pm.project_id);
-    
+
+    // If the user isn't in any projects, just fetch their own profile
     if (projectIds.length === 0) {
-        return { projects: {}, users: usersRecord, projectOrder: [] };
+        const { data: userProfile, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+        if (userError) throw userError;
+        return { projects: {}, users: { [userId]: userProfile as User }, projectOrder: [] };
     }
 
+    // Since we have project IDs, get all members for these projects to fetch all relevant users
+    const { data: allProjectMembers, error: allMembersError } = await supabase
+        .from('project_members')
+        .select('user_id')
+        .in('project_id', projectIds);
+    if (allMembersError) throw allMembersError;
+
+    const allUserIdsInProjects = new Set(allProjectMembers.map(pm => pm.user_id));
+    allUserIdsInProjects.add(userId); // Ensure the current user is included
+
+    const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .in('id', Array.from(allUserIdsInProjects));
+    if (usersError) throw usersError;
+    const usersRecord = arrayToRecord(usersData as User[]);
+
+    // Now fetch the full project data
     const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select(`
             *,
             members:project_members(user_id),
             chat_messages:project_chats(*, author:users(*)),
+            links:project_links(*),
             columns:columns(
                 *,
                 tasks(
@@ -134,7 +150,9 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
         .in('id', projectIds)
         .order('position', { foreignTable: 'columns' })
         .order('position', { foreignTable: 'columns.tasks' })
-        .order('created_at', { foreignTable: 'chat_messages' });
+        .order('created_at', { foreignTable: 'chat_messages' })
+        .order('created_at', { foreignTable: 'links' });
+
 
     if (projectsError) throw projectsError;
 
@@ -182,6 +200,14 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
                 text: msg.text,
                 createdAt: msg.created_at,
                 author: msg.author,
+            })) || [],
+            links: p.links.map((l: any): ProjectLink => ({
+                id: l.id,
+                title: l.title,
+                url: l.url,
+                projectId: l.project_id,
+                creatorId: l.creator_id,
+                createdAt: l.created_at,
             })) || [],
             creatorId: p.creator_id,
             createdAt: p.created_at,
@@ -621,6 +647,27 @@ const acceptInvite = async (token: string): Promise<Project> => {
     return data as Project;
 };
 
+const addProjectLink = async (projectId: string, title: string, url: string, creatorId: string) => {
+    const { error } = await supabase.from('project_links').insert({
+        project_id: projectId,
+        title,
+        url,
+        creator_id: creatorId,
+    });
+    if (error) {
+        console.error("Error adding project link:", error.message || error);
+        throw error;
+    }
+};
+
+const deleteProjectLink = async (linkId: string) => {
+    const { error } = await supabase.from('project_links').delete().eq('id', linkId);
+    if (error) {
+        console.error("Error deleting project link:", error.message || error);
+        throw error;
+    }
+};
+
 
 export const api = {
     auth: {
@@ -655,5 +702,7 @@ export const api = {
         createInviteLink,
         updateInviteLink,
         acceptInvite,
+        addProjectLink,
+        deleteProjectLink,
     }
 }

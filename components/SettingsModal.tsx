@@ -164,7 +164,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <div key={project.id} className="p-4 bg-gray-800/50 rounded-lg">
                             <h4 className="font-semibold text-white">{project.name}</h4>
                             <p className="text-sm text-gray-400">{project.description}</p>
-                            <ProjectDangerZone project={project} onDelete={() => onDeleteProject(project.id)} />
+                            {currentUser.id === project.creatorId && (
+                                <ProjectDangerZone project={project} onDelete={() => onDeleteProject(project.id)} />
+                            )}
                         </div>
                     ))}
                 </div>

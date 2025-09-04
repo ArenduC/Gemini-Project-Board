@@ -1,17 +1,18 @@
 
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { DragDropContext, DropResult } from 'react-beautiful-dnd';
-import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment } from '../types';
+import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project } from '../types';
 import { Column } from './Column';
 import { Filters } from './Filters';
 import { PlusIcon, LayoutDashboardIcon, GitBranchIcon } from './Icons';
 import { ProjectChat } from './ProjectChat';
 import { AiTaskCreator } from './AiTaskCreator';
 import { TaskGraphView } from './TaskGraphView';
+import { ProjectLinksManager } from './ProjectLinksManager';
 
 interface KanbanBoardProps {
-  projectId: string;
-  boardData: BoardData;
+  project: Project;
   currentUser: User;
   users: User[];
   onlineUsers: Set<string>;
@@ -29,6 +30,8 @@ interface KanbanBoardProps {
   chatMessages: ChatMessage[];
   onSendMessage: (text: string) => Promise<void>;
   onTaskClick: (task: Task) => void;
+  addProjectLink: (title: string, url: string) => Promise<void>;
+  deleteProjectLink: (linkId: string) => Promise<void>;
 }
 
 const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColumn }) => {
@@ -93,7 +96,7 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
   )
 }
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, currentUser, users, onlineUsers, aiFeaturesEnabled, onDragEnd, updateTask, addSubtasks, addComment, addAiTask, deleteTask, addColumn, deleteColumn, isChatOpen, onCloseChat, chatMessages, onSendMessage, onTaskClick }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ project, currentUser, users, onlineUsers, aiFeaturesEnabled, onDragEnd, updateTask, addSubtasks, addComment, addAiTask, deleteTask, addColumn, deleteColumn, isChatOpen, onCloseChat, chatMessages, onSendMessage, onTaskClick, addProjectLink, deleteProjectLink }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('');
@@ -102,8 +105,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, 
 
   const [segments, setSegments] = useState<FilterSegment[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>('all');
-
-  const storageKey = `project-segments-${projectId}`;
+  
+  const boardData = project.board;
+  const storageKey = `project-segments-${project.id}`;
 
   useEffect(() => {
     try {
@@ -272,6 +276,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ projectId, boardData, 
         <AiTaskCreator onGenerateTask={addAiTask} />
       </div>
       )}
+      
+      <div className="mb-6">
+        <ProjectLinksManager
+            project={project}
+            onAddLink={addProjectLink}
+            onDeleteLink={deleteProjectLink}
+        />
+      </div>
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <Filters

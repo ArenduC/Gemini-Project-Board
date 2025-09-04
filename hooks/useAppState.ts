@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DropResult } from 'react-beautiful-dnd';
-import { AppState, Task, NewTaskData, User, ChatMessage, TaskPriority, Project } from '../types';
+import { AppState, Task, NewTaskData, User, ChatMessage, TaskPriority, Project, ProjectLink } from '../types';
 import { api } from '../services/api';
 import { generateTaskFromPrompt } from '../services/geminiService';
 
@@ -285,6 +285,16 @@ export const useAppState = (userId?: string, activeProjectId?: string | null) =>
         });
     }
   }, []);
+  
+  const addProjectLink = useCallback(async (projectId: string, title: string, url: string, creatorId: string) => {
+    await api.data.addProjectLink(projectId, title, url, creatorId);
+    await fetchData();
+  }, [fetchData]);
 
-  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage };
+  const deleteProjectLink = useCallback(async (linkId: string) => {
+      await api.data.deleteProjectLink(linkId);
+      await fetchData();
+  }, [fetchData]);
+
+  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink };
 };

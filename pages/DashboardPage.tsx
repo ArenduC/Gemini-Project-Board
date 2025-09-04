@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Project, User } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
 import { ProjectListRow } from '../components/ProjectListRow';
-import { PlusIcon, DownloadIcon, GridIcon, ListIcon } from '../components/Icons';
+import { PlusIcon, DownloadIcon, GridIcon, ListIcon, LayoutDashboardIcon } from '../components/Icons';
 import { exportTasksToCsv } from '../utils/export';
 
 interface DashboardPageProps {
@@ -14,6 +14,28 @@ interface DashboardPageProps {
   onManageMembers: (projectId: string) => void;
   onShareProject: (project: Project) => void;
 }
+
+// Empty state component
+const NoProjects: React.FC<{ onCreateProject: () => void }> = ({ onCreateProject }) => (
+  <div className="text-center py-20 px-6 bg-[#131C1B] rounded-xl border border-dashed border-gray-800">
+    <LayoutDashboardIcon className="mx-auto h-12 w-12 text-gray-500" />
+    <h3 className="mt-4 text-lg font-semibold text-white">No Projects Yet</h3>
+    <p className="mt-1 text-sm text-gray-400">
+      Get started by creating your first project.
+    </p>
+    <div className="mt-6">
+      <button
+        onClick={onCreateProject}
+        type="button"
+        className="inline-flex items-center gap-2 px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all text-sm"
+      >
+        <PlusIcon className="w-4 h-4" />
+        Create Project
+      </button>
+    </div>
+  </div>
+);
+
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, onlineUsers, onSelectProject, onCreateProject, onManageMembers, onShareProject }) => {
   const [view, setView] = useState<'grid' | 'list'>('grid');
@@ -65,43 +87,48 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
             </div>
         </div>
 
-        {/* Conditional Rendering */}
-        {view === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {projects.map(project => (
-                    <ProjectCard 
-                        key={project.id} 
-                        project={project} 
-                        users={users}
-                        onlineUsers={onlineUsers}
-                        onSelect={onSelectProject}
-                        onManageMembers={onManageMembers}
-                        onShare={() => onShareProject(project)} 
-                    />
-                ))}
-            </div>
+        {projects.length === 0 ? (
+            <NoProjects onCreateProject={onCreateProject} />
         ) : (
-            <div className="bg-[#131C1B] rounded-lg shadow-md border border-gray-800 overflow-hidden">
-                {/* List Header */}
-                 <div className="grid grid-cols-12 gap-4 items-center px-4 py-2 border-b border-gray-800 bg-[#1C2326]/50">
-                    <div className="col-span-4 font-semibold text-xs uppercase tracking-wider text-gray-400">Project</div>
-                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Progress</div>
-                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-center">Status</div>
-                    <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-right">Members</div>
-                    <div className="col-span-2"></div>
-                </div>
-                {projects.map(project => (
-                    <ProjectListRow
-                        key={project.id}
-                        project={project}
-                        users={users}
-                        onlineUsers={onlineUsers}
-                        onSelect={onSelectProject}
-                        onManageMembers={onManageMembers}
-                        onShare={() => onShareProject(project)}
-                    />
-                ))}
-            </div>
+            <>
+                {view === 'grid' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {projects.map(project => (
+                            <ProjectCard 
+                                key={project.id} 
+                                project={project} 
+                                users={users}
+                                onlineUsers={onlineUsers}
+                                onSelect={onSelectProject}
+                                onManageMembers={onManageMembers}
+                                onShare={() => onShareProject(project)} 
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="bg-[#131C1B] rounded-lg shadow-md border border-gray-800 overflow-hidden">
+                        {/* List Header */}
+                         <div className="grid grid-cols-12 gap-4 items-center px-4 py-2 border-b border-gray-800 bg-[#1C2326]/50">
+                            <div className="col-span-4 font-semibold text-xs uppercase tracking-wider text-gray-400">Project</div>
+                            <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Progress</div>
+                            <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-center">Status</div>
+                            <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-right">Members</div>
+                            <div className="col-span-2"></div>
+                        </div>
+                        {projects.map(project => (
+                            <ProjectListRow
+                                key={project.id}
+                                project={project}
+                                users={users}
+                                onlineUsers={onlineUsers}
+                                onSelect={onSelectProject}
+                                onManageMembers={onManageMembers}
+                                onShare={() => onShareProject(project)}
+                            />
+                        ))}
+                    </div>
+                )}
+            </>
         )}
     </div>
   );

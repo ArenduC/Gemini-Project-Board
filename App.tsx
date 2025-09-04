@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
@@ -7,10 +8,10 @@ import { ManageMembersModal } from './components/ManageMembersModal';
 import { BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon } from './components/Icons';
 import { useAppState } from './hooks/useAppState';
 import { DashboardPage } from './pages/DashboardPage';
-import { ResourceManagementPage } from './pages/ResourceManagementPage';
 import { TasksPage } from './pages/TasksPage';
+import { ResourceManagementPage } from './pages/ResourceManagementPage';
 import { LoginPage } from './pages/LoginPage';
-import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage } from './types';
+import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage, ProjectLink } from './types';
 import { api } from './services/api';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
@@ -24,7 +25,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { NotificationToast } from './components/NotificationToast';
 
 
-type View = 'dashboard' | 'project' | 'resources' | 'tasks';
+type View = 'dashboard' | 'project' | 'tasks' | 'resources';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('dashboard');
@@ -72,7 +73,7 @@ const App: React.FC = () => {
 
   const appState = useAppState(session?.user?.id, activeProjectId);
   // FIX: Destructure sendChatMessage and updateProjectMembers from appState to resolve reference errors.
-  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateUserProfile, deleteProject, sendChatMessage, updateProjectMembers } = appState;
+  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateUserProfile, deleteProject, sendChatMessage, updateProjectMembers, addProjectLink, deleteProjectLink } = appState;
 
   const activeProject = activeProjectId ? state.projects[activeProjectId] : null;
   const projectToManageMembers = projectForMemberManagementId ? state.projects[projectForMemberManagementId] : null;
@@ -301,6 +302,7 @@ const App: React.FC = () => {
         users: Object.values(state.users).map(u => ({ name: u.name, id: u.id })),
         columns: activeProject ? Object.values(activeProject.board.columns).map(c => ({ name: c.title, id: c.id })) : [],
         tasks: activeProject ? Object.values(activeProject.board.tasks).map(t => ({ title: t.title, id: t.id })) : [],
+        links: activeProject ? activeProject.links.map(l => ({ title: l.title })) : [],
     };
     
     try {
@@ -372,6 +374,16 @@ const App: React.FC = () => {
                     return `I couldn't find a destination called "${dest}".`;
                 }
             
+             case 'OPEN_LINK':
+                if (!activeProject) return "You need to be in a project to open a link.";
+                const linkTitle = result.params.linkTitle.toLowerCase();
+                const linkToOpen = activeProject.links.find(l => l.title.toLowerCase().includes(linkTitle));
+                if (linkToOpen) {
+                    window.open(linkToOpen.url, '_blank', 'noopener,noreferrer');
+                    return `OK, opening "${linkToOpen.title}".`;
+                }
+                return `I couldn't find a link named "${result.params.linkTitle}".`;
+
             case 'UNKNOWN':
                  return `Sorry, I'm not sure how to help with that. (${result.params.reason})`
             
@@ -531,8 +543,7 @@ const App: React.FC = () => {
           {view === 'project' && activeProject && (
             <KanbanBoard
               key={activeProject.id}
-              projectId={activeProject.id}
-              boardData={activeProject.board}
+              project={activeProject}
               currentUser={currentUser}
               users={Object.values(state.users)}
               onlineUsers={onlineUsers}
@@ -550,6 +561,8 @@ const App: React.FC = () => {
               onCloseChat={() => setIsChatOpen(false)}
               chatMessages={activeProject.chatMessages}
               onSendMessage={(text) => sendChatMessage(activeProject.id, text, currentUser)}
+              addProjectLink={(title, url) => addProjectLink(activeProject.id, title, url, currentUser.id)}
+              deleteProjectLink={(linkId) => deleteProjectLink(linkId)}
             />
           )}
           {view === 'tasks' && (
@@ -561,12 +574,12 @@ const App: React.FC = () => {
               />
           )}
           {view === 'resources' && (
-              <ResourceManagementPage 
-                  projects={state.projects} 
-                  users={state.users} 
-                  onlineUsers={onlineUsers}
-                  onTaskClick={handleTaskClick}
-              />
+            <ResourceManagementPage
+              projects={state.projects}
+              users={state.users}
+              onlineUsers={onlineUsers}
+              onTaskClick={handleTaskClick}
+            />
           )}
         </main>
       </div>
@@ -590,7 +603,7 @@ const App: React.FC = () => {
       {isCreateTaskModalOpen && activeProject && (
         <CreateTaskModal
           columns={Object.values(activeProject.board.columns)}
-          users={Object.values(state.users)}
+          users={activeProject.members.map(id => state.users[id]).filter(Boolean)}
           onAddTask={async (taskData) => {
             await addTask(activeProject.id, taskData, currentUser.id);
             setCreateTaskModalOpen(false);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Project, User } from '../types';
-import { XIcon } from './Icons';
+import { XIcon, TrashIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 
 interface ManageMembersModalProps {
@@ -12,21 +12,24 @@ interface ManageMembersModalProps {
 }
 
 export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ project, allUsers, onlineUsers, onClose, onSave }) => {
-  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set(project.members));
+  const [currentMemberIds, setCurrentMemberIds] = useState<string[]>(project.members);
 
-  const handleToggleMember = (userId: string) => {
-    const newSelection = new Set(selectedMemberIds);
-    if (newSelection.has(userId)) {
-      newSelection.delete(userId);
-    } else {
-      newSelection.add(userId);
+  const handleRemoveMember = (userIdToRemove: string) => {
+    if (userIdToRemove === project.creatorId) {
+        alert("You cannot remove the project creator.");
+        return;
     }
-    setSelectedMemberIds(newSelection);
+    setCurrentMemberIds(currentMemberIds.filter(id => id !== userIdToRemove));
   };
 
   const handleSave = () => {
-    onSave(Array.from(selectedMemberIds));
+    onSave(currentMemberIds);
   };
+
+  const memberDetails = currentMemberIds
+    .map(id => allUsers.find(u => u.id === id))
+    .filter((u): u is User => !!u);
+
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={onClose}>
@@ -42,20 +45,30 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ project,
         </header>
 
         <div className="p-6 overflow-y-auto max-h-[60vh] custom-scrollbar">
-          <h3 className="text-sm font-semibold text-white mb-2">Select members for this project</h3>
+          <h3 className="text-sm font-semibold text-white mb-2">Current Members</h3>
+          <p className="text-xs text-gray-400 mb-4">Add new members by sharing an invite link via the "Share" button on the dashboard.</p>
           <div className="space-y-2">
-            {allUsers.map(user => (
-              <label key={user.id} htmlFor={`user-${user.id}`} className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-800/50 cursor-pointer">
-                <input
-                  type="checkbox"
-                  id={`user-${user.id}`}
-                  checked={selectedMemberIds.has(user.id)}
-                  onChange={() => handleToggleMember(user.id)}
-                  className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500"
-                />
-                <UserAvatar user={user} className="w-9 h-9" isOnline={onlineUsers.has(user.id)} />
-                <span className="font-medium text-sm text-white">{user.name}</span>
-              </label>
+            {memberDetails.map(user => (
+              <div key={user.id} className="flex items-center justify-between gap-3 p-2 rounded-md hover:bg-gray-800/50">
+                <div className="flex items-center gap-3">
+                  <UserAvatar user={user} className="w-9 h-9" isOnline={onlineUsers.has(user.id)} />
+                  <div>
+                    <span className="font-medium text-sm text-white">{user.name}</span>
+                    {user.id === project.creatorId && (
+                       <span className="text-xs text-gray-500 block">Creator</span>
+                    )}
+                  </div>
+                </div>
+                {user.id !== project.creatorId && (
+                    <button
+                        onClick={() => handleRemoveMember(user.id)}
+                        className="p-2 rounded-md text-gray-400 hover:bg-red-900/50 hover:text-red-400 transition-colors"
+                        aria-label={`Remove ${user.name}`}
+                    >
+                       <TrashIcon className="w-4 h-4" />
+                    </button>
+                )}
+              </div>
             ))}
           </div>
         </div>

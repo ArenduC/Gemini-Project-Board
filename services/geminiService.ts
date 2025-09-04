@@ -1,7 +1,9 @@
 
 
+
+
 import { GoogleGenAI, Type } from "@google/genai";
-import { TaskPriority, Project, User } from "../types";
+import { TaskPriority, Project, User, ProjectLink } from "../types";
 
 // FIX: Switched to using process.env.API_KEY and updated the credential check
 // to align with @google/genai guidelines. This resolves the original type error.
@@ -88,6 +90,7 @@ export type VoiceCommandAction =
   | { action: 'MOVE_TASK', params: { taskTitle: string, targetColumnName: string } }
   | { action: 'ASSIGN_TASK', params: { taskTitle: string, assigneeName: string } }
   | { action: 'NAVIGATE', params: { destination: string } }
+  | { action: 'OPEN_LINK', params: { linkTitle: string } }
   | { action: 'UNKNOWN', params: { reason: string } };
 
 const voiceCommandResponseSchema = {
@@ -95,7 +98,7 @@ const voiceCommandResponseSchema = {
     properties: {
         action: { 
             type: Type.STRING,
-            enum: ['CREATE_TASK', 'MOVE_TASK', 'ASSIGN_TASK', 'NAVIGATE', 'UNKNOWN'],
+            enum: ['CREATE_TASK', 'MOVE_TASK', 'ASSIGN_TASK', 'NAVIGATE', 'OPEN_LINK', 'UNKNOWN'],
             description: 'The type of action to perform.'
         },
         params: {
@@ -108,12 +111,36 @@ const voiceCommandResponseSchema = {
                 targetColumnName: { type: Type.STRING, description: 'The name of the column to move a task to.' },
                 assigneeName: { type: Type.STRING, description: 'The name of the user to assign a task to.' },
                 destination: { type: Type.STRING, description: 'The page or project name to navigate to.' },
+                linkTitle: { type: Type.STRING, description: 'The title of the project link to open.' },
                 reason: { type: Type.STRING, description: 'Reason for an unknown command.' }
             }
         }
     },
     required: ['action', 'params']
 }
+
+export interface ProjectLinkResponse {
+    title: string;
+    url: string;
+}
+
+const projectLinkResponseSchema = {
+    type: Type.ARRAY,
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            title: {
+                type: Type.STRING,
+                description: "A descriptive title for the link (e.g., 'Figma Mockups', 'GitHub Repository')."
+            },
+            url: {
+                type: Type.STRING,
+                description: "The full URL for the resource."
+            }
+        },
+        required: ["title", "url"],
+    },
+};
 
 /**
  * Generates a list of subtasks for a given parent task using the Gemini API.
@@ -311,7 +338,7 @@ export const interpretVoiceCommand = async (command: string, context: any): Prom
 
             User's command: "${command}"
 
-            Here is the context of the application state. Use this to find the correct entities (tasks, columns, users, projects):
+            Here is the context of the application state. Use this to find the correct entities (tasks, columns, users, projects, links):
             ${JSON.stringify(context)}
 
             Based on the command, determine the user's intent and choose one of the following actions:
@@ -319,6 +346,7 @@ export const interpretVoiceCommand = async (command: string, context: any): Prom
             - MOVE_TASK: When the user wants to move an existing task to a different column. Extract the task's title and the target column's name.
             - ASSIGN_TASK: When the user wants to assign a task to a user. Extract the task's title and the assignee's name.
             - NAVIGATE: When the user wants to go to a different page or project. The destination can be 'dashboard', 'tasks', 'resources', or a project name.
+            - OPEN_LINK: When the user wants to open a project-specific link. Extract the title of the link from the command.
             - UNKNOWN: If the command is unclear or cannot be mapped to any of the above actions.
 
             Return ONLY the JSON object for the action. Do not add any extra text or explanations.
@@ -354,5 +382,42 @@ export const interpretVoiceCommand = async (command: string, context: any): Prom
             throw new Error("The Gemini API key is invalid or missing.");
         }
         return { action: 'UNKNOWN', params: { reason: "Failed to communicate with the AI assistant." } };
+    }
+};
+
+/**
+ * Generates a list of relevant project links using the Gemini API.
+ * @param projectName The name of the project.
+ * @param projectDescription The description of the project.
+ * @returns A promise that resolves to an array of link objects.
+ */
+export const generateProjectLinks = async (projectName: string, projectDescription: string): Promise<ProjectLinkResponse[]> => {
+    try {
+        const prompt = `
+            Based on the project name "${projectName}" and description "${projectDescription}", 
+            suggest a list of relevant links for development and management. 
+            Common links include source code repositories (like GitHub), design files (like Figma), and documentation.
+            Provide a valid URL for each.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: projectLinkResponseSchema,
+            },
+        });
+
+        const jsonText = response.text.trim();
+        if (!jsonText) {
+            console.warn("Gemini API returned an empty response for project links.");
+            return [];
+        }
+        const parsedResponse = JSON.parse(jsonText);
+        return parsedResponse as ProjectLinkResponse[];
+    } catch (error) {
+        console.error("Error calling Gemini API for project link generation:", error);
+        throw new Error("Failed to generate project links from AI.");
     }
 };
