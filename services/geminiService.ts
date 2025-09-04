@@ -1,9 +1,6 @@
 
-
-
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { TaskPriority, Project, User, ProjectLink } from "../types";
+import { TaskPriority, Project, User, ProjectLink, AiGeneratedProjectPlan } from "../types";
 
 // FIX: Switched to using process.env.API_KEY and updated the credential check
 // to align with @google/genai guidelines. This resolves the original type error.
@@ -141,6 +138,48 @@ const projectLinkResponseSchema = {
         required: ["title", "url"],
     },
 };
+
+const projectFromCsvResponseSchema = {
+    type: Type.OBJECT,
+    properties: {
+        name: { type: Type.STRING, description: "A suitable name for the project, derived from the CSV content." },
+        description: { type: Type.STRING, description: "A brief, one-sentence description of the project's goal." },
+        columns: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    title: { type: Type.STRING, description: "The title of a status column (e.g., 'To Do', 'In Progress', 'Done')." },
+                    tasks: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                title: { type: Type.STRING, description: "The title of the task." },
+                                description: { type: Type.STRING, description: "A detailed description of the task." },
+                                priority: { type: Type.STRING, enum: Object.values(TaskPriority), description: "The priority of the task." },
+                                subtasks: {
+                                    type: Type.ARRAY,
+                                    items: {
+                                        type: Type.OBJECT,
+                                        properties: {
+                                            title: { type: Type.STRING, description: "The title of a subtask." }
+                                        },
+                                        required: ["title"]
+                                    }
+                                }
+                            },
+                            required: ["title", "description", "priority", "subtasks"]
+                        }
+                    }
+                },
+                required: ["title", "tasks"]
+            }
+        }
+    },
+    required: ["name", "description", "columns"]
+};
+
 
 /**
  * Generates a list of subtasks for a given parent task using the Gemini API.
@@ -419,5 +458,55 @@ export const generateProjectLinks = async (projectName: string, projectDescripti
     } catch (error) {
         console.error("Error calling Gemini API for project link generation:", error);
         throw new Error("Failed to generate project links from AI.");
+    }
+};
+
+/**
+ * Generates a structured project plan from CSV data.
+ * @param csvContent The string content of the user's CSV file.
+ * @returns A promise that resolves to a structured project plan object.
+ */
+export const generateProjectFromCsv = async (csvContent: string): Promise<AiGeneratedProjectPlan> => {
+    try {
+        const prompt = `
+            You are an expert project manager. A user has provided a CSV file to bootstrap a new project.
+            Your task is to analyze the CSV content and structure it into a complete project plan.
+
+            CSV Content:
+            ---
+            ${csvContent}
+            ---
+
+            Instructions:
+            1.  Infer a suitable project name and a brief description from the data.
+            2.  Group tasks into logical columns. If a 'status' or 'column' field exists, use it. Otherwise, create standard columns like 'To Do', 'In Progress', and 'Done' and assign tasks appropriately. All tasks without a clear status should go into 'To Do'.
+            3.  For each task, extract a title, description, and priority. If priority isn't specified, default to 'Medium'.
+            4.  If there are items that look like subtasks of a main task, nest them accordingly.
+            5.  Ensure the output is ONLY the JSON object that matches the provided schema. Do not include any other text.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: projectFromCsvResponseSchema,
+            },
+        });
+
+        const jsonText = response.text.trim();
+        if (!jsonText) {
+            throw new Error("AI returned an empty response for the project plan.");
+        }
+        const parsedResponse = JSON.parse(jsonText);
+        // Add more robust validation if needed
+        return parsedResponse as AiGeneratedProjectPlan;
+
+    } catch (error) {
+        console.error("Error calling Gemini API for project generation from CSV:", error);
+        if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
+            throw new Error("The Gemini API key is invalid or missing.");
+        }
+        throw new Error("Failed to generate project from CSV. Please check the file format and try again.");
     }
 };

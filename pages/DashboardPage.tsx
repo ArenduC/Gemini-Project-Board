@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
-import { Project, User } from '../types';
+import { Project, User, AiGeneratedProjectPlan } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
 import { ProjectListRow } from '../components/ProjectListRow';
 import { PlusIcon, DownloadIcon, GridIcon, ListIcon, LayoutDashboardIcon } from '../components/Icons';
 import { exportTasksToCsv } from '../utils/export';
+import { ProjectDropzone } from '../components/ProjectDropzone';
+import { ProjectConfirmationModal } from '../components/ProjectConfirmationModal';
+import { generateProjectFromCsv } from '../services/geminiService';
+
 
 interface DashboardPageProps {
   projects: Project[];
@@ -13,6 +17,7 @@ interface DashboardPageProps {
   onCreateProject: () => void;
   onManageMembers: (projectId: string) => void;
   onShareProject: (project: Project) => void;
+  addProjectFromPlan: (plan: AiGeneratedProjectPlan) => Promise<void>;
 }
 
 // Empty state component
@@ -37,8 +42,35 @@ const NoProjects: React.FC<{ onCreateProject: () => void }> = ({ onCreateProject
 );
 
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, onlineUsers, onSelectProject, onCreateProject, onManageMembers, onShareProject }) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, onlineUsers, onSelectProject, onCreateProject, onManageMembers, onShareProject, addProjectFromPlan }) => {
   const [view, setView] = useState<'grid' | 'list'>('grid');
+  
+  const [generatedPlan, setGeneratedPlan] = useState<AiGeneratedProjectPlan | null>(null);
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+
+  const handleFileProcessed = async (csvContent: string) => {
+    setIsAiProcessing(true);
+    try {
+        const plan = await generateProjectFromCsv(csvContent);
+        setGeneratedPlan(plan);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : "An unknown error occurred.";
+        alert(`AI Error: ${message}`);
+    } finally {
+        setIsAiProcessing(false);
+    }
+  };
+
+  const handleConfirmProjectCreation = async () => {
+    if (!generatedPlan) return;
+    try {
+        await addProjectFromPlan(generatedPlan);
+        setGeneratedPlan(null); // Close modal on success
+    } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not create project.";
+        alert(`Error: ${message}`);
+    }
+  };
 
   const handleExport = () => {
     exportTasksToCsv(projects, users);
@@ -86,6 +118,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                 </button>
             </div>
         </div>
+        
+        <ProjectDropzone onFileProcessed={handleFileProcessed} isLoading={isAiProcessing} />
 
         {projects.length === 0 ? (
             <NoProjects onCreateProject={onCreateProject} />
@@ -129,6 +163,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                     </div>
                 )}
             </>
+        )}
+
+        {generatedPlan && (
+            <ProjectConfirmationModal
+                plan={generatedPlan}
+                onConfirm={handleConfirmProjectCreation}
+                onCancel={() => setGeneratedPlan(null)}
+            />
         )}
     </div>
   );

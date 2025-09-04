@@ -150,3 +150,22 @@ export interface Notification {
   message: string;
   project: Project;
 }
+
+// Types for AI-generated project from CSV
+export interface AiGeneratedTask {
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  subtasks: { title: string }[];
+}
+
+export interface AiGeneratedColumn {
+  title: string;
+  tasks: AiGeneratedTask[];
+}
+
+export interface AiGeneratedProjectPlan {
+  name: string;
+  description: string;
+  columns: AiGeneratedColumn[];
+}

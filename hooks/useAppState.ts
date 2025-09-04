@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DropResult } from 'react-beautiful-dnd';
-import { AppState, Task, NewTaskData, User, ChatMessage, TaskPriority, Project, ProjectLink } from '../types';
+import { AppState, Task, NewTaskData, User, ChatMessage, TaskPriority, Project, ProjectLink, AiGeneratedProjectPlan } from '../types';
 import { api } from '../services/api';
 import { generateTaskFromPrompt } from '../services/geminiService';
 
@@ -223,6 +223,35 @@ export const useAppState = (userId?: string, activeProjectId?: string | null) =>
     await fetchData();
   }, [fetchData]);
 
+  const addProjectFromPlan = useCallback(async (plan: AiGeneratedProjectPlan) => {
+    if (!currentUser) throw new Error("User must be logged in.");
+
+    // 1. Create Project Shell
+    const newProject = await api.data.createProjectShell(plan.name, plan.description, currentUser.id);
+
+    // 2. Create Columns and Tasks
+    for (const col of plan.columns) {
+        const newColumn = await api.data.addColumn(newProject.id, col.title);
+        if (newColumn) {
+            for (const task of col.tasks) {
+                const taskData: NewTaskData = {
+                    title: task.title,
+                    description: task.description,
+                    priority: task.priority,
+                    columnId: newColumn.id,
+                };
+                const newTask = await api.data.addTask(taskData, currentUser.id);
+                if (newTask && task.subtasks && task.subtasks.length > 0) {
+                    await api.data.addSubtasks(newTask.id, task.subtasks, currentUser.id);
+                }
+            }
+        }
+    }
+    
+    // 3. Refresh state
+    await fetchData();
+  }, [fetchData, currentUser]);
+
   const deleteProject = useCallback(async (projectId: string) => {
     await api.data.deleteProject(projectId);
     await fetchData();
@@ -296,5 +325,5 @@ export const useAppState = (userId?: string, activeProjectId?: string | null) =>
       await fetchData();
   }, [fetchData]);
 
-  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink };
+  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink };
 };

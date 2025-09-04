@@ -74,7 +74,7 @@ const App: React.FC = () => {
 
   const appState = useAppState(session?.user?.id, activeProjectId);
   // FIX: Destructure sendChatMessage and updateProjectMembers from appState to resolve reference errors.
-  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, updateUserProfile, deleteProject, sendChatMessage, updateProjectMembers, addProjectLink, deleteProjectLink } = appState;
+  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, updateUserProfile, deleteProject, sendChatMessage, updateProjectMembers, addProjectLink, deleteProjectLink } = appState;
 
   const activeProject = activeProjectId ? state.projects[activeProjectId] : null;
   const projectToManageMembers = projectForMemberManagementId ? state.projects[projectForMemberManagementId] : null;
@@ -550,6 +550,7 @@ const App: React.FC = () => {
               onCreateProject={() => setCreateProjectModalOpen(true)}
               onManageMembers={handleOpenManageMembersModal}
               onShareProject={handleOpenInviteModal}
+              addProjectFromPlan={addProjectFromPlan}
             />
           )}
           {view === 'project' && activeProject && (

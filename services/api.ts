@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabase';
-import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink } from '../types';
+import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column } from '../types';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
@@ -483,16 +483,21 @@ const addComment = async (taskId: string, commentText: string, authorId: string)
     if (error) console.error("Error adding comment", error.message || error);
 };
 
-const addTask = async (taskData: NewTaskData, creatorId: string) => {
-    const { error } = await supabase.from('tasks').insert({
+const addTask = async (taskData: NewTaskData, creatorId: string): Promise<Task> => {
+    const { data, error } = await supabase.from('tasks').insert({
         title: taskData.title,
         description: taskData.description,
         priority: taskData.priority,
         column_id: taskData.columnId,
         creator_id: creatorId,
         assignee_id: taskData.assigneeId,
-    });
-    if(error) console.error("Error adding task", error.message || error);
+    }).select().single();
+
+    if(error) {
+        console.error("Error adding task", error.message || error);
+        throw error;
+    }
+    return data as Task;
 };
 
 const deleteTask = async (taskId: string) => {
@@ -500,18 +505,44 @@ const deleteTask = async (taskId: string) => {
     if(error) console.error("Error deleting task", error.message || error);
 };
 
-const addColumn = async (projectId: string, title: string) => {
-    const { error } = await supabase.from('columns').insert({
+const addColumn = async (projectId: string, title: string): Promise<Column> => {
+    const { data, error } = await supabase.from('columns').insert({
         title: title,
         project_id: projectId,
-    });
-    if(error) console.error("Error adding column", error.message || error);
+    }).select().single();
+    if(error) {
+        console.error("Error adding column", error.message || error);
+        throw error;
+    }
+    return data as Column;
 };
 
 const deleteColumn = async (columnId: string) => {
     const { error } = await supabase.from('columns').delete().eq('id', columnId);
     if(error) console.error("Error deleting column", error.message || error);
 };
+
+const createProjectShell = async (name: string, description: string, creatorId: string): Promise<Project> => {
+    const { data: project, error } = await supabase
+        .from('projects')
+        .insert({ name, description, creator_id: creatorId })
+        .select()
+        .single();
+    if (error) {
+        console.error("Error creating project shell", error.message || error);
+        throw error;
+    }
+
+    const { error: memberError } = await supabase
+        .from('project_members')
+        .insert({ project_id: project.id, user_id: creatorId });
+    if (memberError) {
+        console.error("Error adding creator to project", memberError.message || memberError);
+        throw memberError;
+    }
+    return project as Project;
+}
+
 
 const addProject = async (name: string, description: string, creatorId: string) => {
     const { data: project, error } = await supabase
@@ -696,6 +727,7 @@ export const api = {
         addColumn,
         deleteColumn,
         addProject,
+        createProjectShell,
         deleteProject,
         updateProjectMembers,
         sendChatMessage,
