@@ -1,6 +1,5 @@
 
-
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
@@ -13,7 +12,7 @@ import { ResourceManagementPage } from './pages/ResourceManagementPage';
 import { LoginPage } from './pages/LoginPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import CallbackPage from './pages/CallbackPage';
-import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage, ProjectLink } from './types';
+import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage } from './types';
 import { api } from './services/api';
 import { Session, RealtimeChannel, AuthChangeEvent } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
@@ -31,11 +30,9 @@ import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 type View = 'dashboard' | 'project' | 'tasks' | 'resources' | 'privacy';
 
 const App: React.FC = () => {
-  const [view, setView] = useState<View>('dashboard');
-  const [previousView, setPreviousView] = useState<View>('dashboard');
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [locationPath, setLocationPath] = useState(window.location.pathname);
+  
   const [isChatOpen, setIsChatOpen] = useState(false);
-
   const [isCreateTaskModalOpen, setCreateTaskModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setCreateProjectModalOpen] = useState(false);
   const [isManageMembersModalOpen, setManageMembersModalOpen] = useState(false);
@@ -49,7 +46,6 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
-  const [preAuthView, setPreAuthView] = useState<'login' | 'privacy'>('login');
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -57,6 +53,20 @@ const App: React.FC = () => {
   const [isSearchModalOpen, setSearchModalOpen] = useState(false);
   const [isVoiceAssistantModalOpen, setVoiceAssistantModalOpen] = useState(false);
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
+
+  // Derive view and active project ID from the URL path
+  const { view, activeProjectId } = useMemo(() => {
+    const path = locationPath;
+    if (path.startsWith('/projects/')) {
+        const id = path.split('/')[2];
+        return { view: 'project' as View, activeProjectId: id };
+    }
+    if (path === '/tasks') return { view: 'tasks' as View, activeProjectId: null };
+    if (path === '/resources') return { view: 'resources' as View, activeProjectId: null };
+    if (path === '/privacy') return { view: 'privacy' as View, activeProjectId: null };
+    
+    return { view: 'dashboard' as View, activeProjectId: null };
+  }, [locationPath]);
 
   // Feature Flags
   const [featureFlags, setFeatureFlags] = useState({
@@ -77,29 +87,43 @@ const App: React.FC = () => {
   const chatMessagesRef = useRef<ChatMessage[]>([]);
   const activeProjectIdRef = useRef<string | null>(null);
 
-  const appState = useAppState(session?.user?.id, activeProjectId);
-  // FIX: Destructure sendChatMessage and updateProjectMembers from appState to resolve reference errors.
+  const appState = useAppState(session, currentUser, activeProjectId);
   const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, updateUserProfile, deleteProject, sendChatMessage, updateProjectMembers, addProjectLink, deleteProjectLink } = appState;
 
   const activeProject = activeProjectId ? state.projects[activeProjectId] : null;
   const projectToManageMembers = projectForMemberManagementId ? state.projects[projectForMemberManagementId] : null;
 
+    // Navigation function
+    const navigate = (path: string) => {
+        window.history.pushState({}, '', path);
+        setLocationPath(path);
+    };
+
+    // Listen to browser's back/forward events
+    useEffect(() => {
+        const onLocationChange = () => {
+            setLocationPath(window.location.pathname);
+        };
+        window.addEventListener('popstate', onLocationChange);
+        return () => {
+            window.removeEventListener('popstate', onLocationChange);
+        };
+    }, []);
+
     useEffect(() => {
         setAuthLoading(true);
         const { data: { subscription } } = api.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
-            // Handle password recovery event
             if (_event === 'PASSWORD_RECOVERY') {
                 setIsResettingPassword(true);
-                setAuthLoading(false); // Stop loading to show reset page
+                setAuthLoading(false);
                 return;
             } else if (_event !== 'INITIAL_SESSION') {
                 setIsResettingPassword(false);
             }
 
-            // Handle email confirmation redirect
             if (session?.user && window.location.pathname === '/callback') {
-                window.location.replace('/');
-                return; // Stop processing to allow redirect to happen
+                window.history.replaceState({}, '', '/');
+                setLocationPath('/');
             }
             
             setSession(session);
@@ -125,7 +149,6 @@ const App: React.FC = () => {
 
         channel.on('presence', { event: 'sync' }, () => {
           const presenceState = channel.presenceState();
-          // FIX: Type assertion to handle potential mismatch in Supabase presence state type inference.
           const userIds = Object.keys(presenceState).map(key => (presenceState[key][0] as any).user_id);
           setOnlineUsers(new Set(userIds));
         });
@@ -186,21 +209,20 @@ const App: React.FC = () => {
             const token = localStorage.getItem('project_invite_token') || (window.location.pathname.startsWith('/invite/') ? window.location.pathname.split('/invite/')[1] : null);
 
             if (token && currentUser) {
-                localStorage.removeItem('project_invite_token'); // Clear token from storage
+                localStorage.removeItem('project_invite_token'); 
                 try {
                     const joinedProject = await api.data.acceptInvite(token);
                     alert(`Successfully joined project: ${joinedProject.name}`);
-                    await fetchData(); // Refresh data to include the new project
-                    handleSelectProject(joinedProject.id);
+                    await fetchData(); 
+                    navigate(`/projects/${joinedProject.id}`);
                 } catch (error) {
                     alert(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 } finally {
                     if (window.location.pathname.startsWith('/invite/')) {
-                        window.history.replaceState({}, document.title, window.location.origin);
+                       navigate('/');
                     }
                 }
             } else if (token && !currentUser) {
-                // Not logged in, store token and wait for login
                 localStorage.setItem('project_invite_token', token);
             }
         };
@@ -235,32 +257,19 @@ const App: React.FC = () => {
   const handleLogout = async () => {
     await api.auth.signOut();
     setIsUserMenuOpen(false);
-    setView('dashboard');
-    setActiveProjectId(null);
+    navigate('/');
   };
 
   const handleSelectProject = useCallback((projectId: string) => {
-    setActiveProjectId(projectId);
-    setView('project');
+    navigate(`/projects/${projectId}`);
   }, []);
 
 
   const handleBackToDashboard = useCallback(() => {
-    setActiveProjectId(null);
-    setView('dashboard');
-    setIsChatOpen(false); // Close chat when leaving project
+    setIsChatOpen(false); 
+    navigate('/');
   }, []);
-
-  const handleShowPrivacy = () => {
-    setPreviousView(view);
-    setView('privacy');
-  };
-
-  const handleBackFromPrivacy = () => {
-      setView(previousView);
-  };
-
-
+  
   const handleOpenManageMembersModal = (projectId: string) => {
     setProjectForMemberManagementId(projectId);
     setManageMembersModalOpen(true);
@@ -324,7 +333,6 @@ const App: React.FC = () => {
         return "Sorry, I didn't catch that.";
     }
 
-    // Create a simplified context for the AI
     const context = {
         currentView: view,
         activeProject: activeProject ? { name: activeProject.name, id: activeProject.id } : null,
@@ -364,7 +372,6 @@ const App: React.FC = () => {
                  const sourceColumn = Object.values(activeProject.board.columns).find(c => c.taskIds.includes(taskToMove.id));
                  if (!sourceColumn) return "I couldn't determine the task's current location.";
 
-                 // FIX: Add `combine: null` to satisfy the DropResult type.
                  const dragResult: DropResult = {
                      draggableId: taskToMove.id,
                      source: { droppableId: sourceColumn.id, index: sourceColumn.taskIds.indexOf(taskToMove.id) },
@@ -392,17 +399,16 @@ const App: React.FC = () => {
 
             case 'NAVIGATE':
                 const dest = result.params.destination.toLowerCase();
-                if (['dashboard', 'tasks', 'resources'].includes(dest)) {
-                    setView(dest as View);
-                    return `Navigating to ${dest}.`;
-                } else {
-                    const projectToNav = Object.values(state.projects).find(p => p.name.toLowerCase() === dest);
-                    if (projectToNav) {
-                        handleSelectProject(projectToNav.id);
-                        return `Opening project: ${projectToNav.name}.`;
-                    }
-                    return `I couldn't find a destination called "${dest}".`;
+                if (dest === 'dashboard') { navigate('/'); return `Navigating to dashboard.`; }
+                if (dest === 'tasks') { navigate('/tasks'); return `Navigating to tasks.`; }
+                if (dest === 'resources') { navigate('/resources'); return `Navigating to resources.`; }
+                
+                const projectToNav = Object.values(state.projects).find(p => p.name.toLowerCase() === dest);
+                if (projectToNav) {
+                    navigate(`/projects/${projectToNav.id}`);
+                    return `Opening project: ${projectToNav.name}.`;
                 }
+                return `I couldn't find a destination called "${dest}".`;
             
              case 'OPEN_LINK':
                 if (!activeProject) return "You need to be in a project to open a link.";
@@ -427,7 +433,6 @@ const App: React.FC = () => {
   };
   
     const handleResetSuccess = async () => {
-        // Sign out the temporary session so the user can log in with their new password
         await api.auth.signOut();
         setIsResettingPassword(false);
     };
@@ -473,10 +478,10 @@ const App: React.FC = () => {
   }
 
   if (!session || !currentUser) {
-    if (preAuthView === 'privacy') {
-        return <PrivacyPolicyPage onBack={() => setPreAuthView('login')} />;
+    if (view === 'privacy') {
+        return <PrivacyPolicyPage onBack={() => navigate('/')} />;
     }
-    return <LoginPage onShowPrivacy={() => setPreAuthView('privacy')} />;
+    return <LoginPage onShowPrivacy={() => navigate('/privacy')} />;
   }
   
   if (appStateLoading) {
@@ -487,9 +492,9 @@ const App: React.FC = () => {
         </div>
     );
   }
-
+  
   if (view === 'privacy') {
-    return <PrivacyPolicyPage onBack={handleBackFromPrivacy} />;
+    return <PrivacyPolicyPage onBack={() => window.history.back()} />;
   }
 
   return (
@@ -499,9 +504,9 @@ const App: React.FC = () => {
           <HeaderContent />
 
           <nav className="flex items-center gap-2 px-2 py-1 bg-[#1C2326] rounded-full">
-            <button onClick={() => setView('dashboard')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'dashboard' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><LayoutDashboardIcon className="w-4 h-4" /> Dashboard</button>
-            <button onClick={() => setView('tasks')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'tasks' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><ClipboardListIcon className="w-4 h-4" /> Tasks</button>
-            <button onClick={() => setView('resources')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'resources' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><UsersIcon className="w-4 h-4" /> Resources</button>
+            <button onClick={() => navigate('/')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'dashboard' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><LayoutDashboardIcon className="w-4 h-4" /> Dashboard</button>
+            <button onClick={() => navigate('/tasks')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'tasks' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><ClipboardListIcon className="w-4 h-4" /> Tasks</button>
+            <button onClick={() => navigate('/resources')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'resources' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><UsersIcon className="w-4 h-4" /> Resources</button>
           </nav>
           
           <div className="flex items-center gap-2">
@@ -651,7 +656,7 @@ const App: React.FC = () => {
           }}
           onShowPrivacy={() => {
             setSettingsModalOpen(false);
-            handleShowPrivacy();
+            navigate('/privacy');
           }}
         />
       )}
@@ -714,7 +719,7 @@ const App: React.FC = () => {
             projects={state.projects}
             users={state.users}
             onSelectProject={(projectId) => {
-                handleSelectProject(projectId);
+                navigate(`/projects/${projectId}`);
                 setSearchModalOpen(false);
             }}
             onSelectTask={(task) => {

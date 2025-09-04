@@ -5,6 +5,7 @@ import { DropResult } from 'react-beautiful-dnd';
 import { AppState, Task, NewTaskData, User, ChatMessage, TaskPriority, Project, ProjectLink, AiGeneratedProjectPlan } from '../types';
 import { api } from '../services/api';
 import { generateTaskFromPrompt } from '../services/geminiService';
+import { Session } from '@supabase/supabase-js';
 
 const initialState: AppState = {
   projects: {},
@@ -12,22 +13,11 @@ const initialState: AppState = {
   projectOrder: [],
 };
 
-export const useAppState = (userId?: string, activeProjectId?: string | null) => {
+export const useAppState = (session: Session | null, currentUser: User | null, activeProjectId?: string | null) => {
   const [state, setState] = useState<AppState>(initialState);
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-        if(userId) {
-            const user = await api.auth.getUserProfile(userId);
-            setCurrentUser(user);
-        } else {
-            setCurrentUser(null);
-        }
-    };
-    fetchUser();
-  }, [userId]);
+  
+  const userId = session?.user?.id;
 
   const fetchData = useCallback(async () => {
     if (!userId) {
@@ -54,7 +44,7 @@ export const useAppState = (userId?: string, activeProjectId?: string | null) =>
   
   // Real-time subscription for project chat
   useEffect(() => {
-    if (!activeProjectId || !userId) return;
+    if (!activeProjectId || !session) return;
 
     const handleNewMessage = (payload: any) => {
       const newMessageData = payload.new;
@@ -114,7 +104,7 @@ export const useAppState = (userId?: string, activeProjectId?: string | null) =>
     return () => {
       subscription.unsubscribe();
     };
-  }, [activeProjectId, userId]);
+  }, [activeProjectId, session]);
 
 
   const onDragEnd = useCallback(async (projectId: string, result: DropResult) => {
