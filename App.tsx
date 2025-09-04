@@ -30,7 +30,7 @@ import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 type View = 'dashboard' | 'project' | 'tasks' | 'resources' | 'privacy';
 
 const App: React.FC = () => {
-  const [locationPath, setLocationPath] = useState(window.location.pathname);
+  const [locationHash, setLocationHash] = useState(window.location.hash);
   
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isCreateTaskModalOpen, setCreateTaskModalOpen] = useState(false);
@@ -54,9 +54,17 @@ const App: React.FC = () => {
   const [isVoiceAssistantModalOpen, setVoiceAssistantModalOpen] = useState(false);
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
 
-  // Derive view and active project ID from the URL path
+  // Navigation function using hash
+  const navigate = (path: string) => {
+      // Ensure path starts with a slash
+      const safePath = path.startsWith('/') ? path : `/${path}`;
+      window.location.hash = safePath;
+  };
+
+  // Derive view and active project ID from the URL hash
   const { view, activeProjectId } = useMemo(() => {
-    const path = locationPath;
+    const path = (locationHash.startsWith('#') ? locationHash.substring(1) : locationHash) || '/';
+
     if (path.startsWith('/projects/')) {
         const id = path.split('/')[2];
         return { view: 'project' as View, activeProjectId: id };
@@ -66,7 +74,7 @@ const App: React.FC = () => {
     if (path === '/privacy') return { view: 'privacy' as View, activeProjectId: null };
     
     return { view: 'dashboard' as View, activeProjectId: null };
-  }, [locationPath]);
+  }, [locationHash]);
 
   // Feature Flags
   const [featureFlags, setFeatureFlags] = useState({
@@ -93,47 +101,72 @@ const App: React.FC = () => {
   const activeProject = activeProjectId ? state.projects[activeProjectId] : null;
   const projectToManageMembers = projectForMemberManagementId ? state.projects[projectForMemberManagementId] : null;
 
-    // Navigation function
-    const navigate = (path: string) => {
-        window.history.pushState({}, '', path);
-        setLocationPath(path);
-    };
-
-    // Listen to browser's back/forward events
+    // Listen to hash changes
     useEffect(() => {
-        const onLocationChange = () => {
-            setLocationPath(window.location.pathname);
+        const onHashChange = () => {
+            setLocationHash(window.location.hash);
         };
-        window.addEventListener('popstate', onLocationChange);
+        window.addEventListener('hashchange', onHashChange);
         return () => {
-            window.removeEventListener('popstate', onLocationChange);
+            window.removeEventListener('hashchange', onHashChange);
         };
     }, []);
 
     useEffect(() => {
         setAuthLoading(true);
         const { data: { subscription } } = api.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
+          try {
+            // Handle password recovery state, but don't exit early.
             if (_event === 'PASSWORD_RECOVERY') {
                 setIsResettingPassword(true);
-                setAuthLoading(false);
-                return;
             } else if (_event !== 'INITIAL_SESSION') {
+                // This ensures the reset state is cleared on subsequent auth events.
                 setIsResettingPassword(false);
             }
 
+            // Handle OAuth callback
             if (session?.user && window.location.pathname === '/callback') {
-                window.history.replaceState({}, '', '/');
-                setLocationPath('/');
+                // Redirect to the root of the app with a hash, causing a clean reload.
+                window.location.assign('/#/');
+                return; // Stop further processing as we are redirecting.
             }
             
-            setSession(session);
-            if (session?.user) {
-                const userProfile = await api.auth.getUserProfile(session.user.id);
+            // Set session and user profile, but skip profile fetch during password recovery
+            if (session?.user && _event !== 'PASSWORD_RECOVERY') {
+                let userProfile = await api.auth.getUserProfile(session.user.id);
+
+                // If the user is authenticated but has no profile in our public table, create one.
+                // This makes the app resilient if the DB trigger for new user creation is missing.
+                if (!userProfile) {
+                    console.warn(`User profile not found for user ${session.user.id}. Attempting to create one.`);
+                    try {
+                        userProfile = await api.auth.createUserProfile(session.user);
+                    } catch (creationError) {
+                        console.error("Fatal: Could not create user profile.", creationError);
+                        // Sign out to prevent an infinite loop of login attempts
+                        await api.auth.signOut();
+                        setSession(null);
+                        setCurrentUser(null);
+                        // The finally block will hide the auth loader, and the app will show the login page.
+                        return;
+                    }
+                }
+
+                setSession(session);
                 setCurrentUser(userProfile);
             } else {
+                setSession(null);
                 setCurrentUser(null);
             }
-            setAuthLoading(false);
+          } catch (error) {
+            console.error("Error in onAuthStateChange handler:", error);
+            // Ensure state is reset on error
+            setSession(null);
+            setCurrentUser(null);
+            setIsResettingPassword(false);
+          } finally {
+             setAuthLoading(false);
+          }
         });
 
         return () => {
@@ -214,12 +247,18 @@ const App: React.FC = () => {
                     const joinedProject = await api.data.acceptInvite(token);
                     alert(`Successfully joined project: ${joinedProject.name}`);
                     await fetchData(); 
-                    navigate(`/projects/${joinedProject.id}`);
+
+                    if (window.location.pathname.startsWith('/invite/')) {
+                       // If we were on an invite link, redirect to the new project cleanly
+                       window.location.assign(`/#/projects/${joinedProject.id}`);
+                    } else {
+                       // Otherwise just navigate internally
+                       navigate(`/projects/${joinedProject.id}`);
+                    }
                 } catch (error) {
                     alert(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                } finally {
                     if (window.location.pathname.startsWith('/invite/')) {
-                       navigate('/');
+                       window.location.assign('/#/'); // Redirect home on failure
                     }
                 }
             } else if (token && !currentUser) {
@@ -451,6 +490,18 @@ const App: React.FC = () => {
           </div>
       );
     }
+    if (view === 'privacy') {
+        return (
+            <div className="flex items-center gap-3">
+                <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-gray-800 transition-colors" aria-label="Back to dashboard">
+                    <ArrowLeftIcon className="w-5 h-5"/>
+                </button>
+                <h1 className="text-xl font-bold tracking-tight text-white">
+                    Privacy Policy
+                </h1>
+            </div>
+        );
+    }
      return (
         <div className="flex items-center gap-3">
             <BotMessageSquareIcon className="w-7 h-7 text-gray-400" />
@@ -478,23 +529,19 @@ const App: React.FC = () => {
   }
 
   if (!session || !currentUser) {
+    // If the path is an invite link, the effect will handle login/redirect.
+    // Show a simple loader until that happens.
+    if (window.location.pathname.startsWith('/invite/')) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[#1C2326]">
+                <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
+            </div>
+        );
+    }
     if (view === 'privacy') {
         return <PrivacyPolicyPage onBack={() => navigate('/')} />;
     }
     return <LoginPage onShowPrivacy={() => navigate('/privacy')} />;
-  }
-  
-  if (appStateLoading) {
-     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#1C2326]">
-            <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
-            <p className="ml-4 text-base font-semibold text-gray-400">Loading your board...</p>
-        </div>
-    );
-  }
-  
-  if (view === 'privacy') {
-    return <PrivacyPolicyPage onBack={() => window.history.back()} />;
   }
 
   return (
@@ -584,58 +631,82 @@ const App: React.FC = () => {
           </div>
         </header>
         <main className="p-4 sm:p-6">
-          {view === 'dashboard' && (
-            <DashboardPage 
-              projects={Object.values(state.projects)}
-              users={state.users}
-              onlineUsers={onlineUsers}
-              onSelectProject={handleSelectProject}
-              onCreateProject={() => setCreateProjectModalOpen(true)}
-              onManageMembers={handleOpenManageMembersModal}
-              onShareProject={handleOpenInviteModal}
-              addProjectFromPlan={addProjectFromPlan}
-            />
-          )}
-          {view === 'project' && activeProject && (
-            <KanbanBoard
-              key={activeProject.id}
-              project={activeProject}
-              currentUser={currentUser}
-              users={Object.values(state.users)}
-              onlineUsers={onlineUsers}
-              aiFeaturesEnabled={featureFlags.ai}
-              onTaskClick={handleTaskClick}
-              onDragEnd={(result) => onDragEnd(activeProject.id, result)}
-              updateTask={(task) => updateTask(activeProject.id, task)}
-              addSubtasks={(taskId, subtasks, creatorId) => addSubtasks(activeProject.id, taskId, subtasks, creatorId)}
-              addComment={(taskId, commentText) => addComment(activeProject.id, taskId, commentText, currentUser)}
-              addAiTask={(prompt) => addAiTask(activeProject.id, prompt)}
-              deleteTask={(taskId, columnId) => deleteTask(activeProject.id, taskId, columnId)}
-              addColumn={(title) => addColumn(activeProject.id, title)}
-              deleteColumn={(columnId) => deleteColumn(activeProject.id, columnId)}
-              isChatOpen={isChatOpen}
-              onCloseChat={() => setIsChatOpen(false)}
-              chatMessages={activeProject.chatMessages}
-              onSendMessage={(text) => sendChatMessage(activeProject.id, text, currentUser)}
-              addProjectLink={(title, url) => addProjectLink(activeProject.id, title, url, currentUser.id)}
-              deleteProjectLink={(linkId) => deleteProjectLink(linkId)}
-            />
-          )}
-          {view === 'tasks' && (
-              <TasksPage
-                projects={state.projects}
-                users={state.users}
-                currentUser={currentUser}
-                onTaskClick={handleTaskClick}
-              />
-          )}
-          {view === 'resources' && (
-            <ResourceManagementPage
-              projects={state.projects}
-              users={state.users}
-              onlineUsers={onlineUsers}
-              onTaskClick={handleTaskClick}
-            />
+          {appStateLoading ? (
+            <div className="flex items-center justify-center pt-20">
+              <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
+              <p className="ml-4 text-base font-semibold text-gray-400">Loading your data...</p>
+            </div>
+          ) : (
+            <>
+              {view === 'dashboard' && (
+                <DashboardPage 
+                  projects={Object.values(state.projects)}
+                  users={state.users}
+                  onlineUsers={onlineUsers}
+                  onSelectProject={handleSelectProject}
+                  onCreateProject={() => setCreateProjectModalOpen(true)}
+                  onManageMembers={handleOpenManageMembersModal}
+                  onShareProject={handleOpenInviteModal}
+                  addProjectFromPlan={addProjectFromPlan}
+                />
+              )}
+              {view === 'project' && activeProject && (
+                <KanbanBoard
+                  key={activeProject.id}
+                  project={activeProject}
+                  currentUser={currentUser}
+                  users={Object.values(state.users)}
+                  onlineUsers={onlineUsers}
+                  aiFeaturesEnabled={featureFlags.ai}
+                  onTaskClick={handleTaskClick}
+                  onDragEnd={(result) => onDragEnd(activeProject.id, result)}
+                  updateTask={(task) => updateTask(activeProject.id, task)}
+                  addSubtasks={(taskId, subtasks, creatorId) => addSubtasks(activeProject.id, taskId, subtasks, creatorId)}
+                  addComment={(taskId, commentText) => addComment(activeProject.id, taskId, commentText, currentUser)}
+                  addAiTask={(prompt) => addAiTask(activeProject.id, prompt)}
+                  deleteTask={(taskId, columnId) => deleteTask(activeProject.id, taskId, columnId)}
+                  addColumn={(title) => addColumn(activeProject.id, title)}
+                  deleteColumn={(columnId) => deleteColumn(activeProject.id, columnId)}
+                  isChatOpen={isChatOpen}
+                  onCloseChat={() => setIsChatOpen(false)}
+                  chatMessages={activeProject.chatMessages}
+                  onSendMessage={(text) => sendChatMessage(activeProject.id, text, currentUser)}
+                  addProjectLink={(title, url) => addProjectLink(activeProject.id, title, url, currentUser.id)}
+                  deleteProjectLink={(linkId) => deleteProjectLink(linkId)}
+                />
+              )}
+              {view === 'tasks' && (
+                  <TasksPage
+                    projects={state.projects}
+                    users={state.users}
+                    currentUser={currentUser}
+                    onTaskClick={handleTaskClick}
+                  />
+              )}
+              {view === 'resources' && (
+                <ResourceManagementPage
+                  projects={state.projects}
+                  users={state.users}
+                  onlineUsers={onlineUsers}
+                  onTaskClick={handleTaskClick}
+                />
+              )}
+              {view === 'privacy' && (
+                  <PrivacyPolicyPage onBack={() => navigate('/')} isEmbedded={true} />
+              )}
+              {view === 'project' && !activeProject && (
+                <div className="text-center pt-20 text-gray-400">
+                  <h2 className="text-xl font-bold text-white">Project Not Found</h2>
+                  <p className="mt-2">The project may have been deleted or you don't have access.</p>
+                  <button 
+                    onClick={handleBackToDashboard} 
+                    className="mt-6 px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all text-sm"
+                  >
+                    Go to Dashboard
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>

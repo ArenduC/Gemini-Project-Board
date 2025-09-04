@@ -1,7 +1,7 @@
 
 import { supabase } from './supabase';
 import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column } from '../types';
-import { Session, RealtimeChannel, AuthChangeEvent } from '@supabase/supabase-js';
+import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
 const arrayToRecord = <T extends { id: string }>(arr: T[]): Record<string, T> => {
@@ -31,6 +31,33 @@ const getUserProfile = async (userId: string): Promise<User | null> => {
     }
     return userProfile as User;
 };
+
+const createUserProfile = async (supabaseUser: SupabaseUser): Promise<User> => {
+    // Use name from signup metadata, fallback to a name derived from email.
+    const name = supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'New User';
+    
+    const { data, error } = await supabase
+        .from('users')
+        .insert({
+            id: supabaseUser.id,
+            name,
+            role: UserRole.MEMBER, // Assign a default role
+            avatar_url: '' // Default avatar
+        })
+        .select()
+        .single();
+    
+    if (error) {
+        console.error("Error creating user profile:", error);
+        // This could happen if RLS prevents insertion or if there's a race condition
+        // where the profile was created by a trigger just now.
+        // A more advanced implementation might re-fetch the profile here.
+        throw error;
+    }
+    
+    return data as User;
+};
+
 
 const updateUserProfile = async (userId: string, updates: { name: string }): Promise<User> => {
     const { data, error } = await supabase
@@ -719,6 +746,7 @@ export const api = {
     auth: {
         onAuthStateChange,
         getUserProfile,
+        createUserProfile,
         updateUserProfile,
         signOut,
         signInWithPassword,
