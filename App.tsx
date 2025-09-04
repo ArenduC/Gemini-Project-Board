@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
@@ -15,7 +14,7 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import CallbackPage from './pages/CallbackPage';
 import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage } from './types';
 import { api } from './services/api';
-import { Session, RealtimeChannel, AuthChangeEvent } from '@supabase/supabase-js';
+import { Session, RealtimeChannel } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
@@ -124,42 +123,65 @@ const App: React.FC = () => {
         return () => clearTimeout(timer);
     }, []);
 
+    // Effect 1: Manages the session object and the initial loading state.
+    // It's responsible for making sure the "Restoring session..." screen ALWAYS goes away.
     useEffect(() => {
-        const { data: { subscription } } = api.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
-            try {
-                if (_event === 'PASSWORD_RECOVERY') {
-                    setIsResettingPassword(true);
-                    return; 
-                }
-                
-                if (isResettingPassword) {
-                    setIsResettingPassword(false);
-                }
+        setIsAuthLoading(true);
 
-                if (session?.user) {
-                    let userProfile = await api.auth.getUserProfile(session.user.id);
-                    if (!userProfile) {
-                        userProfile = await api.auth.createUserProfile(session.user);
-                    }
-                    setSession(session);
-                    setCurrentUser(userProfile);
-                } else {
-                    setSession(null);
-                    setCurrentUser(null);
-                }
-            } catch (error) {
-                console.warn("Auth state change handler failed, likely due to an invalid session.", error);
-                setSession(null);
-                setCurrentUser(null);
-            } finally {
-                // This is crucial: it marks that the initial session check is complete.
+        // Check the initial session state when the app loads.
+        api.auth.getSession()
+            .then(({ data: { session } }) => {
+                setSession(session);
+            })
+            .catch(err => {
+                console.error("Error getting initial session:", err);
+            })
+            .finally(() => {
                 setIsAuthLoading(false);
+            });
+
+        // Listen for any subsequent changes in auth state (login, logout, etc.).
+        const { data: { subscription } } = api.auth.onAuthStateChange((event, session) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                setIsResettingPassword(true);
+            } else if (isResettingPassword) {
+                // Clear the flag on any other event if it was set.
+                setIsResettingPassword(false);
             }
+            setSession(session);
         });
 
-        return () => subscription.unsubscribe();
-    }, [isResettingPassword]);
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, []); // Runs only once on mount.
 
+    // Effect 2: Reacts to changes in the session to fetch the user's profile.
+    // This keeps the profile data in sync with the auth session.
+    useEffect(() => {
+        // If there's a user object in the session, we need to ensure we have a profile.
+        if (session?.user) {
+            const resolveUserProfile = async () => {
+                try {
+                    let userProfile = await api.auth.getUserProfile(session.user.id);
+                    // Self-healing: if a user is authenticated but has no profile, create one.
+                    if (!userProfile) {
+                        console.log("No user profile found, creating one.");
+                        userProfile = await api.auth.createUserProfile(session.user!);
+                    }
+                    setCurrentUser(userProfile);
+                } catch (error) {
+                    console.error("Error resolving user profile:", error);
+                    // If we can't get a profile for a valid session, something is wrong. Sign out.
+                    api.auth.signOut();
+                }
+            };
+            resolveUserProfile();
+        } else {
+            // If the session is null, there is no current user.
+            setCurrentUser(null);
+        }
+    }, [session]); // This should only depend on `session`.
 
     // Effect for Supabase Presence
     useEffect(() => {
@@ -459,8 +481,10 @@ const App: React.FC = () => {
   };
   
     const handleResetSuccess = async () => {
+        // After password is successfully reset, sign out to force re-login.
         await api.auth.signOut();
-        setIsResettingPassword(false);
+        // The onAuthStateChange listener will handle setting the user/session to null,
+        // and isResettingPassword is now handled within that listener as well.
     };
 
   const HeaderContent = () => {
@@ -526,7 +550,7 @@ const App: React.FC = () => {
         );
     }
     if (view === 'privacy') {
-        return <PrivacyPolicyPage onBack={() => navigate('/')} />;
+        return <PrivacyPolicyPage isEmbedded={false} onBack={() => navigate('/')} />;
     }
     return <LoginPage onShowPrivacy={() => navigate('/privacy')} />;
   }

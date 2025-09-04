@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase';
 import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
@@ -16,6 +17,10 @@ const arrayToRecord = <T extends { id: string }>(arr: T[]): Record<string, T> =>
 // This resolves issues with both the return type for destructuring and the callback signature.
 const onAuthStateChange = (callback: (event: AuthChangeEvent, session: Session | null) => void) => {
     return supabase.auth.onAuthStateChange(callback);
+};
+
+const getSession = async () => {
+    return await supabase.auth.getSession();
 };
 
 const getUserProfile = async (userId: string): Promise<User | null> => {
@@ -706,6 +711,7 @@ const deleteProjectLink = async (linkId: string) => {
 
 export const api = {
     auth: {
+        getSession,
         onAuthStateChange,
         getUserProfile,
         createUserProfile,
