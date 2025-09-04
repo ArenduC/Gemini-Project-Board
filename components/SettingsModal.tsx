@@ -11,6 +11,7 @@ interface SettingsModalProps {
   onFlagsChange: (flags: { ai: boolean, voice: boolean }) => void;
   projects: Project[];
   onDeleteProject: (projectId: string) => Promise<void>;
+  onShowPrivacy: () => void;
 }
 
 type Tab = 'general' | 'profile' | 'projects';
@@ -74,7 +75,8 @@ const ProjectDangerZone: React.FC<{ project: Project; onDelete: () => Promise<vo
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen, onClose, currentUser, onUpdateUser,
-  featureFlags, onFlagsChange, projects, onDeleteProject
+  featureFlags, onFlagsChange, projects, onDeleteProject,
+  onShowPrivacy,
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>('general');
   const [userName, setUserName] = useState(currentUser.name);
@@ -130,6 +132,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <ToggleSwitch label="Enable AI Features" enabled={featureFlags.ai} onChange={enabled => onFlagsChange({...featureFlags, ai: enabled})} />
                     <ToggleSwitch label="Enable Voice Assistant" enabled={featureFlags.voice} onChange={enabled => onFlagsChange({...featureFlags, voice: enabled})} />
                  </div>
+                 <div className="p-4 bg-gray-800/50 rounded-lg">
+                     <button onClick={onShowPrivacy} className="font-medium text-white hover:underline">
+                        View Privacy Policy
+                     </button>
+                     <p className="text-xs text-gray-400 mt-1">Review our terms and how we handle your data.</p>
+                </div>
               </div>
             )}
             

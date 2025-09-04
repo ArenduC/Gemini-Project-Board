@@ -11,10 +11,11 @@ import { DashboardPage } from './pages/DashboardPage';
 import { TasksPage } from './pages/TasksPage';
 import { ResourceManagementPage } from './pages/ResourceManagementPage';
 import { LoginPage } from './pages/LoginPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import CallbackPage from './pages/CallbackPage';
 import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage, ProjectLink } from './types';
 import { api } from './services/api';
-import { Session, RealtimeChannel } from '@supabase/supabase-js';
+import { Session, RealtimeChannel, AuthChangeEvent } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
 import { TaskDetailsModal } from './components/TaskDetailsModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
@@ -24,12 +25,14 @@ import { DropResult } from 'react-beautiful-dnd';
 import { ManageInviteLinksModal } from './components/ManageInviteLinksModal';
 import { SettingsModal } from './components/SettingsModal';
 import { NotificationToast } from './components/NotificationToast';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 
 
-type View = 'dashboard' | 'project' | 'tasks' | 'resources';
+type View = 'dashboard' | 'project' | 'tasks' | 'resources' | 'privacy';
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('dashboard');
+  const [previousView, setPreviousView] = useState<View>('dashboard');
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
@@ -45,6 +48,8 @@ const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [preAuthView, setPreAuthView] = useState<'login' | 'privacy'>('login');
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -81,10 +86,18 @@ const App: React.FC = () => {
 
     useEffect(() => {
         setAuthLoading(true);
-        const subscription = api.auth.onAuthStateChange(async (session) => {
+        const { data: { subscription } } = api.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
+            // Handle password recovery event
+            if (_event === 'PASSWORD_RECOVERY') {
+                setIsResettingPassword(true);
+                setAuthLoading(false); // Stop loading to show reset page
+                return;
+            } else if (_event !== 'INITIAL_SESSION') {
+                setIsResettingPassword(false);
+            }
+
             // Handle email confirmation redirect
             if (session?.user && window.location.pathname === '/callback') {
-                // Redirect to the dashboard. Using replace to avoid adding the callback page to history.
                 window.location.replace('/');
                 return; // Stop processing to allow redirect to happen
             }
@@ -237,6 +250,15 @@ const App: React.FC = () => {
     setView('dashboard');
     setIsChatOpen(false); // Close chat when leaving project
   }, []);
+
+  const handleShowPrivacy = () => {
+    setPreviousView(view);
+    setView('privacy');
+  };
+
+  const handleBackFromPrivacy = () => {
+      setView(previousView);
+  };
 
 
   const handleOpenManageMembersModal = (projectId: string) => {
@@ -402,8 +424,14 @@ const App: React.FC = () => {
         console.error("Error processing voice command:", error);
         return "I encountered an error trying to understand that.";
     }
-};
+  };
   
+    const handleResetSuccess = async () => {
+        // Sign out the temporary session so the user can log in with their new password
+        await api.auth.signOut();
+        setIsResettingPassword(false);
+    };
+
   const HeaderContent = () => {
     if (view === 'project' && activeProject) {
       return (
@@ -431,6 +459,10 @@ const App: React.FC = () => {
   if (window.location.pathname === '/callback') {
     return <CallbackPage />;
   }
+  
+  if (isResettingPassword) {
+    return <ResetPasswordPage onResetSuccess={handleResetSuccess} />;
+  }
 
   if (authLoading) {
     return (
@@ -441,7 +473,10 @@ const App: React.FC = () => {
   }
 
   if (!session || !currentUser) {
-    return <LoginPage />;
+    if (preAuthView === 'privacy') {
+        return <PrivacyPolicyPage onBack={() => setPreAuthView('login')} />;
+    }
+    return <LoginPage onShowPrivacy={() => setPreAuthView('privacy')} />;
   }
   
   if (appStateLoading) {
@@ -453,6 +488,9 @@ const App: React.FC = () => {
     );
   }
 
+  if (view === 'privacy') {
+    return <PrivacyPolicyPage onBack={handleBackFromPrivacy} />;
+  }
 
   return (
     <>
@@ -610,6 +648,10 @@ const App: React.FC = () => {
             if (activeProjectId === projectId) {
               handleBackToDashboard();
             }
+          }}
+          onShowPrivacy={() => {
+            setSettingsModalOpen(false);
+            handleShowPrivacy();
           }}
         />
       )}

@@ -7,7 +7,7 @@ import { exportTasksToCsv } from '../utils/export';
 import { ProjectDropzone } from '../components/ProjectDropzone';
 import { ProjectConfirmationModal } from '../components/ProjectConfirmationModal';
 import { generateProjectFromCsv } from '../services/geminiService';
-
+import { Pagination } from '../components/Pagination';
 
 interface DashboardPageProps {
   projects: Project[];
@@ -47,6 +47,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
   
   const [generatedPlan, setGeneratedPlan] = useState<AiGeneratedProjectPlan | null>(null);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  const totalPages = Math.ceil(projects.length / ITEMS_PER_PAGE);
+  const paginatedProjects = projects.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const handleFileProcessed = async (csvContent: string) => {
     setIsAiProcessing(true);
@@ -140,26 +148,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                         ))}
                     </div>
                 ) : (
-                    <div className="bg-[#131C1B] rounded-lg shadow-md border border-gray-800 overflow-hidden">
-                        {/* List Header */}
-                         <div className="grid grid-cols-12 gap-4 items-center px-4 py-2 border-b border-gray-800 bg-[#1C2326]/50">
-                            <div className="col-span-4 font-semibold text-xs uppercase tracking-wider text-gray-400">Project</div>
-                            <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Progress</div>
-                            <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-center">Status</div>
-                            <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-right">Members</div>
-                            <div className="col-span-2"></div>
+                    <div>
+                        <div className="bg-[#131C1B] rounded-lg shadow-md border border-gray-800 overflow-hidden">
+                            {/* List Header */}
+                             <div className="grid grid-cols-12 gap-4 items-center px-4 py-2 border-b border-gray-800 bg-[#1C2326]/50">
+                                <div className="col-span-4 font-semibold text-xs uppercase tracking-wider text-gray-400">Project</div>
+                                <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Progress</div>
+                                <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-center">Status</div>
+                                <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-right">Members</div>
+                                <div className="col-span-2"></div>
+                            </div>
+                            {paginatedProjects.map(project => (
+                                <ProjectListRow
+                                    key={project.id}
+                                    project={project}
+                                    users={users}
+                                    onlineUsers={onlineUsers}
+                                    onSelect={onSelectProject}
+                                    onManageMembers={onManageMembers}
+                                    onShare={() => onShareProject(project)}
+                                />
+                            ))}
                         </div>
-                        {projects.map(project => (
-                            <ProjectListRow
-                                key={project.id}
-                                project={project}
-                                users={users}
-                                onlineUsers={onlineUsers}
-                                onSelect={onSelectProject}
-                                onManageMembers={onManageMembers}
-                                onShare={() => onShareProject(project)}
-                            />
-                        ))}
+                        <Pagination
+                          currentPage={currentPage}
+                          totalPages={totalPages}
+                          onPageChange={setCurrentPage}
+                          itemsPerPage={ITEMS_PER_PAGE}
+                          totalItems={projects.length}
+                        />
                     </div>
                 )}
             </>

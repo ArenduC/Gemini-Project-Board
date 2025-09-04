@@ -1,8 +1,7 @@
 
-
 import { supabase } from './supabase';
 import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column } from '../types';
-import { Session, RealtimeChannel } from '@supabase/supabase-js';
+import { Session, RealtimeChannel, AuthChangeEvent } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
 const arrayToRecord = <T extends { id: string }>(arr: T[]): Record<string, T> => {
@@ -14,11 +13,10 @@ const arrayToRecord = <T extends { id: string }>(arr: T[]): Record<string, T> =>
 
 // --- AUTHENTICATION ---
 
-const onAuthStateChange = (callback: (session: Session | null) => void) => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        callback(session);
-    });
-    return subscription;
+// FIX: Updated function to correctly proxy the call to `supabase.auth.onAuthStateChange`.
+// This resolves issues with both the return type for destructuring and the callback signature.
+const onAuthStateChange = (callback: (event: AuthChangeEvent, session: Session | null) => void) => {
+    return supabase.auth.onAuthStateChange(callback);
 };
 
 const getUserProfile = async (userId: string): Promise<User | null> => {
@@ -68,6 +66,22 @@ const signUp = async ({ email, password, name }: { email: string, password: stri
         }
     });
 };
+
+const sendPasswordResetEmail = async (email: string) => {
+    return await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+    });
+};
+
+const updateUserPassword = async (password: string) => {
+    const { data, error } = await supabase.auth.updateUser({ password });
+    if (error) {
+        console.error("Error updating password:", error.message || error);
+        throw error;
+    }
+    return data;
+};
+
 
 // --- REALTIME ---
 // FIX: Renamed function to match its export key in the `api` object.
@@ -709,6 +723,8 @@ export const api = {
         signOut,
         signInWithPassword,
         signUp,
+        sendPasswordResetEmail,
+        updateUserPassword,
     },
     realtime: {
         isConfigured,

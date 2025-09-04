@@ -4,6 +4,7 @@ import { DownloadIcon } from '../components/Icons';
 import { exportAugmentedTasksToCsv } from '../utils/export';
 import { TaskListRow } from '../components/TaskListRow';
 import { Filters } from '../components/Filters';
+import { Pagination } from '../components/Pagination';
 
 interface TasksPageProps {
   projects: Record<string, Project>;
@@ -22,6 +23,10 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [segments, setSegments] = useState<FilterSegment[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>('all');
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
 
   const storageKey = 'tasks-page-segments';
 
@@ -150,6 +155,18 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
     return tasks;
   }, [allTasks, viewMode, currentUser.id, searchTerm, priorityFilter, assigneeFilter, statusFilter]);
   
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredTasks.length]);
+
+  const totalPages = Math.ceil(filteredTasks.length / ITEMS_PER_PAGE);
+  const paginatedTasks = filteredTasks.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+
   const handleExport = () => {
     exportAugmentedTasksToCsv(filteredTasks, users);
   };
@@ -216,8 +233,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
           <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Status</div>
           <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-right">Assignee</div>
         </div>
-        {filteredTasks.length > 0 ? (
-            filteredTasks.map(task => (
+        {paginatedTasks.length > 0 ? (
+            paginatedTasks.map(task => (
                 <TaskListRow
                     key={task.id}
                     task={task}
@@ -231,6 +248,13 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
             </div>
         )}
       </div>
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        itemsPerPage={ITEMS_PER_PAGE}
+        totalItems={filteredTasks.length}
+      />
     </div>
   );
 };
