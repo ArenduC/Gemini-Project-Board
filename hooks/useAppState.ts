@@ -80,9 +80,9 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
           setState(freshState);
         }
       } catch (error) {
+        // Auth-related errors are now handled in App.tsx. This hook's responsibility
+        // is only to manage app state, not auth state.
         console.error("An error occurred while fetching app data:", error);
-        // If fetch fails, we still want to hide the loader so the user isn't stuck.
-        // They will see either the (stale) cached data or an empty state.
       } finally {
         if (isMounted) {
           setLoading(false);

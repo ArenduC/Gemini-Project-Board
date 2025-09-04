@@ -1,4 +1,3 @@
-
 import { supabase } from './supabase';
 import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
@@ -25,9 +24,9 @@ const getUserProfile = async (userId: string): Promise<User | null> => {
         .select('*')
         .eq('id', userId)
         .single();
-    if (error) {
+    if (error && error.code !== 'PGRST116') { // PGRST116: "exact one row not found" which is a valid case
         console.error("Error fetching user profile:", error.message || error);
-        return null;
+        throw error; // Propagate auth errors to be handled by the caller
     }
     return userProfile as User;
 };
@@ -131,7 +130,7 @@ const removeChannel = (channel: RealtimeChannel) => {
 // --- DATA FETCHING ---
 
 const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'projectOrder'> & {projectOrder: string[]}> => {
-    // Fetch project IDs for projects the user is a member of
+    // Step 1: Fetch project memberships
     const { data: projectMembers, error: projectMembersError } = await supabase
         .from('project_members')
         .select('project_id')
@@ -139,27 +138,20 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
     if (projectMembersError) throw projectMembersError;
     const projectIds = projectMembers.map(pm => pm.project_id);
 
-    // If the user isn't in any projects, just fetch their own profile
+    // Step 2: Handle case where user has no projects
     if (projectIds.length === 0) {
-        const { data: userProfile, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', userId)
-            .single();
-        if (userError) throw userError;
-        return { projects: {}, users: { [userId]: userProfile as User }, projectOrder: [] };
+        const userProfile = await getUserProfile(userId);
+        return { projects: {}, users: userProfile ? { [userId]: userProfile } : {}, projectOrder: [] };
     }
 
-    // Since we have project IDs, get all members for these projects to fetch all relevant users
+    // Step 3: Fetch all relevant user profiles for all projects
     const { data: allProjectMembers, error: allMembersError } = await supabase
         .from('project_members')
         .select('user_id')
         .in('project_id', projectIds);
     if (allMembersError) throw allMembersError;
-
     const allUserIdsInProjects = new Set(allProjectMembers.map(pm => pm.user_id));
-    allUserIdsInProjects.add(userId); // Ensure the current user is included
-
+    allUserIdsInProjects.add(userId);
     const { data: usersData, error: usersError } = await supabase
         .from('users')
         .select('*')
@@ -167,7 +159,7 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
     if (usersError) throw usersError;
     const usersRecord = arrayToRecord(usersData as User[]);
 
-    // Now fetch the full project data
+    // Step 4: Fetch projects with their nested, but non-task-related, data
     const { data: projectsData, error: projectsError } = await supabase
         .from('projects')
         .select(`
@@ -175,60 +167,27 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
             members:project_members(user_id),
             chat_messages:project_chats(*, author:users(*)),
             links:project_links(*),
-            columns:columns(
-                *,
-                tasks(
-                    *,
-                    assignee:users!tasks_assignee_id_fkey(*),
-                    subtasks(*),
-                    comments(
-                        *,
-                        author:users(*)
-                    ),
-                    tags:task_tags(tags(name))
-                )
-            )
+            columns(*)
         `)
         .in('id', projectIds)
         .order('position', { foreignTable: 'columns' })
-        .order('position', { foreignTable: 'columns.tasks' })
         .order('created_at', { foreignTable: 'chat_messages' })
         .order('created_at', { foreignTable: 'links' });
 
-
     if (projectsError) throw projectsError;
 
-    // Transform the fetched data
+    // Step 5: Initialize the projectsRecord from the fetched project data
     const projectsRecord: Record<string, Project> = {};
-    const projectOrder = projectsData.map(p => p.id).sort();
+    const projectOrder = projectsData.map(p => p.id).sort((a, b) => a.localeCompare(b));
 
     for (const p of projectsData) {
         const board: BoardData = {
             tasks: {},
             columns: {},
-            columnOrder: [],
+            columnOrder: p.columns.map((c: any) => c.id),
         };
-
         p.columns.forEach((c: any) => {
-            const taskIds: string[] = [];
-            c.tasks.forEach((t: any) => {
-                taskIds.push(t.id);
-                board.tasks[t.id] = {
-                    ...t,
-                    assignee: t.assignee,
-                    tags: t.tags.map((tag: any) => tag.tags.name),
-                    comments: t.comments.map((cmt: any) => ({
-                        ...cmt,
-                        author: cmt.author,
-                    })) || [],
-                    history: [], // Initialize history as empty; will be populated in a separate query
-                    subtasks: t.subtasks || [],
-                    createdAt: t.created_at,
-                    creatorId: t.creator_id,
-                };
-            });
-            board.columns[c.id] = { id: c.id, title: c.title, taskIds };
-            board.columnOrder.push(c.id);
+            board.columns[c.id] = { id: c.id, title: c.title, taskIds: [] };
         });
 
         projectsRecord[p.id] = {
@@ -238,52 +197,54 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
             members: p.members.map((m: any) => m.user_id),
             board,
             chatMessages: p.chat_messages.map((msg: any): ChatMessage => ({
-                id: msg.id,
-                text: msg.text,
-                createdAt: msg.created_at,
-                author: msg.author,
+                id: msg.id, text: msg.text, createdAt: msg.created_at, author: msg.author,
             })) || [],
             links: p.links.map((l: any): ProjectLink => ({
-                id: l.id,
-                title: l.title,
-                url: l.url,
-                projectId: l.project_id,
-                creatorId: l.creator_id,
-                createdAt: l.created_at,
+                id: l.id, title: l.title, url: l.url, projectId: l.project_id, creatorId: l.creator_id, createdAt: l.created_at,
             })) || [],
             creatorId: p.creator_id,
             createdAt: p.created_at,
         };
     }
 
-    // Fetch history separately to avoid RLS issues with deep nesting
-    const allTaskIds = Object.values(projectsRecord).flatMap(p => Object.keys(p.board.tasks));
-    if (allTaskIds.length > 0) {
-        const { data: tasksWithHistory, error: historyError } = await supabase
+    // Step 6: Fetch all tasks for all columns across all user's projects in a single query
+    const allColumnIds = projectsData.flatMap((p: any) => p.columns.map((c: any) => c.id));
+
+    if (allColumnIds.length > 0) {
+        const { data: tasksData, error: tasksError } = await supabase
             .from('tasks')
-            .select('id, history:task_history(*, user:users(*))')
-            .in('id', allTaskIds)
-            .order('created_at', { foreignTable: 'task_history', ascending: false });
+            .select(`
+                *,
+                assignee:users!tasks_assignee_id_fkey(*),
+                subtasks(*),
+                comments(*, author:users(*)),
+                tags:task_tags(tags(name)),
+                history:task_history(*, user:users(*))
+            `)
+            .in('column_id', allColumnIds)
+            .order('position');
 
-        if (historyError) {
-            console.warn(`Could not fetch task history. This might be because the 'task_history' table's security policies are too restrictive. Proceeding without history data.`, historyError);
-        } else if (tasksWithHistory) {
-            const historyMap = new Map<string, TaskHistory[]>();
-            tasksWithHistory.forEach((task: any) => {
-                const histories = (task.history || []).map((h: any): TaskHistory => ({
-                    id: h.id,
-                    user: h.user,
-                    changeDescription: h.change_description,
-                    createdAt: h.created_at,
-                }));
-                historyMap.set(task.id, histories);
-            });
-
-            // Merge history back into the projectsRecord
-            for (const project of Object.values(projectsRecord)) {
-                for (const taskId in project.board.tasks) {
-                    if (historyMap.has(taskId)) {
-                        project.board.tasks[taskId].history = historyMap.get(taskId)!;
+        if (tasksError) {
+            console.error("Critical error fetching tasks, app state will be incomplete.", tasksError);
+        } else {
+            // Step 7: Stitch tasks back into the projectsRecord
+            for (const task of tasksData) {
+                const project = Object.values(projectsRecord).find(p => p.board.columns[task.column_id]);
+                if (project) {
+                    project.board.tasks[task.id] = {
+                        ...task,
+                        assignee: task.assignee,
+                        tags: task.tags.map((tag: any) => tag.tags.name),
+                        comments: (task.comments || []).map((cmt: any) => ({ ...cmt, author: cmt.author })),
+                        history: (task.history || []).map((h: any): TaskHistory => ({
+                            id: h.id, user: h.user, changeDescription: h.change_description, createdAt: h.created_at,
+                        })).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+                        subtasks: task.subtasks || [],
+                        createdAt: task.created_at,
+                        creatorId: task.creator_id,
+                    };
+                    if (project.board.columns[task.column_id]) {
+                        project.board.columns[task.column_id].taskIds.push(task.id);
                     }
                 }
             }
@@ -296,6 +257,7 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
         projectOrder,
     };
 };
+
 
 const subscribeToProjectChat = (projectId: string, callback: (payload: any) => void) => {
     const channel = supabase.channel(`project-chat-${projectId}`)

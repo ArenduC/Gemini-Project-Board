@@ -113,66 +113,64 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        // On initial app load (e.g., after a refresh), force redirect to the dashboard.
+        // This simplifies the initial data loading sequence and ensures the app
+        // always starts from a known, stable state, resolving the refresh issue.
+        if (window.location.hash && window.location.hash !== '#/' && window.location.hash !== '#') {
+            window.location.hash = '/';
+        }
+    }, []); // Empty dependency array ensures this runs only once on mount.
+
+    useEffect(() => {
         setAuthLoading(true);
         const { data: { subscription } } = api.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
-          try {
-            // Handle password recovery state, but don't exit early.
-            if (_event === 'PASSWORD_RECOVERY') {
-                setIsResettingPassword(true);
-            } else if (_event !== 'INITIAL_SESSION') {
-                // This ensures the reset state is cleared on subsequent auth events.
-                setIsResettingPassword(false);
-            }
-
-            // Handle OAuth callback
-            if (session?.user && window.location.pathname === '/callback') {
-                // Redirect to the root of the app with a hash, causing a clean reload.
-                window.location.assign('/#/');
-                return; // Stop further processing as we are redirecting.
-            }
-            
-            // Set session and user profile, but skip profile fetch during password recovery
-            if (session?.user && _event !== 'PASSWORD_RECOVERY') {
-                let userProfile = await api.auth.getUserProfile(session.user.id);
-
-                // If the user is authenticated but has no profile in our public table, create one.
-                // This makes the app resilient if the DB trigger for new user creation is missing.
-                if (!userProfile) {
-                    console.warn(`User profile not found for user ${session.user.id}. Attempting to create one.`);
-                    try {
-                        userProfile = await api.auth.createUserProfile(session.user);
-                    } catch (creationError) {
-                        console.error("Fatal: Could not create user profile.", creationError);
-                        // Sign out to prevent an infinite loop of login attempts
-                        await api.auth.signOut();
-                        setSession(null);
-                        setCurrentUser(null);
-                        // The finally block will hide the auth loader, and the app will show the login page.
-                        return;
-                    }
+            try {
+                if (_event === 'PASSWORD_RECOVERY') {
+                    setIsResettingPassword(true);
+                    // No further processing needed, the ResetPasswordPage will be shown.
+                    return; 
+                }
+                
+                // Clear password reset state on other events.
+                if (isResettingPassword) {
+                    setIsResettingPassword(false);
                 }
 
-                setSession(session);
-                setCurrentUser(userProfile);
-            } else {
+                // If a session exists, validate it by fetching the user profile.
+                // This is the crucial step to catch invalid refresh tokens.
+                if (session?.user) {
+                    // api.auth.getUserProfile will now throw on auth errors
+                    let userProfile = await api.auth.getUserProfile(session.user.id);
+
+                    // If profile doesn't exist for a valid user, create it (self-healing).
+                    if (!userProfile) {
+                        userProfile = await api.auth.createUserProfile(session.user);
+                    }
+
+                    // Success: session is valid, profile exists.
+                    setSession(session);
+                    setCurrentUser(userProfile);
+                } else {
+                    // No session means we are logged out.
+                    setSession(null);
+                    setCurrentUser(null);
+                }
+            } catch (error) {
+                console.warn("Auth state change handler failed, likely due to an invalid session. Signing out.", error);
+                // If any part of the session validation fails, the token is bad.
+                // Sign out to clear the corrupted token from storage.
+                await api.auth.signOut();
                 setSession(null);
                 setCurrentUser(null);
+            } finally {
+                // Always hide the initial auth loader.
+                setAuthLoading(false);
             }
-          } catch (error) {
-            console.error("Error in onAuthStateChange handler:", error);
-            // Ensure state is reset on error
-            setSession(null);
-            setCurrentUser(null);
-            setIsResettingPassword(false);
-          } finally {
-             setAuthLoading(false);
-          }
         });
 
-        return () => {
-            subscription.unsubscribe();
-        };
+        return () => subscription.unsubscribe();
     }, []);
+
 
     // Effect for Supabase Presence
     useEffect(() => {
