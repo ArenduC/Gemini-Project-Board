@@ -169,3 +169,23 @@ export interface AiGeneratedProjectPlan {
   description: string;
   columns: AiGeneratedColumn[];
 }
+
+export enum FeedbackType {
+  BUG = 'Bug Report',
+  FEATURE = 'Feature Request',
+  GENERAL = 'General Feedback',
+}
+
+export interface Feedback {
+  id: string;
+  createdAt: string;
+  userId: string;
+  type: FeedbackType;
+  title: string;
+  description: string;
+  contextData: {
+    url: string;
+    userAgent: string;
+  };
+  status: 'new' | 'seen' | 'in-progress' | 'done';
+}

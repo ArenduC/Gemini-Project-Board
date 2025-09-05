@@ -1,6 +1,7 @@
 
+
 import { supabase } from './supabase';
-import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column } from '../types';
+import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column, FeedbackType } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
@@ -101,6 +102,16 @@ const signUp = async ({ email, password, name }: { email: string, password: stri
 const sendPasswordResetEmail = async (email: string) => {
     return await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin,
+    });
+};
+
+const resendConfirmationEmail = async (email: string) => {
+    return await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+            emailRedirectTo: `${window.location.origin}/callback`,
+        }
     });
 };
 
@@ -708,6 +719,26 @@ const deleteProjectLink = async (linkId: string) => {
     }
 };
 
+const submitFeedback = async (feedbackData: { 
+  userId: string;
+  type: FeedbackType;
+  title: string;
+  description: string;
+  contextData: object;
+}) => {
+    const { error } = await supabase.from('feedback').insert({
+        user_id: feedbackData.userId,
+        feedback_type: feedbackData.type,
+        title: feedbackData.title,
+        description: feedbackData.description,
+        context_data: feedbackData.contextData,
+    });
+    if (error) {
+        console.error("Error submitting feedback:", error.message || error);
+        throw error;
+    }
+};
+
 
 export const api = {
     auth: {
@@ -721,6 +752,7 @@ export const api = {
         signUp,
         sendPasswordResetEmail,
         updateUserPassword,
+        resendConfirmationEmail,
     },
     realtime: {
         isConfigured,
@@ -749,5 +781,6 @@ export const api = {
         acceptInvite,
         addProjectLink,
         deleteProjectLink,
+        submitFeedback,
     }
 }

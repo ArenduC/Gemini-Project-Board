@@ -1,8 +1,9 @@
 
 
+
 import React, { useState, useMemo } from 'react';
 import { api } from '../services/api';
-import { BotMessageSquareIcon, UsersIcon, LoaderCircleIcon } from '../components/Icons';
+import { BotMessageSquareIcon, UsersIcon, LoaderCircleIcon, CheckIcon } from '../components/Icons';
 import { PasswordInput } from '../components/PasswordInput';
 import { PasswordStrength } from '../components/PasswordStrength';
 
@@ -13,7 +14,7 @@ const demoUsers = [
     { name: 'Charlie', email: 'charlie@example.com' },
 ]
 
-type AuthMode = 'signIn' | 'signUp' | 'forgotPassword';
+type AuthMode = 'signIn' | 'signUp' | 'forgotPassword' | 'awaitingConfirmation';
 
 interface LoginPageProps {
     onShowPrivacy: () => void;
@@ -38,6 +39,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
 
     const isPasswordValid = Object.values(passwordChecks).every(Boolean);
 
+    const handleResendConfirmation = async () => {
+        if (!email) {
+            setError('Please enter your email address to resend the confirmation link.');
+            return;
+        }
+        setLoading(true);
+        setError('');
+        setSuccessMessage('');
+
+        const { error } = await api.auth.resendConfirmationEmail(email);
+
+        if (error) {
+            setError(error.message);
+        } else {
+            setSuccessMessage('A new confirmation link has been sent to your email.');
+        }
+        setLoading(false);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -54,7 +74,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
         } else if (mode === 'signIn') {
             const { error } = await api.auth.signInWithPassword({ email, password });
             if (error) {
-                setError(error.message);
+                if (error.message.toLowerCase().includes('email not confirmed')) {
+                    setMode('awaitingConfirmation');
+                    setSuccessMessage('');
+                    setError('');
+                } else {
+                    setError(error.message);
+                }
             }
         } else { // signUp
             if (!isPasswordValid) {
@@ -66,8 +92,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
             if (error) {
                 setError(error.message);
             } else {
-                setSuccessMessage("Success! Please check your email for a confirmation link.");
-                setMode('signIn');
+                setSuccessMessage(`A confirmation link has been sent to ${email}.`);
+                setMode('awaitingConfirmation');
             }
         }
         
@@ -87,6 +113,45 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
         if (mode === 'signUp') return 'Create a new account';
         return 'Reset your password';
     };
+
+    if (mode === 'awaitingConfirmation') {
+        return (
+            <div className="min-h-screen font-sans bg-[#1C2326] flex flex-col items-center justify-center p-4">
+                <div className="w-full max-w-sm text-center">
+                    <div className="flex flex-col items-center mb-6">
+                        <div className="relative mb-6">
+                            <BotMessageSquareIcon className="w-16 h-16 text-gray-400" />
+                             <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-1 border-2 border-[#1C2326]">
+                                <CheckIcon className="w-5 h-5 text-white" />
+                            </div>
+                        </div>
+                        <h1 className="text-2xl font-bold tracking-tight text-white mt-2">
+                            Check your email
+                        </h1>
+                    </div>
+                    <div className="bg-[#131C1B] rounded-xl shadow-lg p-8 space-y-4">
+                        <p className="text-sm text-gray-300">
+                            {successMessage || `We've sent a confirmation link to ${email}. Please check your inbox (and spam folder) to complete your registration.`}
+                        </p>
+                        
+                        {error && <p className="text-sm text-red-500">{error}</p>}
+                        
+                        <button
+                            onClick={handleResendConfirmation}
+                            disabled={loading}
+                            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-black bg-gray-300 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-[#131C1B] disabled:bg-gray-500"
+                        >
+                            {loading ? <LoaderCircleIcon className="animate-spin h-5 w-5" /> : 'Resend confirmation link'}
+                        </button>
+
+                        <button onClick={() => handleModeChange('signIn')} className="text-sm font-medium text-white hover:text-gray-300">
+                           Back to Sign In
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen font-sans bg-[#1C2326] flex flex-col items-center justify-center p-4">
@@ -117,7 +182,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                                 />
                             </div>
                         )}
-                        {mode !== 'signIn' || (
+                        {mode === 'signIn' || mode === 'signUp' ? (
                             <div>
                                 <label htmlFor="email" className="block text-sm font-medium text-white mb-1">
                                     Email Address
@@ -133,7 +198,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                                     className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
                                 />
                             </div>
-                        )}
+                        ) : null}
                          {mode === 'forgotPassword' && (
                             <div>
                                 <label htmlFor="email-forgot" className="block text-sm font-medium text-white mb-1">
@@ -195,8 +260,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                         {mode === 'signUp' && "Already have an account?"}
                         {mode === 'forgotPassword' && "Remembered your password?"}
                         {' '}
-                        <button onClick={() => handleModeChange(mode === 'signIn' ? 'signUp' : 'signIn')} className="font-medium text-white hover:text-gray-300">
-                           {mode === 'signIn' ? 'Sign Up' : 'Sign In'}
+                        <button onClick={() => handleModeChange(mode === 'signIn' || mode === 'forgotPassword' ? 'signUp' : 'signIn')} className="font-medium text-white hover:text-gray-300">
+                           {mode === 'signIn' || mode === 'forgotPassword' ? 'Sign Up' : 'Sign In'}
                         </button>
                     </p>
                 </div>

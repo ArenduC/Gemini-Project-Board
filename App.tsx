@@ -12,7 +12,7 @@ import { ResourceManagementPage } from './pages/ResourceManagementPage';
 import { LoginPage } from './pages/LoginPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import CallbackPage from './pages/CallbackPage';
-import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage } from './types';
+import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage, FeedbackType } from './types';
 import { api } from './services/api';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
@@ -25,6 +25,8 @@ import { ManageInviteLinksModal } from './components/ManageInviteLinksModal';
 import { SettingsModal } from './components/SettingsModal';
 import { NotificationToast } from './components/NotificationToast';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
+import { FeedbackFab } from './components/FeedbackFab';
+import { FeedbackModal } from './components/FeedbackModal';
 
 
 type View = 'dashboard' | 'project' | 'tasks' | 'resources' | 'privacy';
@@ -55,6 +57,7 @@ const App: React.FC = () => {
   const [isVoiceAssistantModalOpen, setVoiceAssistantModalOpen] = useState(false);
   const [isSettingsModalOpen, setSettingsModalOpen] = useState(false);
   const [isAppReady, setIsAppReady] = useState(false);
+  const [isFeedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
 
   // Navigation function using hash
@@ -486,6 +489,18 @@ const App: React.FC = () => {
         // The onAuthStateChange listener will handle setting the user/session to null,
         // and isResettingPassword is now handled within that listener as well.
     };
+    
+    const handleFeedbackSubmit = async (feedbackData: {
+      type: FeedbackType;
+      title: string;
+      description: string;
+      contextData: { url: string; userAgent: string; };
+    }) => {
+      if (!currentUser) {
+        throw new Error("You must be logged in to submit feedback.");
+      }
+      await api.data.submitFeedback({ ...feedbackData, userId: currentUser.id });
+    };
 
   const HeaderContent = () => {
     if (view === 'project' && activeProject) {
@@ -822,6 +837,12 @@ const App: React.FC = () => {
           <NotificationToast key={notification.id} notification={notification} />
         ))}
       </div>
+      <FeedbackFab onClick={() => setFeedbackModalOpen(true)} />
+      <FeedbackModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setFeedbackModalOpen(false)}
+        onSubmit={handleFeedbackSubmit}
+      />
     </>
   );
 };
