@@ -275,11 +275,15 @@ const App: React.FC = () => {
                 }
             } else if (token && !currentUser) {
                 localStorage.setItem('project_invite_token', token);
+                if (window.location.pathname.startsWith('/invite/')) {
+                    // Redirect to login page, the token is saved.
+                    window.location.assign('/#/');
+                }
             }
         };
 
         handleInvite();
-    }, [currentUser, fetchData]);
+    }, [currentUser, fetchData, navigate]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -313,13 +317,13 @@ const App: React.FC = () => {
 
   const handleSelectProject = useCallback((projectId: string) => {
     navigate(`/projects/${projectId}`);
-  }, []);
+  }, [navigate]);
 
 
   const handleBackToDashboard = useCallback(() => {
     setIsChatOpen(false); 
     navigate('/');
-  }, []);
+  }, [navigate]);
   
   const handleOpenManageMembersModal = (projectId: string) => {
     setProjectForMemberManagementId(projectId);
@@ -557,13 +561,6 @@ const App: React.FC = () => {
   }
 
   if (!session || !currentUser) {
-    if (window.location.pathname.startsWith('/invite/')) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-[#1C2326]">
-                <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
-            </div>
-        );
-    }
     if (view === 'privacy') {
         return <PrivacyPolicyPage isEmbedded={false} onBack={() => navigate('/')} />;
     }

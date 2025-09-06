@@ -1,18 +1,9 @@
 
-
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { api } from '../services/api';
 import { BotMessageSquareIcon, UsersIcon, LoaderCircleIcon, CheckIcon } from '../components/Icons';
 import { PasswordInput } from '../components/PasswordInput';
 import { PasswordStrength } from '../components/PasswordStrength';
-
-// Demo users for UI hints
-const demoUsers = [
-    { name: 'Alice', email: 'alice@example.com' },
-    { name: 'Bob', email: 'bob@example.com' },
-    { name: 'Charlie', email: 'charlie@example.com' },
-]
 
 type AuthMode = 'signIn' | 'signUp' | 'forgotPassword' | 'awaitingConfirmation';
 
@@ -28,6 +19,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
+    const [hasInvite, setHasInvite] = useState(false);
+
+    useEffect(() => {
+        if (localStorage.getItem('project_invite_token')) {
+            setHasInvite(true);
+        }
+    }, []);
 
     const passwordChecks = useMemo(() => ({
         length: password.length >= 8,
@@ -163,6 +161,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                     </h1>
                     <p className="text-gray-400 mt-1 text-sm">{getTitle()}</p>
                 </div>
+                {hasInvite && (
+                    <div className="mb-4 text-center text-sm text-green-300 bg-green-900/30 p-3 rounded-lg border border-green-700">
+                        You've been invited to a project!
+                        <br />
+                        Please sign in or create an account to join.
+                    </div>
+                )}
                 <div className="bg-[#131C1B] rounded-xl shadow-lg p-8">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {mode === 'signUp' && (
@@ -264,17 +269,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                            {mode === 'signIn' || mode === 'forgotPassword' ? 'Sign Up' : 'Sign In'}
                         </button>
                     </p>
-                </div>
-                 <div className="mt-6 bg-[#131C1B] p-4 rounded-lg">
-                    <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2"><UsersIcon className="w-4 h-4"/> Demo Users</h3>
-                    <p className="text-xs text-gray-400 mb-3">You can log in as any of these users. The password for all is `password123`.</p>
-                    <div className="flex flex-wrap gap-2">
-                        {demoUsers.map(user => (
-                            <button key={user.email} onClick={() => {setEmail(user.email); setPassword('password123'); handleModeChange('signIn');}} className="text-xs font-medium bg-gray-700 text-white px-2 py-1 rounded-full hover:bg-gray-600">
-                                {user.name}
-                            </button>
-                        ))}
-                    </div>
                 </div>
                 <div className="mt-6 text-center text-xs text-gray-500">
                     <button onClick={onShowPrivacy} className="hover:text-white hover:underline">
