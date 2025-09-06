@@ -272,3 +272,12 @@ export const LifeBuoyIcon: React.FC<IconProps> = (props) => (
     <line x1="4.93" y1="19.07" x2="9.17" y2="14.83" />
   </svg>
 );
+
+export const RotateCwIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M21 2v6h-6"/>
+    <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+    <path d="M3 22v-6h6"/>
+    <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+  </svg>
+);

@@ -1,10 +1,11 @@
 
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ManageMembersModal } from './components/ManageMembersModal';
-import { BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon } from './components/Icons';
+import { BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon, RotateCwIcon } from './components/Icons';
 import { useAppState } from './hooks/useAppState';
 import { DashboardPage } from './pages/DashboardPage';
 import { TasksPage } from './pages/TasksPage';
@@ -598,6 +599,14 @@ const App: React.FC = () => {
                 <MessageCircleIcon className="w-5 h-5" />
               </button>
             )}
+            <button
+                onClick={() => fetchData()}
+                disabled={appStateLoading}
+                className="p-2 rounded-full text-gray-400 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Refresh data"
+            >
+                <RotateCwIcon className={`w-5 h-5 ${appStateLoading ? 'animate-spin' : ''}`} />
+            </button>
             {featureFlags.voice && (
              <button
                 onClick={() => setVoiceAssistantModalOpen(true)}

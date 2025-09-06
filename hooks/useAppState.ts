@@ -18,83 +18,54 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
 
   const fetchData = useCallback(async () => {
     if (!userId) {
-      // This should ideally not be called if userId is null, but as a safeguard:
-      throw new Error("fetchData called without a user.");
+      setState(initialState);
+      setLoading(true);
+      return;
     }
-    const { projects, users, projectOrder } = await api.data.fetchInitialData(userId);
-    const freshState = { projects, users, projectOrder };
-    const cacheKey = `gemini-board-cache-${userId}`;
-    
+    setLoading(true);
     try {
-        localStorage.setItem(cacheKey, JSON.stringify(freshState));
-    } catch (e) {
-        console.warn("Could not save state to cache:", e);
+        const { projects, users, projectOrder } = await api.data.fetchInitialData(userId);
+        const freshState = { projects, users, projectOrder };
+        const cacheKey = `gemini-board-cache-${userId}`;
+        
+        try {
+            localStorage.setItem(cacheKey, JSON.stringify(freshState));
+        } catch (e) {
+            console.warn("Could not save state to cache:", e);
+        }
+        
+        setState(freshState);
+    } catch (error) {
+        console.error("An error occurred while fetching app data:", error);
+    } finally {
+        setLoading(false);
     }
-    
-    return freshState;
   }, [userId]);
   
   // This effect orchestrates the entire data loading and caching lifecycle.
   useEffect(() => {
-    // If there's no user session, reset the state and wait for authentication.
-    // The main App component will show its own auth loader.
     if (!userId) {
       setState(initialState);
       setLoading(true);
       return;
     }
-
-    let isMounted = true;
     
-    const loadAppData = async () => {
-      const cacheKey = `gemini-board-cache-${userId}`;
-      let cacheLoaded = false;
-      
-      // Step 1: Attempt to hydrate from cache for an instant UI.
+    // Step 1: Attempt to hydrate from cache for an instant UI.
+    const cacheKey = `gemini-board-cache-${userId}`;
+    const cachedStateJSON = localStorage.getItem(cacheKey);
+    if (cachedStateJSON) {
       try {
-        const cachedStateJSON = localStorage.getItem(cacheKey);
-        if (cachedStateJSON) {
-          const cachedState = JSON.parse(cachedStateJSON);
-          if (isMounted) {
-            setState(cachedState);
-            setLoading(false); // Cache hit, hide data loading screen immediately.
-            cacheLoaded = true;
-          }
-        }
+        setState(JSON.parse(cachedStateJSON));
+        setLoading(false); // Cache hit, hide data loading screen immediately.
       } catch (e) {
         console.warn("Failed to parse cached state, clearing it.", e);
         localStorage.removeItem(cacheKey);
       }
+    }
 
-      // If there was no cache, we need to show the loading screen until the fetch completes.
-      if (!cacheLoaded && isMounted) {
-        setLoading(true);
-      }
+    // Step 2: Always fetch fresh data from the server.
+    fetchData();
 
-      // Step 2: Always fetch fresh data from the server.
-      // If cache was loaded, this acts as a background refresh.
-      // If not, this is the primary data load.
-      try {
-        const freshState = await fetchData();
-        if (isMounted) {
-          setState(freshState);
-        }
-      } catch (error) {
-        // Auth-related errors are now handled in App.tsx. This hook's responsibility
-        // is only to manage app state, not auth state.
-        console.error("An error occurred while fetching app data:", error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadAppData();
-
-    return () => {
-      isMounted = false;
-    };
   }, [userId, fetchData]);
 
 
@@ -199,7 +170,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     } catch (error) {
         console.error("Error moving task:", error);
     } finally {
-        fetchData().then(freshState => setState(freshState)).catch(console.error);
+        await fetchData();
     }
 
   }, [state, currentUser, fetchData]);
@@ -207,23 +178,23 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   const updateTask = useCallback(async (projectId: string, updatedTask: Task) => {
       if (!currentUser) return;
       await api.data.updateTask(updatedTask, currentUser.id);
-      fetchData().then(freshState => setState(freshState)).catch(console.error);
+      await fetchData();
   }, [fetchData, currentUser]);
 
   const addSubtasks = useCallback(async (projectId: string, taskId: string, newSubtasksData: { title:string }[], creatorId: string) => {
     await api.data.addSubtasks(taskId, newSubtasksData, creatorId);
-    fetchData().then(freshState => setState(freshState)).catch(console.error);
+    await fetchData();
   }, [fetchData]);
 
 
   const addComment = useCallback(async (projectId: string, taskId: string, commentText: string, author: User) => {
       await api.data.addComment(taskId, commentText, author.id);
-      fetchData().then(freshState => setState(freshState)).catch(console.error);
+      await fetchData();
   }, [fetchData]);
 
   const addTask = useCallback(async (projectId: string, taskData: NewTaskData, creatorId: string) => {
     await api.data.addTask(taskData, creatorId);
-    fetchData().then(freshState => setState(freshState)).catch(console.error);
+    await fetchData();
   }, [fetchData]);
 
   const addAiTask = useCallback(async (projectId: string, prompt: string) => {
@@ -244,28 +215,28 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     };
 
     await api.data.addTask(taskData, currentUser.id);
-    fetchData().then(freshState => setState(freshState)).catch(console.error);
+    await fetchData();
   }, [fetchData, state.projects, currentUser]);
 
 
   const deleteTask = useCallback(async (projectId: string, taskId: string, columnId: string) => {
     await api.data.deleteTask(taskId);
-    fetchData().then(freshState => setState(freshState)).catch(console.error);
+    await fetchData();
   }, [fetchData]);
 
   const addColumn = useCallback(async (projectId: string, title: string) => {
       await api.data.addColumn(projectId, title);
-      fetchData().then(freshState => setState(freshState)).catch(console.error);
+      await fetchData();
   }, [fetchData]);
 
   const deleteColumn = useCallback(async (projectId: string, columnId: string) => {
     await api.data.deleteColumn(columnId);
-    fetchData().then(freshState => setState(freshState)).catch(console.error);
+    await fetchData();
   }, [fetchData]);
 
   const addProject = useCallback(async (name: string, description: string, creatorId: string) => {
     await api.data.addProject(name, description, creatorId);
-    fetchData().then(freshState => setState(freshState)).catch(console.error);
+    await fetchData();
   }, [fetchData]);
 
   const addProjectFromPlan = useCallback(async (plan: AiGeneratedProjectPlan) => {
@@ -294,23 +265,23 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     }
     
     // 3. Refresh state
-    fetchData().then(freshState => setState(freshState)).catch(console.error);
+    await fetchData();
   }, [fetchData, currentUser]);
 
   const deleteProject = useCallback(async (projectId: string) => {
     await api.data.deleteProject(projectId);
-    fetchData().then(freshState => setState(freshState)).catch(console.error);
+    await fetchData();
   }, [fetchData]);
 
   const updateUserProfile = useCallback(async (updates: { name: string }) => {
     if (!userId) return;
     await api.auth.updateUserProfile(userId, updates);
-    fetchData().then(freshState => setState(freshState)).catch(console.error);
+    await fetchData();
   }, [fetchData, userId]);
 
   const updateProjectMembers = useCallback(async (projectId: string, memberIds: string[]) => {
       await api.data.updateProjectMembers(projectId, memberIds);
-      fetchData().then(freshState => setState(freshState)).catch(console.error);
+      await fetchData();
   }, [fetchData]);
   
   const sendChatMessage = useCallback(async (projectId: string, text: string, author: User) => {
@@ -363,12 +334,12 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   
   const addProjectLink = useCallback(async (projectId: string, title: string, url: string, creatorId: string) => {
     await api.data.addProjectLink(projectId, title, url, creatorId);
-    fetchData().then(freshState => setState(freshState)).catch(console.error);
+    await fetchData();
   }, [fetchData]);
 
   const deleteProjectLink = useCallback(async (linkId: string) => {
       await api.data.deleteProjectLink(linkId);
-      fetchData().then(freshState => setState(freshState)).catch(console.error);
+      await fetchData();
   }, [fetchData]);
 
   return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink };
