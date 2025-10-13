@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DropResult } from 'react-beautiful-dnd';
-import { AppState, Task, NewTaskData, User, ChatMessage, AiGeneratedProjectPlan } from '../types';
+import { AppState, Task, NewTaskData, User, ChatMessage, AiGeneratedProjectPlan, Bug, BugStatus, TaskPriority } from '../types';
 import { api } from '../services/api';
-import { generateTaskFromPrompt } from '../services/geminiService';
+import { generateTaskFromPrompt, generateBugsFromFile, BugResponse } from '../services/geminiService';
 import { Session } from '@supabase/supabase-js';
 
 const initialState: AppState = {
@@ -342,5 +342,54 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
       await fetchData();
   }, [fetchData]);
 
-  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink };
+  // Bug Management
+  const addBug = useCallback(async (projectId: string, bugData: { title: string, description: string, priority: TaskPriority }) => {
+    if (!currentUser) return;
+    await api.data.addBug({
+        ...bugData,
+        projectId,
+        status: BugStatus.NEW,
+        reporterId: currentUser.id,
+    });
+    await fetchData();
+  }, [fetchData, currentUser]);
+
+  const addBugsBatch = useCallback(async (projectId: string, fileContent: string) => {
+    if (!currentUser) return;
+    const parsedBugs: BugResponse[] = await generateBugsFromFile(fileContent);
+    if (parsedBugs.length > 0) {
+        const bugsToCreate = parsedBugs.map(b => ({
+            ...b,
+            projectId,
+            priority: TaskPriority.MEDIUM,
+            status: BugStatus.NEW,
+            reporterId: currentUser.id,
+        }));
+        await api.data.addBugsBatch(bugsToCreate);
+        await fetchData();
+    }
+  }, [fetchData, currentUser]);
+
+  const updateBug = useCallback(async (bugId: string, updates: Partial<Bug>) => {
+    const { priority, status, assignee } = updates;
+    await api.data.updateBug(bugId, {
+        priority,
+        status,
+        assigneeId: assignee?.id ?? (assignee === undefined ? undefined : null), // Handle unassigning
+    });
+    await fetchData();
+  }, [fetchData]);
+
+  const deleteBug = useCallback(async (bugId: string) => {
+    await api.data.deleteBug(bugId);
+    await fetchData();
+  }, [fetchData]);
+
+  const deleteBugsBatch = useCallback(async (bugIds: string[]) => {
+    await api.data.deleteBugsBatch(bugIds);
+    await fetchData();
+  }, [fetchData]);
+
+
+  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch };
 };

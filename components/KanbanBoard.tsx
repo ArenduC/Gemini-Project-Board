@@ -1,15 +1,16 @@
-
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { DragDropContext, DropResult } from 'react-beautiful-dnd';
-import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project } from '../types';
+import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority } from '../types';
 import { Column } from './Column';
 import { Filters } from './Filters';
-import { PlusIcon, LayoutDashboardIcon, GitBranchIcon } from './Icons';
+import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon } from './Icons';
 import { ProjectChat } from './ProjectChat';
 import { AiTaskCreator } from './AiTaskCreator';
 import { TaskGraphView } from './TaskGraphView';
 import { ProjectLinksManager } from './ProjectLinksManager';
+import { TaskTableView } from './TaskTableView';
+import { BugReporter } from './BugReporter';
+import { Pagination } from './Pagination';
 
 interface KanbanBoardProps {
   project: Project;
@@ -32,6 +33,11 @@ interface KanbanBoardProps {
   onTaskClick: (task: Task) => void;
   addProjectLink: (title: string, url: string) => Promise<void>;
   deleteProjectLink: (linkId: string) => Promise<void>;
+  addBug: (projectId: string, bugData: { title: string, description: string, priority: TaskPriority }) => Promise<void>;
+  updateBug: (bugId: string, updates: Partial<Bug>) => Promise<void>;
+  deleteBug: (bugId: string) => Promise<void>;
+  addBugsBatch: (projectId: string, fileContent: string) => Promise<void>;
+  deleteBugsBatch: (bugIds: string[]) => Promise<void>;
 }
 
 const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColumn }) => {
@@ -96,12 +102,19 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
   )
 }
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ project, currentUser, users, onlineUsers, aiFeaturesEnabled, onDragEnd, updateTask, addSubtasks, addComment, addAiTask, deleteTask, addColumn, deleteColumn, isChatOpen, onCloseChat, chatMessages, onSendMessage, onTaskClick, addProjectLink, deleteProjectLink }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ 
+    project, currentUser, users, onlineUsers, aiFeaturesEnabled, onDragEnd, 
+    updateTask, addSubtasks, addComment, addAiTask, deleteTask, addColumn, 
+    deleteColumn, isChatOpen, onCloseChat, chatMessages, onSendMessage, onTaskClick, 
+    addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch 
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [projectView, setProjectView] = useState<'board' | 'graph'>('board');
+  const [projectView, setProjectView] = useState<'board' | 'table' | 'graph' | 'bugs'>('board');
+  const [tableCurrentPage, setTableCurrentPage] = useState(1);
+  const TABLE_ITEMS_PER_PAGE = 15;
 
   const [segments, setSegments] = useState<FilterSegment[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>('all');
@@ -119,6 +132,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ project, currentUser, 
       console.error("Failed to load filter segments from localStorage", error);
     }
   }, [storageKey]);
+  
+  // Reset page when filters change
+  useEffect(() => {
+    setTableCurrentPage(1);
+  }, [searchTerm, priorityFilter, assigneeFilter, statusFilter]);
 
   const saveSegmentsToStorage = (updatedSegments: FilterSegment[]) => {
     try {
@@ -205,13 +223,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ project, currentUser, 
     if (!boardData.tasks || !boardData.columns) return boardData;
 
     const taskIdToColumnIdMap = new Map<string, string>();
-    for (const column of Object.values(boardData.columns)) {
+    // FIX: Cast Object.values to the correct type to avoid type inference issues.
+    for (const column of Object.values(boardData.columns) as ColumnType[]) {
         for (const taskId of column.taskIds) {
             taskIdToColumnIdMap.set(taskId, column.id);
         }
     }
 
-    const tasks = Object.values(boardData.tasks);
+    // FIX: Cast Object.values to the correct type to avoid type inference issues.
+    const tasks = Object.values(boardData.tasks) as Task[];
     let filteredTasks = tasks;
 
     if (searchTerm) {
@@ -240,8 +260,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ project, currentUser, 
 
     const filteredTaskIds = new Set(filteredTasks.map(t => t.id));
     
+    // FIX: Cast Object.entries to the correct type to avoid type inference issues.
     const newColumns = Object.fromEntries(
-      Object.entries(boardData.columns).map(([columnId, column]) => [
+      (Object.entries(boardData.columns) as [string, ColumnType][]).map(([columnId, column]) => [
         columnId,
         {
           ...column,
@@ -258,7 +279,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ project, currentUser, 
   }, [boardData, searchTerm, priorityFilter, assigneeFilter, statusFilter]);
   
   const uniqueAssignees = useMemo(() => {
-      const assignees = Object.values(boardData.tasks)
+      // FIX: Cast Object.values to the correct type to avoid type inference issues.
+      const assignees = (Object.values(boardData.tasks) as Task[])
           .map(task => task.assignee?.name)
           .filter((name): name is string => !!name);
       return [...new Set(assignees)];
@@ -266,12 +288,27 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ project, currentUser, 
 
   const uniqueStatuses = useMemo(() => {
       if (!boardData.columns) return [];
-      return [...new Set(Object.values(boardData.columns).map(c => c.title))];
+      // FIX: Cast Object.values to the correct type to avoid type inference issues.
+      return [...new Set((Object.values(boardData.columns) as ColumnType[]).map(c => c.title))];
   }, [boardData.columns]);
+
+  const filteredTasksForTable = useMemo(() => {
+    return filteredBoardData.columnOrder.flatMap(columnId => {
+        const column = filteredBoardData.columns[columnId];
+        if (!column) return [];
+        return column.taskIds.map(taskId => filteredBoardData.tasks[taskId]).filter(Boolean);
+    });
+  }, [filteredBoardData]);
+
+  const tableTotalPages = Math.ceil(filteredTasksForTable.length / TABLE_ITEMS_PER_PAGE);
+  const paginatedTasksForTable = filteredTasksForTable.slice(
+    (tableCurrentPage - 1) * TABLE_ITEMS_PER_PAGE,
+    tableCurrentPage * TABLE_ITEMS_PER_PAGE
+  );
   
   return (
     <>
-      {aiFeaturesEnabled && (
+      {aiFeaturesEnabled && projectView !== 'bugs' && (
       <div className="mb-6">
         <AiTaskCreator onGenerateTask={addAiTask} />
       </div>
@@ -286,26 +323,28 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ project, currentUser, 
       </div>
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <Filters
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            priorityFilter={priorityFilter}
-            setPriorityFilter={setPriorityFilter}
-            assigneeFilter={assigneeFilter}
-            setAssigneeFilter={setAssigneeFilter}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            assignees={uniqueAssignees}
-            statuses={uniqueStatuses}
-            segments={segments}
-            activeSegmentId={activeSegmentId}
-            currentFilters={{ searchTerm, priorityFilter, assigneeFilter, statusFilter }}
-            onAddSegment={handleAddSegment}
-            onDeleteSegment={handleDeleteSegment}
-            onApplySegment={handleApplySegment}
-            onClearFilters={handleClearFilters}
-          />
-         <div className="flex items-center gap-4">
+        {projectView !== 'bugs' && (
+            <Filters
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                priorityFilter={priorityFilter}
+                setPriorityFilter={setPriorityFilter}
+                assigneeFilter={assigneeFilter}
+                setAssigneeFilter={setAssigneeFilter}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                assignees={uniqueAssignees}
+                statuses={uniqueStatuses}
+                segments={segments}
+                activeSegmentId={activeSegmentId}
+                currentFilters={{ searchTerm, priorityFilter, assigneeFilter, statusFilter }}
+                onAddSegment={handleAddSegment}
+                onDeleteSegment={handleDeleteSegment}
+                onApplySegment={handleApplySegment}
+                onClearFilters={handleClearFilters}
+            />
+        )}
+         <div className="flex items-center gap-4 ml-auto">
             <div className="flex-shrink-0">
                 <h4 className="text-sm font-semibold text-gray-400 mb-2 text-right">View</h4>
                 <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
@@ -318,12 +357,28 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ project, currentUser, 
                         <LayoutDashboardIcon className="w-5 h-5" />
                     </button>
                     <button
+                        onClick={() => setProjectView('table')}
+                        className={`p-2 rounded-md ${projectView === 'table' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
+                        aria-label="Table View"
+                        title="Table View"
+                    >
+                        <TableIcon className="w-5 h-5" />
+                    </button>
+                    <button
                         onClick={() => setProjectView('graph')}
                         className={`p-2 rounded-md ${projectView === 'graph' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
                         aria-label="Graph View"
                         title="Graph View"
                     >
                         <GitBranchIcon className="w-5 h-5" />
+                    </button>
+                    <button
+                        onClick={() => setProjectView('bugs')}
+                        className={`p-2 rounded-md ${projectView === 'bugs' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
+                        aria-label="Bug Tracker"
+                        title="Bug Tracker"
+                    >
+                        <LifeBuoyIcon className="w-5 h-5" />
                     </button>
                 </div>
             </div>
@@ -335,7 +390,18 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ project, currentUser, 
         </div>
       </div>
       
-      {projectView === 'board' ? (
+      {projectView === 'bugs' ? (
+        <BugReporter
+            project={project}
+            users={users}
+            currentUser={currentUser}
+            onAddBug={(bugData) => addBug(project.id, bugData)}
+            onUpdateBug={updateBug}
+            onDeleteBug={deleteBug}
+            onAddBugsBatch={(fileContent) => addBugsBatch(project.id, fileContent)}
+            onDeleteBugsBatch={deleteBugsBatch}
+        />
+      ) : projectView === 'board' ? (
         <DragDropContext onDragEnd={onDragEnd}>
             <div className="flex gap-6 items-start pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto custom-scrollbar">
             {filteredBoardData.columnOrder.map((columnId) => {
@@ -357,8 +423,26 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ project, currentUser, 
             })}
             </div>
         </DragDropContext>
+      ) : projectView === 'table' ? (
+        <>
+          <TaskTableView
+              project={project}
+              tasks={paginatedTasksForTable}
+              users={users}
+              onUpdateTask={updateTask}
+              onDragEnd={onDragEnd}
+              onTaskClick={onTaskClick}
+          />
+           <Pagination
+              currentPage={tableCurrentPage}
+              totalPages={tableTotalPages}
+              onPageChange={setTableCurrentPage}
+              itemsPerPage={TABLE_ITEMS_PER_PAGE}
+              totalItems={filteredTasksForTable.length}
+          />
+        </>
       ) : (
-        <TaskGraphView boardData={filteredBoardData} users={Object.values(users)} onTaskClick={onTaskClick} />
+        <TaskGraphView boardData={filteredBoardData} users={users} onTaskClick={onTaskClick} />
       )}
       
        {isChatOpen && (

@@ -1,7 +1,5 @@
-
-
 import { supabase } from './supabase';
-import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column, FeedbackType } from '../types';
+import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column, FeedbackType, Bug, BugStatus, TaskPriority } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
@@ -183,12 +181,15 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
             members:project_members(user_id),
             chat_messages:project_chats(*, author:users(*)),
             links:project_links(*),
-            columns(*)
+            columns(*),
+            bugs(*, assignee:users!bugs_assignee_id_fkey(*))
         `)
         .in('id', projectIds)
         .order('position', { foreignTable: 'columns' })
         .order('created_at', { foreignTable: 'chat_messages' })
-        .order('created_at', { foreignTable: 'links' });
+        .order('created_at', { foreignTable: 'links' })
+        .order('created_at', { foreignTable: 'bugs' });
+
 
     if (projectsError) throw projectsError;
 
@@ -206,12 +207,24 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
             board.columns[c.id] = { id: c.id, title: c.title, taskIds: [] };
         });
 
+        const bugs = (p.bugs || []).map((b: any): Bug => ({
+            id: b.id,
+            title: b.title,
+            description: b.description,
+            priority: b.priority,
+            status: b.status,
+            assignee: b.assignee,
+            reporterId: b.reporter_id,
+            createdAt: b.created_at,
+        }));
+
         projectsRecord[p.id] = {
             id: p.id,
             name: p.name,
             description: p.description,
             members: p.members.map((m: any) => m.user_id),
             board,
+            bugs: arrayToRecord(bugs),
             chatMessages: p.chat_messages.map((msg: any): ChatMessage => ({
                 id: msg.id, text: msg.text, createdAt: msg.created_at, author: msg.author,
             })) || [],
@@ -685,10 +698,18 @@ const acceptInvite = async (token: string): Promise<Project> => {
     // increments usage, and returns the joined project's data.
     const { data, error } = await supabase.rpc('accept_project_invite', { invite_token: token });
     if (error) {
-        console.error('Error accepting invite:', error.message || error);
-        // FIX: The 'error' object from Supabase might be of an unknown type in some contexts.
-        // Casting to 'Error' allows safely accessing the 'message' property for the Error constructor.
-        throw new Error((error as Error).message || 'Could not join project. The link may be invalid or expired.');
+        // The 'error' object from Supabase may not be an Error instance.
+        // Casting to 'any' allows safely accessing the 'message' property.
+        console.error('Error accepting invite:', (error as any).message || error);
+        
+        // FIX: The error message from the API can be of an unknown type. This ensures that
+        // a valid string is always passed to the Error constructor to avoid a type error.
+        const potentialMessage = (error as any)?.message;
+        let errorMessage = 'Could not join project. The link may be invalid or expired.';
+        if (typeof potentialMessage === 'string') {
+          errorMessage = potentialMessage;
+        }
+        throw new Error(errorMessage);
     }
     // The RPC function is expected to return the full project data upon success.
     // This is a placeholder; a real implementation might need to fetch project details separately.
@@ -739,6 +760,54 @@ const submitFeedback = async (feedbackData: {
     }
 };
 
+const addBug = async (bugData: Omit<Bug, 'id' | 'createdAt' | 'assignee'> & { projectId: string; assigneeId?: string }) => {
+    const { error } = await supabase.from('bugs').insert({
+        title: bugData.title,
+        description: bugData.description,
+        priority: bugData.priority,
+        status: bugData.status,
+        reporter_id: bugData.reporterId,
+        project_id: bugData.projectId,
+        assignee_id: bugData.assigneeId,
+    });
+    if (error) throw error;
+};
+
+const addBugsBatch = async (bugsData: (Omit<Bug, 'id' | 'createdAt' | 'assignee'> & { projectId: string })[]) => {
+    const records = bugsData.map(b => ({
+        title: b.title,
+        description: b.description,
+        priority: b.priority,
+        status: b.status,
+        reporter_id: b.reporterId,
+        project_id: b.projectId,
+    }));
+    const { error } = await supabase.from('bugs').insert(records);
+    if (error) throw error;
+};
+
+const updateBug = async (bugId: string, updates: Partial<{ priority: TaskPriority, status: BugStatus, assigneeId: string | null }>) => {
+    const { error } = await supabase
+        .from('bugs')
+        .update({
+            priority: updates.priority,
+            status: updates.status,
+            assignee_id: updates.assigneeId,
+        })
+        .eq('id', bugId);
+    if (error) throw error;
+};
+
+const deleteBug = async (bugId: string) => {
+    const { error } = await supabase.from('bugs').delete().eq('id', bugId);
+    if (error) throw error;
+};
+
+const deleteBugsBatch = async (bugIds: string[]) => {
+    const { error } = await supabase.from('bugs').delete().in('id', bugIds);
+    if (error) throw error;
+};
+
 
 export const api = {
     auth: {
@@ -782,5 +851,10 @@ export const api = {
         addProjectLink,
         deleteProjectLink,
         submitFeedback,
+        addBug,
+        updateBug,
+        deleteBug,
+        addBugsBatch,
+        deleteBugsBatch,
     }
 }

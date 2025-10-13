@@ -36,7 +36,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
 
     const allTasks = useMemo(() => {
         const taskMap: Record<string, Task> = {};
-        Object.values(projects).forEach(p => {
+        // FIX: Cast Object.values to the correct type to avoid type inference issues.
+        (Object.values(projects) as Project[]).forEach(p => {
             Object.assign(taskMap, p.board.tasks);
         });
         return taskMap;

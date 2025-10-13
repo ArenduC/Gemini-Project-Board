@@ -1,5 +1,3 @@
-
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { TaskPriority, Project, User, ProjectLink, AiGeneratedProjectPlan } from "../types";
 
@@ -179,6 +177,29 @@ const projectFromCsvResponseSchema = {
         }
     },
     required: ["name", "description", "columns"]
+};
+
+export interface BugResponse {
+    title: string;
+    description: string;
+}
+
+const bugsFromFileResponseSchema = {
+    type: Type.ARRAY,
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            title: {
+                type: Type.STRING,
+                description: "A concise title for the bug, extracted or summarized from the source."
+            },
+            description: {
+                type: Type.STRING,
+                description: "A detailed description of the bug, including any relevant context from the source file."
+            }
+        },
+        required: ["title", "description"],
+    },
 };
 
 
@@ -509,5 +530,52 @@ export const generateProjectFromCsv = async (csvContent: string): Promise<AiGene
             throw new Error("The Gemini API key is invalid or missing.");
         }
         throw new Error("Failed to generate project from CSV. Please check the file format and try again.");
+    }
+};
+
+/**
+ * Parses bugs from a text or CSV file.
+ * @param fileContent The string content of the user's file.
+ * @returns A promise that resolves to an array of bug objects.
+ */
+export const generateBugsFromFile = async (fileContent: string): Promise<BugResponse[]> => {
+    try {
+        const prompt = `
+            You are a bug tracking assistant. A user has provided a file (either CSV or plain text) containing a list of bugs.
+            Your task is to parse the content and structure it into a JSON array of bug objects. Each object must have a 'title' and a 'description'.
+            - For CSVs, look for columns like 'title', 'summary', 'bug', 'issue', 'description', 'details'.
+            - For text files, each line or paragraph may represent a different bug. Use the first line as the title and subsequent lines as the description.
+            - Be robust and handle messy data gracefully. If a row/line is unclear, skip it.
+            - Ensure the output is ONLY the JSON object that matches the provided schema. Do not include any other text.
+
+            File Content:
+            ---
+            ${fileContent}
+            ---
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: bugsFromFileResponseSchema,
+            },
+        });
+
+        const jsonText = response.text.trim();
+        if (!jsonText) {
+            console.warn("Gemini API returned an empty response for bug parsing.");
+            return [];
+        }
+        const parsedResponse = JSON.parse(jsonText);
+        return parsedResponse as BugResponse[];
+
+    } catch (error) {
+        console.error("Error calling Gemini API for bug parsing:", error);
+        if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
+            throw new Error("The Gemini API key is invalid or missing.");
+        }
+        throw new Error("AI failed to parse bugs from the file. Please check the file format and try again.");
     }
 };

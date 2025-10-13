@@ -20,13 +20,16 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
     const userWorkload = useMemo(() => {
         const workload: Record<string, { assignedTasks: number, projects: Set<string> }> = {};
         
-        Object.values(users).forEach(user => {
+        // FIX: Cast Object.values to the correct type to avoid type inference issues.
+        (Object.values(users) as User[]).forEach(user => {
             workload[user.id] = { assignedTasks: 0, projects: new Set() };
         });
 
-        Object.values(projects).forEach(project => {
+        // FIX: Cast Object.values to the correct type to avoid type inference issues.
+        (Object.values(projects) as Project[]).forEach(project => {
             // Count tasks assigned to a user across all projects
-            Object.values(project.board.tasks).forEach(task => {
+            // FIX: Cast Object.values to the correct type to avoid type inference issues.
+            (Object.values(project.board.tasks) as Task[]).forEach(task => {
                 if(task.assignee && workload[task.assignee.id]) {
                     workload[task.assignee.id].assignedTasks++;
                 }
@@ -43,7 +46,8 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
         return workload;
     }, [projects, users]);
     
-    const usersList = Object.values(users);
+    // FIX: Cast Object.values to the correct type to avoid type inference issues.
+    const usersList = Object.values(users) as User[];
     const totalPages = Math.ceil(usersList.length / ITEMS_PER_PAGE);
     const paginatedUsers = usersList.slice(
       (currentPage - 1) * ITEMS_PER_PAGE,

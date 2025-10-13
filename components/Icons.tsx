@@ -281,3 +281,12 @@ export const RotateCwIcon: React.FC<IconProps> = (props) => (
     <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
   </svg>
 );
+
+export const TableIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+    <line x1="3" x2="21" y1="9" y2="9" />
+    <line x1="3" x2="21" y1="15" y2="15" />
+    <line x1="12" x2="12" y1="3" y2="21" />
+  </svg>
+);

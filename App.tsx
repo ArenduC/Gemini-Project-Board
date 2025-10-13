@@ -1,11 +1,9 @@
-
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ManageMembersModal } from './components/ManageMembersModal';
-import { BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon, RotateCwIcon } from './components/Icons';
+import { BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon, RotateCwIcon, LifeBuoyIcon } from './components/Icons';
 import { useAppState } from './hooks/useAppState';
 import { DashboardPage } from './pages/DashboardPage';
 import { TasksPage } from './pages/TasksPage';
@@ -13,7 +11,8 @@ import { ResourceManagementPage } from './pages/ResourceManagementPage';
 import { LoginPage } from './pages/LoginPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import CallbackPage from './pages/CallbackPage';
-import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage, FeedbackType } from './types';
+// FIX: Import `Column` type to be used in casting.
+import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage, FeedbackType, Column } from './types';
 import { api } from './services/api';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
@@ -103,7 +102,10 @@ const App: React.FC = () => {
   const activeProjectIdRef = useRef<string | null>(null);
 
   const appState = useAppState(session, currentUser, activeProjectId);
-  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, updateUserProfile, deleteProject, sendChatMessage, updateProjectMembers, addProjectLink, deleteProjectLink } = appState;
+  // FIX: Added `updateProjectMembers` to the destructuring to make it available in the component's scope.
+  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, updateUserProfile, deleteProject, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch, updateProjectMembers } = appState;
+
+  const hasData = useMemo(() => Object.keys(state.projects).length > 0 || Object.keys(state.users).length > 0, [state]);
 
   const activeProject = activeProjectId ? state.projects[activeProjectId] : null;
   const projectToManageMembers = projectForMemberManagementId ? state.projects[projectForMemberManagementId] : null;
@@ -301,7 +303,8 @@ const App: React.FC = () => {
   // Effect to update the modal's task data when the global state changes
   useEffect(() => {
       if (selectedTask) {
-          for (const project of Object.values(state.projects)) {
+          // FIX: Cast Object.values to the correct type to avoid type inference issues.
+          for (const project of Object.values(state.projects) as Project[]) {
               if (project.board.tasks[selectedTask.id]) {
                   setSelectedTask(project.board.tasks[selectedTask.id]);
                   break;
@@ -355,7 +358,8 @@ const App: React.FC = () => {
   };
 
   const findProjectForTask = (taskId: string) => {
-    return Object.values(state.projects).find(p => p.board.tasks[taskId]);
+    // FIX: Cast Object.values to the correct type to avoid type inference issues.
+    return (Object.values(state.projects) as Project[]).find(p => p.board.tasks[taskId]);
   };
 
   const projectForSelectedTask = selectedTask ? findProjectForTask(selectedTask.id) : null;
@@ -392,10 +396,11 @@ const App: React.FC = () => {
     const context = {
         currentView: view,
         activeProject: activeProject ? { name: activeProject.name, id: activeProject.id } : null,
-        projects: Object.values(state.projects).map(p => ({ name: p.name, id: p.id })),
-        users: Object.values(state.users).map(u => ({ name: u.name, id: u.id })),
-        columns: activeProject ? Object.values(activeProject.board.columns).map(c => ({ name: c.title, id: c.id })) : [],
-        tasks: activeProject ? Object.values(activeProject.board.tasks).map(t => ({ title: t.title, id: t.id })) : [],
+        // FIX: Cast Object.values results to avoid type errors.
+        projects: (Object.values(state.projects) as Project[]).map(p => ({ name: p.name, id: p.id })),
+        users: (Object.values(state.users) as User[]).map(u => ({ name: u.name, id: u.id })),
+        columns: activeProject ? (Object.values(activeProject.board.columns) as Column[]).map(c => ({ name: c.title, id: c.id })) : [],
+        tasks: activeProject ? (Object.values(activeProject.board.tasks) as Task[]).map(t => ({ title: t.title, id: t.id })) : [],
         links: activeProject ? activeProject.links.map(l => ({ title: l.title })) : [],
     };
     
@@ -419,13 +424,15 @@ const App: React.FC = () => {
             case 'MOVE_TASK':
                  if (!activeProject) return "You need to be in a project to move a task.";
                  
-                 const taskToMove = Object.values(activeProject.board.tasks).find(t => t.title.toLowerCase() === result.params.taskTitle.toLowerCase());
-                 const destColumn = Object.values(activeProject.board.columns).find(c => c.title.toLowerCase() === result.params.targetColumnName.toLowerCase());
+                 // FIX: Cast Object.values results to avoid type errors.
+                 const taskToMove = (Object.values(activeProject.board.tasks) as Task[]).find(t => t.title.toLowerCase() === result.params.taskTitle.toLowerCase());
+                 const destColumn = (Object.values(activeProject.board.columns) as Column[]).find(c => c.title.toLowerCase() === result.params.targetColumnName.toLowerCase());
 
                  if (!taskToMove) return `I couldn't find a task named "${result.params.taskTitle}".`;
                  if (!destColumn) return `I couldn't find a column named "${result.params.targetColumnName}".`;
 
-                 const sourceColumn = Object.values(activeProject.board.columns).find(c => c.taskIds.includes(taskToMove.id));
+                 // FIX: Cast Object.values results to avoid type errors.
+                 const sourceColumn = (Object.values(activeProject.board.columns) as Column[]).find(c => c.taskIds.includes(taskToMove.id));
                  if (!sourceColumn) return "I couldn't determine the task's current location.";
 
                  const dragResult: DropResult = {
@@ -443,8 +450,9 @@ const App: React.FC = () => {
             case 'ASSIGN_TASK':
                 if (!activeProject) return "You need to be in a project to assign a task.";
 
-                const taskToAssign = Object.values(activeProject.board.tasks).find(t => t.title.toLowerCase() === result.params.taskTitle.toLowerCase());
-                const userToAssign = Object.values(state.users).find(u => u.name.toLowerCase() === result.params.assigneeName.toLowerCase());
+                // FIX: Cast Object.values results to avoid type errors.
+                const taskToAssign = (Object.values(activeProject.board.tasks) as Task[]).find(t => t.title.toLowerCase() === result.params.taskTitle.toLowerCase());
+                const userToAssign = (Object.values(state.users) as User[]).find(u => u.name.toLowerCase() === result.params.assigneeName.toLowerCase());
                 
                 if (!taskToAssign) return `I couldn't find a task named "${result.params.taskTitle}".`;
                 if (!userToAssign) return `I couldn't find a user named "${result.params.assigneeName}".`;
@@ -458,8 +466,10 @@ const App: React.FC = () => {
                 if (dest === 'dashboard') { navigate('/'); return `Navigating to dashboard.`; }
                 if (dest === 'tasks') { navigate('/tasks'); return `Navigating to tasks.`; }
                 if (dest === 'resources') { navigate('/resources'); return `Navigating to resources.`; }
+                if (dest === 'bugs') { navigate('/bugs'); return `Navigating to bug tracker.`; }
                 
-                const projectToNav = Object.values(state.projects).find(p => p.name.toLowerCase() === dest);
+                // FIX: Cast Object.values results to avoid type errors.
+                const projectToNav = (Object.values(state.projects) as Project[]).find(p => p.name.toLowerCase() === dest);
                 if (projectToNav) {
                     navigate(`/projects/${projectToNav.id}`);
                     return `Opening project: ${projectToNav.name}.`;
@@ -663,7 +673,7 @@ const App: React.FC = () => {
           </div>
         </header>
         <main className="p-4 sm:p-6">
-          {appStateLoading ? (
+          {appStateLoading && !hasData ? (
             <div className="flex items-center justify-center pt-20">
               <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
               <p className="ml-4 text-base font-semibold text-gray-400">Loading your data...</p>
@@ -705,6 +715,11 @@ const App: React.FC = () => {
                   onSendMessage={(text) => sendChatMessage(activeProject.id, text, currentUser)}
                   addProjectLink={(title, url) => addProjectLink(activeProject.id, title, url, currentUser.id)}
                   deleteProjectLink={(linkId) => deleteProjectLink(linkId)}
+                  addBug={addBug}
+                  updateBug={updateBug}
+                  deleteBug={deleteBug}
+                  addBugsBatch={addBugsBatch}
+                  deleteBugsBatch={deleteBugsBatch}
                 />
               )}
               {view === 'tasks' && (
@@ -838,7 +853,7 @@ const App: React.FC = () => {
             onCommand={handleVoiceCommand}
           />
       )}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2">
+      <div id="notification-root" className="fixed bottom-4 right-4 z-50 space-y-2">
         {notifications.map(notification => (
           <NotificationToast key={notification.id} notification={notification} />
         ))}

@@ -33,10 +33,13 @@ interface UserWorkload {
 
 export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, users, onlineUsers, onTaskClick }) => {
     const userWorkloads = useMemo((): UserWorkload[] => {
-        return Object.values(users).map(user => {
-            const projectWorkload = Object.values(projects)
+        // FIX: Cast Object.values to the correct type to avoid type inference issues.
+        return (Object.values(users) as User[]).map(user => {
+            // FIX: Cast Object.values to the correct type to avoid type inference issues.
+            const projectWorkload = (Object.values(projects) as Project[])
                 .map(project => {
-                    const tasks = Object.values(project.board.tasks).filter(task => task.assignee?.id === user.id);
+                    // FIX: Cast Object.values to the correct type to avoid type inference issues.
+                    const tasks = (Object.values(project.board.tasks) as Task[]).filter(task => task.assignee?.id === user.id);
                     return { project, tasks };
                 })
                 .filter(workload => workload.tasks.length > 0); // Only include projects where user has tasks

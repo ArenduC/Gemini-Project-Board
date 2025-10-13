@@ -90,6 +90,24 @@ export interface ProjectLink {
   createdAt: string;
 }
 
+export enum BugStatus {
+  NEW = 'New',
+  IN_PROGRESS = 'In Progress',
+  RESOLVED = 'Resolved',
+}
+
+export interface Bug {
+  id: string;
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  status: BugStatus;
+  assignee?: User;
+  reporterId: string;
+  createdAt: string;
+}
+
+
 export interface Project {
   id: string;
   name: string;
@@ -100,6 +118,7 @@ export interface Project {
   createdAt: string;
   chatMessages: ChatMessage[];
   links: ProjectLink[];
+  bugs: Record<string, Bug>;
 }
 
 export interface AppState {

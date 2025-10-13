@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Project, User, AugmentedTask, Task, FilterSegment } from '../types';
+// FIX: Import `Column` type to be used in casting.
+import { Project, User, AugmentedTask, Task, FilterSegment, Column } from '../types';
 import { DownloadIcon } from '../components/Icons';
 import { exportAugmentedTasksToCsv } from '../utils/export';
 import { TaskListRow } from '../components/TaskListRow';
@@ -95,9 +96,12 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   };
 
   const allTasks = useMemo((): AugmentedTask[] => {
-    return Object.values(projects).flatMap(project =>
-      Object.values(project.board.tasks).map(task => {
-        const column = Object.values(project.board.columns).find(c => c.taskIds.includes(task.id));
+    // FIX: Cast Object.values to the correct type to avoid type inference issues.
+    return (Object.values(projects) as Project[]).flatMap(project =>
+      // FIX: Cast Object.values to the correct type to avoid type inference issues.
+      (Object.values(project.board.tasks) as Task[]).map(task => {
+        // FIX: Cast Object.values to the correct type to avoid type inference issues.
+        const column = (Object.values(project.board.columns) as Column[]).find(c => c.taskIds.includes(task.id));
         return {
           ...task,
           projectId: project.id,
@@ -118,8 +122,10 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
 
   const allStatuses = useMemo(() => {
     const statusSet = new Set<string>();
-    Object.values(projects).forEach(project => {
-      Object.values(project.board.columns).forEach(column => {
+    // FIX: Cast Object.values to the correct type to avoid type inference issues.
+    (Object.values(projects) as Project[]).forEach(project => {
+      // FIX: Cast Object.values to the correct type to avoid type inference issues.
+      (Object.values(project.board.columns) as Column[]).forEach(column => {
         statusSet.add(column.title);
       });
     });

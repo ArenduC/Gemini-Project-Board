@@ -1,7 +1,7 @@
 import React, { useState, FormEvent, ReactNode } from 'react';
 import { Project } from '../types';
 import { generateProjectLinks } from '../services/geminiService';
-import { LinkIcon, GitHubIcon, FigmaIcon, PlusIcon, TrashIcon, SparklesIcon, LoaderCircleIcon } from './Icons';
+import { LinkIcon, GitHubIcon, FigmaIcon, PlusIcon, TrashIcon, SparklesIcon, LoaderCircleIcon, CopyIcon, CheckIcon } from './Icons';
 
 interface ProjectLinksManagerProps {
   project: Project;
@@ -25,7 +25,8 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
     const [url, setUrl] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [isOpen, setIsOpen] = useState(true);
+    const [isOpen, setIsOpen] = useState(false);
+    const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
 
     const handleAddSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -58,6 +59,12 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
         }
     };
 
+    const handleCopyLink = (linkUrl: string, linkId: string) => {
+        navigator.clipboard.writeText(linkUrl);
+        setCopiedLinkId(linkId);
+        setTimeout(() => setCopiedLinkId(null), 2000);
+    };
+
     return (
         <div className="bg-[#131C1B]/50 border border-gray-800 rounded-xl">
             <button onClick={() => setIsOpen(!isOpen)} className="w-full p-4 flex justify-between items-center">
@@ -75,13 +82,22 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
                                         <a href={link.url} target="_blank" rel="noopener noreferrer" className="font-medium text-sm text-white hover:underline">{link.title}</a>
                                         <p className="text-xs text-gray-500 truncate">{link.url}</p>
                                     </div>
-                                    <button
-                                        onClick={() => onDeleteLink(link.id)}
-                                        className="p-1.5 rounded-full text-gray-400 hover:bg-red-900/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        aria-label="Delete link"
-                                    >
-                                        <TrashIcon className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={() => handleCopyLink(link.url, link.id)}
+                                            className="p-1.5 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white"
+                                            aria-label="Copy link"
+                                        >
+                                            {copiedLinkId === link.id ? <CheckIcon className="w-4 h-4 text-green-500" /> : <CopyIcon className="w-4 h-4" />}
+                                        </button>
+                                        <button
+                                            onClick={() => onDeleteLink(link.id)}
+                                            className="p-1.5 rounded-full text-gray-400 hover:bg-red-900/50 hover:text-red-400"
+                                            aria-label="Delete link"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>

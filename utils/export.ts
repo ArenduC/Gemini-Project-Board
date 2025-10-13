@@ -1,5 +1,4 @@
-
-import { Project, User, AugmentedTask } from '../types';
+import { Project, User, AugmentedTask, Bug } from '../types';
 
 // Helper to escape CSV fields
 const escapeCsvField = (field: string | undefined | null): string => {
@@ -92,6 +91,47 @@ export const exportAugmentedTasksToCsv = (tasks: AugmentedTask[], users: Record<
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     link.setAttribute('download', 'tasks_export.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+};
+
+export const exportBugsToCsv = (bugs: Bug[], projectName: string, users: Record<string, User>) => {
+  const headers = [
+    'Bug ID', 'Project Name', 'Title', 'Description', 'Status', 'Priority', 
+    'Assignee ID', 'Assignee Name', 'Reporter ID', 'Reporter Name', 'Created At'
+  ];
+
+  const rows = bugs.map(bug => {
+    const assignee = bug.assignee ? users[bug.assignee.id] : null;
+    const reporter = users[bug.reporterId];
+
+    return [
+      bug.id,
+      projectName,
+      bug.title,
+      bug.description,
+      bug.status,
+      bug.priority,
+      assignee?.id || '',
+      assignee?.name || 'Unassigned',
+      reporter?.id || '',
+      reporter?.name || 'Unknown',
+      bug.createdAt
+    ].map(escapeCsvField).join(',');
+  });
+
+  const csvContent = [headers.join(','), ...rows].join('\n');
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob);
+    const timestamp = new Date().toISOString().slice(0, 10);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `bug_export_${projectName.replace(/\s+/g, '_')}_${timestamp}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

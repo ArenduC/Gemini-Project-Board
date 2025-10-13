@@ -1,5 +1,6 @@
 import React from 'react';
-import { Project, User } from '../types';
+// FIX: Import `Column` type to be used in casting.
+import { Project, User, Column } from '../types';
 import { UsersIcon, Share2Icon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 
@@ -14,7 +15,8 @@ interface ProjectCardProps {
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onlineUsers, onSelect, onManageMembers, onShare }) => {
   const totalTasks = Object.keys(project.board.tasks).length;
-  const doneColumn = Object.values(project.board.columns).find(c => c.title.toLowerCase() === 'done');
+  // FIX: Cast Object.values to the correct type to avoid type inference issues.
+  const doneColumn = (Object.values(project.board.columns) as Column[]).find(c => c.title.toLowerCase() === 'done');
   const completedTasks = doneColumn ? doneColumn.taskIds.length : 0;
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   const creator = users[project.creatorId];
