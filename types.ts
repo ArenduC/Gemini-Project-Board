@@ -119,6 +119,7 @@ export interface Project {
   chatMessages: ChatMessage[];
   links: ProjectLink[];
   bugs: Record<string, Bug>;
+  bugOrder: string[];
 }
 
 export interface AppState {

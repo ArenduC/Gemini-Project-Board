@@ -26,7 +26,8 @@ export const BugsPage: React.FC<BugsPageProps> = ({
 }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
 
-  const projectList = useMemo(() => Object.values(projects).sort((a, b) => a.name.localeCompare(b.name)), [projects]);
+  // FIX: Cast Object.values to the correct type to avoid type inference issues.
+  const projectList = useMemo(() => (Object.values(projects) as Project[]).sort((a, b) => a.name.localeCompare(b.name)), [projects]);
 
   const selectedProject = useMemo(() => {
     if (selectedProjectId && projects[selectedProjectId]) {

@@ -167,8 +167,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
   }, [project.bugs]);
 
   const filteredBugs = useMemo(() => {
-    // FIX: Cast the result of Object.values to Bug[] to allow sorting by the `createdAt` property.
-    let bugsToFilter = (Object.values(project.bugs || {}) as Bug[]).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    let bugsToFilter = (project.bugOrder || []).map(id => project.bugs[id]).filter(Boolean);
 
     if (searchTerm) {
       const lowercasedTerm = searchTerm.toLowerCase();
@@ -187,7 +186,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
       bugsToFilter = bugsToFilter.filter(bug => bug.assignee?.id === assigneeFilter);
     }
     return bugsToFilter;
-  }, [project.bugs, searchTerm, statusFilter, priorityFilter, assigneeFilter]);
+  }, [project.bugs, project.bugOrder, searchTerm, statusFilter, priorityFilter, assigneeFilter]);
   
   // Reset page when filters change
   useEffect(() => {

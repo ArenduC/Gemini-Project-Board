@@ -188,7 +188,8 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
         .order('position', { foreignTable: 'columns' })
         .order('created_at', { foreignTable: 'chat_messages' })
         .order('created_at', { foreignTable: 'links' })
-        .order('created_at', { foreignTable: 'bugs' });
+        .order('created_at', { foreignTable: 'bugs' })
+        .order('id', { foreignTable: 'bugs' });
 
 
     if (projectsError) throw projectsError;
@@ -217,6 +218,8 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
             reporterId: b.reporter_id,
             createdAt: b.created_at,
         }));
+        
+        const bugOrder = bugs.map(b => b.id);
 
         projectsRecord[p.id] = {
             id: p.id,
@@ -225,6 +228,7 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
             members: p.members.map((m: any) => m.user_id),
             board,
             bugs: arrayToRecord(bugs),
+            bugOrder: bugOrder,
             chatMessages: p.chat_messages.map((msg: any): ChatMessage => ({
                 id: msg.id, text: msg.text, createdAt: msg.created_at, author: msg.author,
             })) || [],
@@ -705,10 +709,9 @@ const acceptInvite = async (token: string): Promise<Project> => {
         // FIX: The error message from the API can be of an unknown type. This ensures that
         // a valid string is always passed to the Error constructor to avoid a type error.
         const potentialMessage = (error as any)?.message;
-        let errorMessage = 'Could not join project. The link may be invalid or expired.';
-        if (typeof potentialMessage === 'string') {
-          errorMessage = potentialMessage;
-        }
+        const errorMessage = typeof potentialMessage === 'string' && potentialMessage
+          ? potentialMessage
+          : 'Could not join project. The link may be invalid or expired.';
         throw new Error(errorMessage);
     }
     // The RPC function is expected to return the full project data upon success.
