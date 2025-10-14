@@ -31,7 +31,7 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({ notificati
   return ReactDOM.createPortal(
     <div
       className={`bg-[#131C1B] shadow-lg rounded-xl w-80 p-4 border border-gray-800 transition-all duration-300 ease-in-out
-        ${isVisible && !isClosing ? 'transform translate-y-0 opacity-100' : 'transform translate-y-4 opacity-0'}`}
+        ${isVisible && !isClosing ? 'transform translate-y-0 opacity-100' : 'transform translate-y-4 opacity-0 pointer-events-none'}`}
       onAnimationEnd={() => {
         if (isClosing) setIsVisible(false);
       }}

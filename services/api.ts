@@ -705,13 +705,9 @@ const acceptInvite = async (token: string): Promise<Project> => {
         // The error object from Supabase may not be an Error instance. We must safely extract a string message.
         console.error('Error accepting invite:', error);
         
-        const message = (error as any)?.message;
-        
-        if (typeof message === 'string' && message) {
-            throw new Error(message);
-        } else {
-            throw new Error('Could not join project. The link may be invalid or expired.');
-        }
+        // FIX: The type of `error` from `supabase.rpc` can be `unknown` or may not have a `message` property.
+        // This ensures a string is always passed to the Error constructor, resolving the type error.
+        throw new Error(String((error as any)?.message ?? 'Could not join project. The link may be invalid or expired.'));
     }
 
     if (!data || !data.id || !data.name) {

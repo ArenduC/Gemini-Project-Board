@@ -292,7 +292,14 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
   return (
     <div className="bg-[#1C2326]/50 p-4 sm:p-6 rounded-lg">
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-        <h3 className="text-xl font-bold text-white flex items-center gap-2"><LifeBuoyIcon className="w-6 h-6"/> Bug Tracker</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2"><LifeBuoyIcon className="w-6 h-6"/> Bug Tracker</h3>
+          {bugsExist && (
+            <span className="text-sm font-medium text-gray-400 bg-gray-800/50 px-3 py-1 rounded-full">
+              Showing {filteredBugs.length} of {Object.keys(project.bugs || {}).length}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setExportModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 text-white font-semibold rounded-lg text-sm hover:bg-gray-700">
               <DownloadIcon className="w-5 h-5"/> Export

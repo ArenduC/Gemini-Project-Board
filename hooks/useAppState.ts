@@ -4,6 +4,7 @@ import { AppState, Task, NewTaskData, User, ChatMessage, AiGeneratedProjectPlan,
 import { api } from '../services/api';
 import { generateTaskFromPrompt, generateBugsFromFile, BugResponse } from '../services/geminiService';
 import { Session } from '@supabase/supabase-js';
+import { playSentSound } from '../utils/sound';
 
 const initialState: AppState = {
   projects: {},
@@ -285,6 +286,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, [fetchData]);
   
   const sendChatMessage = useCallback(async (projectId: string, text: string, author: User) => {
+    playSentSound();
     const tempId = `temp-${Date.now()}`;
     const optimisticMessage: ChatMessage = {
         id: tempId,

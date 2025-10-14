@@ -27,6 +27,7 @@ import { NotificationToast } from './components/NotificationToast';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { FeedbackFab } from './components/FeedbackFab';
 import { FeedbackModal } from './components/FeedbackModal';
+import { playReceiveSound, playNotificationSound, initAudio } from './utils/sound';
 
 
 type View = 'dashboard' | 'project' | 'tasks' | 'resources' | 'privacy';
@@ -98,8 +99,8 @@ const App: React.FC = () => {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const chatMessagesRef = useRef<ChatMessage[]>([]);
-  const activeProjectIdRef = useRef<string | null>(null);
+  const chatMessagesRef = useRef<Record<string, ChatMessage[]>>({});
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
   const appState = useAppState(session, currentUser, activeProjectId);
   // FIX: Added `updateProjectMembers` to the destructuring to make it available in the component's scope.
@@ -226,27 +227,34 @@ const App: React.FC = () => {
     }, []);
 
     useEffect(() => {
-      if (activeProject && currentUser && isChatOpen === false) {
-          if (activeProjectIdRef.current !== activeProject.id) {
-              chatMessagesRef.current = activeProject.chatMessages;
-              activeProjectIdRef.current = activeProject.id;
-              return;
-          }
-
-          const previousMessages = chatMessagesRef.current;
+      if (activeProject && currentUser) {
+          const projectId = activeProject.id;
+          const previousMessages = chatMessagesRef.current[projectId] || [];
           const currentMessages = activeProject.chatMessages;
-
+  
           if (currentMessages.length > previousMessages.length) {
-              const newMessage = currentMessages[currentMessages.length - 1];
-              if (newMessage.author.id !== currentUser.id && !previousMessages.some(m => m.id === newMessage.id)) {
-                  addNotification({
-                      author: newMessage.author,
-                      message: newMessage.text,
-                      project: activeProject
-                  });
-              }
+              const newMessages = currentMessages.filter(cm => !previousMessages.some(pm => pm.id === cm.id));
+  
+              newMessages.forEach(newMessage => {
+                  if (newMessage.author.id !== currentUser.id) {
+                      if (isChatOpen) {
+                          playReceiveSound();
+                      } else {
+                          playNotificationSound();
+                          addNotification({
+                              author: newMessage.author,
+                              message: newMessage.text,
+                              project: activeProject,
+                          });
+                          setUnreadCounts(prev => ({
+                              ...prev,
+                              [projectId]: (prev[projectId] || 0) + 1,
+                          }));
+                      }
+                  }
+              });
           }
-          chatMessagesRef.current = currentMessages;
+          chatMessagesRef.current[projectId] = currentMessages;
       }
     }, [activeProject, currentUser, isChatOpen, addNotification]);
 
@@ -552,6 +560,8 @@ const App: React.FC = () => {
         </div>
      )
   };
+
+  const unreadCount = activeProjectId ? unreadCounts[activeProjectId] || 0 : 0;
   
   // This state prevents the login page from flashing on refresh for logged-in users.
   if (isAuthLoading) {
@@ -580,7 +590,7 @@ const App: React.FC = () => {
 
   return (
     <>
-      <div className="min-h-screen font-sans text-gray-300 bg-[#1C2326] transition-colors duration-300">
+      <div onClick={initAudio} className="min-h-screen font-sans text-gray-300 bg-[#1C2326] transition-colors duration-300">
         <header className="bg-[#131C1B]/80 backdrop-blur-sm border-b border-gray-800 p-4 flex justify-between items-center sticky top-0 z-20 flex-wrap gap-4">
           <HeaderContent />
 
@@ -601,13 +611,26 @@ const App: React.FC = () => {
               </button>
             )}
             {view === 'project' && (
-              <button
-                onClick={() => setIsChatOpen(prev => !prev)}
-                className="p-2 rounded-full text-gray-400 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
-                aria-label="Toggle project chat"
-              >
-                <MessageCircleIcon className="w-5 h-5" />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => {
+                      const wasOpen = isChatOpen;
+                      setIsChatOpen(!wasOpen);
+                      if (!wasOpen && activeProjectId) {
+                          setUnreadCounts(prev => ({ ...prev, [activeProjectId]: 0 }));
+                      }
+                  }}
+                  className="p-2 rounded-full text-gray-400 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
+                  aria-label="Toggle project chat"
+                >
+                  <MessageCircleIcon className="w-5 h-5" />
+                </button>
+                {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white pointer-events-none">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                )}
+              </div>
             )}
             <button
                 onClick={() => fetchData()}
@@ -858,7 +881,7 @@ const App: React.FC = () => {
           <NotificationToast key={notification.id} notification={notification} />
         ))}
       </div>
-      <FeedbackFab onClick={() => setFeedbackModalOpen(true)} />
+      {!isChatOpen && <FeedbackFab onClick={() => setFeedbackModalOpen(true)} />}
       <FeedbackModal
         isOpen={isFeedbackModalOpen}
         onClose={() => setFeedbackModalOpen(false)}
