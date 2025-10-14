@@ -1,3 +1,4 @@
+
 import React, { useState, FormEvent, DragEvent, useRef, useMemo, useEffect } from 'react';
 import { Project, User, Bug, BugStatus, TaskPriority } from '../types';
 import { LifeBuoyIcon, PlusIcon, FileUpIcon, LoaderCircleIcon, SparklesIcon, XIcon, TrashIcon, SearchIcon, DownloadIcon } from './Icons';
@@ -146,6 +147,8 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
@@ -173,7 +176,8 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
       const lowercasedTerm = searchTerm.toLowerCase();
       bugsToFilter = bugsToFilter.filter(bug =>
         bug.title.toLowerCase().includes(lowercasedTerm) ||
-        (bug.description && bug.description.toLowerCase().includes(lowercasedTerm))
+        (bug.description && bug.description.toLowerCase().includes(lowercasedTerm)) ||
+        (bug.bugNumber && bug.bugNumber.toLowerCase().includes(lowercasedTerm))
       );
     }
     if (statusFilter) {
@@ -185,8 +189,16 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
     if (assigneeFilter) {
       bugsToFilter = bugsToFilter.filter(bug => bug.assignee?.id === assigneeFilter);
     }
+    if (startDate) {
+      const start = new Date(startDate).setHours(0, 0, 0, 0);
+      bugsToFilter = bugsToFilter.filter(bug => new Date(bug.createdAt).getTime() >= start);
+    }
+    if (endDate) {
+      const end = new Date(endDate).setHours(23, 59, 59, 999);
+      bugsToFilter = bugsToFilter.filter(bug => new Date(bug.createdAt).getTime() <= end);
+    }
     return bugsToFilter;
-  }, [project.bugs, project.bugOrder, searchTerm, statusFilter, priorityFilter, assigneeFilter]);
+  }, [project.bugs, project.bugOrder, searchTerm, statusFilter, priorityFilter, assigneeFilter, startDate, endDate]);
   
   // Reset page when filters change
   useEffect(() => {
@@ -257,8 +269,17 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
     }
   };
   
-  const hasActiveFilters = searchTerm || statusFilter || priorityFilter || assigneeFilter;
+  const hasActiveFilters = searchTerm || statusFilter || priorityFilter || assigneeFilter || startDate || endDate;
   const bugsExist = Object.keys(project.bugs || {}).length > 0;
+  
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('');
+    setPriorityFilter('');
+    setAssigneeFilter('');
+    setStartDate('');
+    setEndDate('');
+  };
 
   return (
     <div className="bg-[#1C2326]/50 p-4 sm:p-6 rounded-lg">
@@ -277,7 +298,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
         </div>
       </div>
 
-      <div className="mb-4 p-3 bg-[#1C2326] rounded-lg flex items-center justify-between gap-2 flex-wrap">
+      <div className="mb-4 p-3 bg-[#1C2326] rounded-lg flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -289,33 +310,21 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
               className="pl-10 pr-4 py-2 w-48 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"
             />
           </div>
-          
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"
-          >
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm">
             <option value="">All Statuses</option>
             {Object.values(BugStatus).map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-
-          <select
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"
-          >
+          <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="px-3 py-2 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm">
             <option value="">All Priorities</option>
             {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
           </select>
-
-          <select
-            value={assigneeFilter}
-            onChange={(e) => setAssigneeFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"
-          >
+          <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className="px-3 py-2 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm">
             <option value="">All Assignees</option>
             {uniqueAssignees.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
+          <div className="flex items-center gap-2"><label className="text-sm text-gray-400">From:</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="px-2 py-1.5 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"/></div>
+          <div className="flex items-center gap-2"><label className="text-sm text-gray-400">To:</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="px-2 py-1.5 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"/></div>
+          {hasActiveFilters && (<button onClick={clearFilters} className="px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 rounded-lg">Clear Filters</button>)}
         </div>
         {selectedBugIds.size > 0 && (
             <div className="flex items-center gap-2">
@@ -332,29 +341,18 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
         )}
       </div>
 
-
       <div className="bg-[#131C1B] rounded-lg shadow-md border border-gray-800 overflow-x-auto">
-        <table className="w-full text-left min-w-[800px]">
+        <table className="w-full text-left min-w-[1000px]">
             <thead className="bg-[#1C2326]/50">
               <tr className="text-xs">
                   <th className="px-4 py-2 w-12">
-                    <input
-                      type="checkbox"
-                      checked={isAllOnPageSelected}
-                      ref={input => {
-                          if (input) {
-                              const numSelectedOnPage = paginatedBugs.filter(b => selectedBugIds.has(b.id)).length;
-                              input.indeterminate = numSelectedOnPage > 0 && !isAllOnPageSelected;
-                          }
-                      }}
-                      onChange={handleSelectAll}
-                      className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500"
-                      aria-label="Select all bugs on page"
-                    />
+                    <input type="checkbox" checked={isAllOnPageSelected} ref={input => { if (input) { const numSelectedOnPage = paginatedBugs.filter(b => selectedBugIds.has(b.id)).length; input.indeterminate = numSelectedOnPage > 0 && !isAllOnPageSelected; }}} onChange={handleSelectAll} className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500" aria-label="Select all bugs on page" />
                   </th>
+                  <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider w-24">Bug ID</th>
                   <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider w-2/5">Bug</th>
                   <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Status</th>
                   <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Priority</th>
+                  <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Date</th>
                   <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Assignee</th>
                   <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider text-right">Actions</th>
               </tr>
@@ -362,41 +360,18 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
             <tbody className="divide-y divide-gray-800">
               {bugsExist && paginatedBugs.length > 0 ? paginatedBugs.map(bug => (
                 <tr key={bug.id} className={`text-sm text-white ${selectedBugIds.has(bug.id) ? 'bg-gray-800/50' : 'hover:bg-gray-800/30'}`}>
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedBugIds.has(bug.id)}
-                      onChange={() => handleSelectOne(bug.id)}
-                      className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="font-semibold">{bug.title}</p>
-                    <p className="text-xs text-gray-400 truncate max-w-xs">{bug.description}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <select value={bug.status} onChange={e => handleUpdate(bug.id, 'status', e.target.value)} className={`text-xs font-semibold border-none rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${statusStyles[bug.status]}`}>
-                      {Object.values(BugStatus).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    <select value={bug.priority} onChange={e => handleUpdate(bug.id, 'priority', e.target.value)} className={`bg-transparent border text-xs font-semibold rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${priorityStyles[bug.priority]}`}>
-                      {Object.values(TaskPriority).map(p => <option key={p} value={p} className="bg-[#1C2326] text-white font-normal">{p}</option>)}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    <select value={bug.assignee?.id || ''} onChange={e => handleUpdate(bug.id, 'assignee', e.target.value)} className="w-full bg-[#1C2326] text-white text-sm border border-gray-800 focus:ring-2 focus:ring-gray-500 rounded-md px-2 py-1">
-                      <option value="">Unassigned</option>
-                      {projectMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => onDeleteBug(bug.id)} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-900/50 rounded-full"><TrashIcon className="w-4 h-4" /></button>
-                  </td>
+                  <td className="px-4 py-3"><input type="checkbox" checked={selectedBugIds.has(bug.id)} onChange={() => handleSelectOne(bug.id)} className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500" /></td>
+                  <td className="px-4 py-3 font-mono text-sm text-gray-400">{bug.bugNumber}</td>
+                  <td className="px-4 py-3"><p className="font-semibold">{bug.title}</p><p className="text-xs text-gray-400 truncate max-w-xs" title={bug.description}>{bug.description}</p></td>
+                  <td className="px-4 py-3"><select value={bug.status} onChange={e => handleUpdate(bug.id, 'status', e.target.value)} className={`text-xs font-semibold border-none rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${statusStyles[bug.status]}`}>{Object.values(BugStatus).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                  <td className="px-4 py-3"><select value={bug.priority} onChange={e => handleUpdate(bug.id, 'priority', e.target.value)} className={`bg-transparent border text-xs font-semibold rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${priorityStyles[bug.priority]}`}>{Object.values(TaskPriority).map(p => <option key={p} value={p} className="bg-[#1C2326] text-white font-normal">{p}</option>)}</select></td>
+                  <td className="px-4 py-3 text-gray-400">{new Date(bug.createdAt).toLocaleDateString()}</td>
+                  <td className="px-4 py-3"><select value={bug.assignee?.id || ''} onChange={e => handleUpdate(bug.id, 'assignee', e.target.value)} className="w-full bg-[#1C2326] text-white text-sm border border-gray-800 focus:ring-2 focus:ring-gray-500 rounded-md px-2 py-1"><option value="">Unassigned</option>{projectMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
+                  <td className="px-4 py-3 text-right"><button onClick={() => onDeleteBug(bug.id)} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-900/50 rounded-full"><TrashIcon className="w-4 h-4" /></button></td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={6} className="text-center py-8 text-gray-500">
+                  <td colSpan={8} className="text-center py-8 text-gray-500">
                     {hasActiveFilters ? "No bugs match your current filters." : "No bugs reported yet."}
                   </td>
                 </tr>

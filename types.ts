@@ -98,6 +98,7 @@ export enum BugStatus {
 
 export interface Bug {
   id: string;
+  bugNumber: string;
   title: string;
   description: string;
   priority: TaskPriority;

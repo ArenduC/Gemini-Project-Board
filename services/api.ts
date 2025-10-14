@@ -210,6 +210,7 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
 
         const bugs = (p.bugs || []).map((b: any): Bug => ({
             id: b.id,
+            bugNumber: b.bug_number,
             title: b.title,
             description: b.description,
             priority: b.priority,
@@ -706,8 +707,7 @@ const acceptInvite = async (token: string): Promise<Project> => {
         // Casting to 'any' allows safely accessing the 'message' property.
         console.error('Error accepting invite:', (error as any).message || error);
         
-        // FIX: The error message from the API can be of an unknown type. This ensures that
-        // a valid string is always passed to the Error constructor to avoid a type error.
+        // FIX: The error object's message property can be of an unknown type. This robust check ensures a valid string is always passed to the Error constructor, preventing a type error.
         const potentialMessage = (error as any)?.message;
         const errorMessage = typeof potentialMessage === 'string' && potentialMessage
           ? potentialMessage
@@ -763,7 +763,7 @@ const submitFeedback = async (feedbackData: {
     }
 };
 
-const addBug = async (bugData: Omit<Bug, 'id' | 'createdAt' | 'assignee'> & { projectId: string; assigneeId?: string }) => {
+const addBug = async (bugData: Omit<Bug, 'id' | 'createdAt' | 'assignee' | 'bugNumber'> & { projectId: string; assigneeId?: string }) => {
     const { error } = await supabase.from('bugs').insert({
         title: bugData.title,
         description: bugData.description,
@@ -776,7 +776,7 @@ const addBug = async (bugData: Omit<Bug, 'id' | 'createdAt' | 'assignee'> & { pr
     if (error) throw error;
 };
 
-const addBugsBatch = async (bugsData: (Omit<Bug, 'id' | 'createdAt' | 'assignee'> & { projectId: string })[]) => {
+const addBugsBatch = async (bugsData: (Omit<Bug, 'id' | 'createdAt' | 'assignee' | 'bugNumber'> & { projectId: string })[]) => {
     const records = bugsData.map(b => ({
         title: b.title,
         description: b.description,
