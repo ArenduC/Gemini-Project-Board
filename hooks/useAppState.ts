@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DropResult } from 'react-beautiful-dnd';
-import { AppState, Task, NewTaskData, User, ChatMessage, AiGeneratedProjectPlan, Bug, BugStatus, TaskPriority } from '../types';
+import { AppState, Task, NewTaskData, User, ChatMessage, AiGeneratedProjectPlan, Bug, TaskPriority } from '../types';
 import { api } from '../services/api';
 import { generateTaskFromPrompt, generateBugsFromFile, BugResponse } from '../services/geminiService';
 import { Session } from '@supabase/supabase-js';
@@ -345,30 +345,46 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   // Bug Management
   const addBug = useCallback(async (projectId: string, bugData: { title: string, description: string, priority: TaskPriority }) => {
     if (!currentUser) return;
+    const project = state.projects[projectId];
+    if (!project) {
+        console.error("Project not found for bug creation");
+        return;
+    }
+    const firstColumn = project.board.columns[project.board.columnOrder[0]];
+    const initialStatus = firstColumn ? firstColumn.title : 'New';
+
     await api.data.addBug({
         ...bugData,
         projectId,
-        status: BugStatus.NEW,
+        status: initialStatus,
         reporterId: currentUser.id,
     });
     await fetchData();
-  }, [fetchData, currentUser]);
+  }, [fetchData, currentUser, state.projects]);
 
   const addBugsBatch = useCallback(async (projectId: string, fileContent: string) => {
     if (!currentUser) return;
+    const project = state.projects[projectId];
+     if (!project) {
+        console.error("Project not found for bug import");
+        return;
+    }
+    const firstColumn = project.board.columns[project.board.columnOrder[0]];
+    const initialStatus = firstColumn ? firstColumn.title : 'New';
+
     const parsedBugs: BugResponse[] = await generateBugsFromFile(fileContent);
     if (parsedBugs.length > 0) {
         const bugsToCreate = parsedBugs.map(b => ({
             ...b,
             projectId,
             priority: TaskPriority.MEDIUM,
-            status: BugStatus.NEW,
+            status: initialStatus,
             reporterId: currentUser.id,
         }));
         await api.data.addBugsBatch(bugsToCreate);
         await fetchData();
     }
-  }, [fetchData, currentUser]);
+  }, [fetchData, currentUser, state.projects]);
 
   const updateBug = useCallback(async (bugId: string, updates: Partial<Bug>) => {
     const { priority, status, assignee } = updates;

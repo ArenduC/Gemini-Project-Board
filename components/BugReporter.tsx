@@ -1,6 +1,7 @@
 
+
 import React, { useState, FormEvent, DragEvent, useRef, useMemo, useEffect } from 'react';
-import { Project, User, Bug, BugStatus, TaskPriority } from '../types';
+import { Project, User, Bug, TaskPriority } from '../types';
 import { LifeBuoyIcon, PlusIcon, FileUpIcon, LoaderCircleIcon, SparklesIcon, XIcon, TrashIcon, SearchIcon, DownloadIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 import { ExportBugsModal } from './ExportBugsModal';
@@ -132,11 +133,17 @@ const priorityStyles: Record<TaskPriority, string> = {
   [TaskPriority.LOW]: 'bg-gray-400 border-gray-400',
 };
 
-const statusStyles: Record<BugStatus, string> = {
-    [BugStatus.NEW]: 'bg-gray-700 text-gray-300',
-    [BugStatus.IN_PROGRESS]: 'bg-blue-800 text-blue-300',
-    [BugStatus.RESOLVED]: 'bg-green-800 text-green-300',
-}
+const getStatusStyle = (status: string): string => {
+    const lowerCaseStatus = status.toLowerCase();
+    if (lowerCaseStatus.includes('done') || lowerCaseStatus.includes('resolved') || lowerCaseStatus.includes('closed')) {
+        return 'bg-green-800 text-green-300';
+    }
+    if (lowerCaseStatus.includes('progress') || lowerCaseStatus.includes('review') || lowerCaseStatus.includes('testing')) {
+        return 'bg-blue-800 text-blue-300';
+    }
+    return 'bg-gray-700 text-gray-300'; // Default for 'To Do', 'New', 'Backlog', etc.
+};
+
 
 export const BugReporter: React.FC<BugReporterProps> = ({ project, users, currentUser, onAddBug, onUpdateBug, onDeleteBug, onAddBugsBatch, onDeleteBugsBatch }) => {
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
@@ -154,6 +161,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
   const ITEMS_PER_PAGE = 10;
 
   const projectMembers = useMemo(() => project.members.map(id => users.find(u => u.id === id)).filter((u): u is User => !!u), [project.members, users]);
+  const columnTitles = useMemo(() => project.board.columnOrder.map(id => project.board.columns[id].title), [project.board]);
   
   const uniqueAssignees = useMemo(() => {
     const assignees = (Object.values(project.bugs || {}) as Bug[])
@@ -312,7 +320,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
           </div>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm">
             <option value="">All Statuses</option>
-            {Object.values(BugStatus).map(s => <option key={s} value={s}>{s}</option>)}
+            {columnTitles.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
           <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="px-3 py-2 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm">
             <option value="">All Priorities</option>
@@ -363,7 +371,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
                   <td className="px-4 py-3"><input type="checkbox" checked={selectedBugIds.has(bug.id)} onChange={() => handleSelectOne(bug.id)} className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500" /></td>
                   <td className="px-4 py-3 font-mono text-sm text-gray-400">{bug.bugNumber}</td>
                   <td className="px-4 py-3"><p className="font-semibold">{bug.title}</p><p className="text-xs text-gray-400 truncate max-w-xs" title={bug.description}>{bug.description}</p></td>
-                  <td className="px-4 py-3"><select value={bug.status} onChange={e => handleUpdate(bug.id, 'status', e.target.value)} className={`text-xs font-semibold border-none rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${statusStyles[bug.status]}`}>{Object.values(BugStatus).map(s => <option key={s} value={s}>{s}</option>)}</select></td>
+                  <td className="px-4 py-3"><select value={bug.status} onChange={e => handleUpdate(bug.id, 'status', e.target.value)} className={`text-xs font-semibold border-none rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${getStatusStyle(bug.status)}`}>{columnTitles.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
                   <td className="px-4 py-3"><select value={bug.priority} onChange={e => handleUpdate(bug.id, 'priority', e.target.value)} className={`bg-transparent border text-xs font-semibold rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${priorityStyles[bug.priority]}`}>{Object.values(TaskPriority).map(p => <option key={p} value={p} className="bg-[#1C2326] text-white font-normal">{p}</option>)}</select></td>
                   <td className="px-4 py-3 text-gray-400">{new Date(bug.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3"><select value={bug.assignee?.id || ''} onChange={e => handleUpdate(bug.id, 'assignee', e.target.value)} className="w-full bg-[#1C2326] text-white text-sm border border-gray-800 focus:ring-2 focus:ring-gray-500 rounded-md px-2 py-1"><option value="">Unassigned</option>{projectMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>

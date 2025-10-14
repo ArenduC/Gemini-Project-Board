@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column, FeedbackType, Bug, BugStatus, TaskPriority } from '../types';
+import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column, FeedbackType, Bug, TaskPriority } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
@@ -188,8 +188,7 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
         .order('position', { foreignTable: 'columns' })
         .order('created_at', { foreignTable: 'chat_messages' })
         .order('created_at', { foreignTable: 'links' })
-        .order('created_at', { foreignTable: 'bugs' })
-        .order('id', { foreignTable: 'bugs' });
+        .order('position', { foreignTable: 'bugs' });
 
 
     if (projectsError) throw projectsError;
@@ -218,6 +217,7 @@ const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'project
             assignee: b.assignee,
             reporterId: b.reporter_id,
             createdAt: b.created_at,
+            position: b.position,
         }));
         
         const bugOrder = bugs.map(b => b.id);
@@ -699,23 +699,21 @@ const updateInviteLink = async (linkId: string, updates: Partial<{ is_active: bo
 
 const acceptInvite = async (token: string): Promise<Project> => {
     // This calls a Supabase RPC function that should handle the invite logic atomically.
-    // The RPC function finds the invite, validates it, adds the user to the project,
-    // increments usage, and returns the joined project's data.
     const { data, error } = await supabase.rpc('accept_project_invite', { invite_token: token });
+
     if (error) {
-        // The 'error' object from Supabase may not be an Error instance.
-        // Casting to 'any' allows safely accessing the 'message' property.
-        console.error('Error accepting invite:', (error as any).message || error);
+        // The error object from Supabase may not be an Error instance. We must safely extract a string message.
+        console.error('Error accepting invite:', error);
         
-        // FIX: The error object's message property can be of an unknown type. This robust check ensures a valid string is always passed to the Error constructor, preventing a type error.
-        const potentialMessage = (error as any)?.message;
-        const errorMessage = typeof potentialMessage === 'string' && potentialMessage
-          ? potentialMessage
-          : 'Could not join project. The link may be invalid or expired.';
-        throw new Error(errorMessage);
+        const message = (error as any)?.message;
+        
+        if (typeof message === 'string' && message) {
+            throw new Error(message);
+        } else {
+            throw new Error('Could not join project. The link may be invalid or expired.');
+        }
     }
-    // The RPC function is expected to return the full project data upon success.
-    // This is a placeholder; a real implementation might need to fetch project details separately.
+
     if (!data || !data.id || !data.name) {
       throw new Error("Joined project but could not retrieve its details.");
     }
@@ -763,33 +761,54 @@ const submitFeedback = async (feedbackData: {
     }
 };
 
-const addBug = async (bugData: Omit<Bug, 'id' | 'createdAt' | 'assignee' | 'bugNumber'> & { projectId: string; assigneeId?: string }) => {
-    const { error } = await supabase.from('bugs').insert({
-        title: bugData.title,
-        description: bugData.description,
-        priority: bugData.priority,
-        status: bugData.status,
-        reporter_id: bugData.reporterId,
-        project_id: bugData.projectId,
-        assignee_id: bugData.assigneeId,
+const addBug = async (bugData: Omit<Bug, 'id' | 'createdAt' | 'assignee' | 'bugNumber' | 'position'> & { projectId: string; assigneeId?: string }) => {
+    const { error } = await supabase.rpc('add_bug_with_position', {
+        p_title: bugData.title,
+        p_description: bugData.description,
+        p_priority: bugData.priority,
+        p_status: bugData.status,
+        p_reporter_id: bugData.reporterId,
+        p_project_id: bugData.projectId,
+        p_assignee_id: bugData.assigneeId
     });
-    if (error) throw error;
+
+    if (error) {
+        console.error("Error calling add_bug_with_position RPC:", error);
+        throw error;
+    }
 };
 
-const addBugsBatch = async (bugsData: (Omit<Bug, 'id' | 'createdAt' | 'assignee' | 'bugNumber'> & { projectId: string })[]) => {
-    const records = bugsData.map(b => ({
+const addBugsBatch = async (bugsData: (Omit<Bug, 'id' | 'createdAt' | 'assignee' | 'bugNumber' | 'position'> & { projectId: string })[]) => {
+    if (bugsData.length === 0) return;
+    const projectId = bugsData[0].projectId;
+
+    const { data: maxPosData, error: posError } = await supabase
+        .from('bugs')
+        .select('position')
+        .eq('project_id', projectId)
+        .order('position', { ascending: false })
+        .limit(1)
+        .single();
+    
+    if (posError && posError.code !== 'PGRST116') { // Ignore "no rows" error
+        throw posError;
+    }
+    const startPosition = (maxPosData?.position || 0);
+
+    const records = bugsData.map((b, index) => ({
         title: b.title,
         description: b.description,
         priority: b.priority,
         status: b.status,
         reporter_id: b.reporterId,
         project_id: b.projectId,
+        position: startPosition + index + 1,
     }));
     const { error } = await supabase.from('bugs').insert(records);
     if (error) throw error;
 };
 
-const updateBug = async (bugId: string, updates: Partial<{ priority: TaskPriority, status: BugStatus, assigneeId: string | null }>) => {
+const updateBug = async (bugId: string, updates: Partial<{ priority: TaskPriority, status: string, assigneeId: string | null }>) => {
     const { error } = await supabase
         .from('bugs')
         .update({

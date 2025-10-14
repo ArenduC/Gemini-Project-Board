@@ -90,22 +90,17 @@ export interface ProjectLink {
   createdAt: string;
 }
 
-export enum BugStatus {
-  NEW = 'New',
-  IN_PROGRESS = 'In Progress',
-  RESOLVED = 'Resolved',
-}
-
 export interface Bug {
   id: string;
   bugNumber: string;
   title: string;
   description: string;
   priority: TaskPriority;
-  status: BugStatus;
+  status: string;
   assignee?: User;
   reporterId: string;
   createdAt: string;
+  position: number;
 }
 
 
