@@ -412,7 +412,8 @@ const updateTask = async (updatedTask: Task, actorId: string) => {
     if (fetchSubtasksError) {
         console.error("Error fetching subtasks for sync:", fetchSubtasksError.message || fetchSubtasksError);
     } else {
-        const existingSubtaskIds = new Set(existingSubtasks.map(s => s.id));
+        // FIX: Add a null check for `existingSubtasks` and cast subtask IDs to strings to prevent type errors.
+        const existingSubtaskIds = new Set((existingSubtasks || []).map(s => s.id as string));
         const incomingSubtaskIds = new Set(updatedTask.subtasks.map(s => s.id));
 
         // Find and delete subtasks that are no longer present
@@ -702,12 +703,10 @@ const acceptInvite = async (token: string): Promise<Project> => {
     const { data, error } = await supabase.rpc('accept_project_invite', { invite_token: token });
 
     if (error) {
-        // The error object from Supabase may not be an Error instance. We must safely extract a string message.
         console.error('Error accepting invite:', error);
-        
-        // FIX: The type of `error` from `supabase.rpc` can be `unknown` or may not have a `message` property.
-        // This ensures a string is always passed to the Error constructor, resolving the type error.
-        throw new Error(String((error as any)?.message ?? 'Could not join project. The link may be invalid or expired.'));
+        // The `error` object from an RPC call is a PostgrestError, which has a message property.
+        const errorMessage = error.message ?? 'Could not join project. The link may be invalid or expired.';
+        throw new Error(errorMessage);
     }
 
     if (!data || !data.id || !data.name) {

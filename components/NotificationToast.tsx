@@ -40,13 +40,13 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({ notificati
         <div className="flex-shrink-0 pt-1">
           <BellIcon className="w-6 h-6 text-gray-500" />
         </div>
-        <div className="flex-grow">
+        <div className="flex-grow min-w-0">
           <p className="text-sm font-semibold text-white">
             New message in <span className="font-bold">{notification.project.name}</span>
           </p>
           <div className="flex items-center gap-2 mt-2">
-            <UserAvatar user={notification.author} className="w-6 h-6 text-xs" />
-            <p className="text-sm text-white truncate">
+            <UserAvatar user={notification.author} className="w-6 h-6 text-xs flex-shrink-0" />
+            <p className="text-sm text-white truncate min-w-0">
               <strong>{notification.author.name.split(' ')[0]}:</strong> {notification.message}
             </p>
           </div>

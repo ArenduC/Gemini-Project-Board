@@ -32,6 +32,15 @@ import { playReceiveSound, playNotificationSound, initAudio } from './utils/soun
 
 type View = 'dashboard' | 'project' | 'tasks' | 'resources' | 'privacy';
 
+const getLastReadTimestamp = (projectId: string, userId: string): string | null => {
+  return localStorage.getItem(`lastReadTimestamp_${userId}_${projectId}`);
+};
+
+const setLastReadTimestamp = (projectId: string, userId: string, timestamp: string) => {
+  localStorage.setItem(`lastReadTimestamp_${userId}_${projectId}`, timestamp);
+};
+
+
 const App: React.FC = () => {
   const [locationHash, setLocationHash] = useState(window.location.hash);
   
@@ -257,6 +266,24 @@ const App: React.FC = () => {
           chatMessagesRef.current[projectId] = currentMessages;
       }
     }, [activeProject, currentUser, isChatOpen, addNotification]);
+
+    // Effect to calculate initial unread counts from localStorage on data load
+    useEffect(() => {
+        if (!currentUser || Object.keys(state.projects).length === 0) return;
+
+        const initialUnreadCounts: Record<string, number> = {};
+        for (const project of Object.values(state.projects) as Project[]) {
+            const lastRead = getLastReadTimestamp(project.id, currentUser.id);
+            // Count messages that are not from the current user and are newer than the last read timestamp.
+            const unreadCount = project.chatMessages.filter(
+                msg => msg.author.id !== currentUser.id && new Date(msg.createdAt).getTime() > new Date(lastRead || 0).getTime()
+            ).length;
+            if (unreadCount > 0) {
+                initialUnreadCounts[project.id] = unreadCount;
+            }
+        }
+        setUnreadCounts(initialUnreadCounts);
+    }, [state.projects, currentUser]);
 
 
     // Effect to handle invite link from URL
@@ -616,8 +643,15 @@ const App: React.FC = () => {
                   onClick={() => {
                       const wasOpen = isChatOpen;
                       setIsChatOpen(!wasOpen);
-                      if (!wasOpen && activeProjectId) {
+                      if (!wasOpen && activeProjectId && activeProject && currentUser) {
                           setUnreadCounts(prev => ({ ...prev, [activeProjectId]: 0 }));
+                          // Get the timestamp of the very last message in the chat
+                          const latestMessage = activeProject.chatMessages.length > 0
+                              ? activeProject.chatMessages[activeProject.chatMessages.length - 1]
+                              : null;
+                          // Store its timestamp, or the current time if no messages exist.
+                          const timestampToStore = latestMessage ? latestMessage.createdAt : new Date().toISOString();
+                          setLastReadTimestamp(activeProjectId, currentUser.id, timestampToStore);
                       }
                   }}
                   className="p-2 rounded-full text-gray-400 hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
