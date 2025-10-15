@@ -1,11 +1,72 @@
 
 
+
 import React, { useState, FormEvent, DragEvent, useRef, useMemo, useEffect } from 'react';
 import { Project, User, Bug, TaskPriority } from '../types';
 import { LifeBuoyIcon, PlusIcon, FileUpIcon, LoaderCircleIcon, SparklesIcon, XIcon, TrashIcon, SearchIcon, DownloadIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 import { ExportBugsModal } from './ExportBugsModal';
 import { Pagination } from './Pagination';
+
+// --- HELPER COMPONENTS ---
+
+const EditableField: React.FC<{
+  value: string;
+  onSave: (value: string) => void;
+  isTextArea?: boolean;
+  textClassName?: string;
+  inputClassName?: string;
+  placeholder?: string;
+}> = ({ value, onSave, isTextArea = false, textClassName, inputClassName, placeholder }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentValue, setCurrentValue] = useState(value);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setCurrentValue(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (isEditing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [isEditing]);
+  
+  const handleSave = () => {
+    if (currentValue.trim() !== value.trim()) {
+      onSave(currentValue.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !isTextArea) {
+        e.preventDefault();
+        handleSave();
+    } else if (e.key === 'Escape') {
+        setCurrentValue(value);
+        setIsEditing(false);
+    }
+  };
+
+  if (isEditing) {
+    const commonProps = {
+        ref: inputRef,
+        value: currentValue,
+        onChange: (e: any) => setCurrentValue(e.target.value),
+        onBlur: handleSave,
+        onKeyDown: handleKeyDown,
+        className: `w-full bg-[#1C2326] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 rounded-md ${inputClassName}`,
+        placeholder,
+    };
+    return isTextArea 
+        ? <textarea {...commonProps} rows={3} /> 
+        : <input type="text" {...commonProps} />;
+  }
+  return <div onClick={() => setIsEditing(true)} className={`cursor-pointer hover:bg-gray-800/50 rounded-md p-1 -m-1 transition-colors ${textClassName}`}>{value || <span className="text-gray-500">{placeholder || '...'}</span>}</div>;
+};
+
 
 // --- MODAL COMPONENTS ---
 
@@ -265,7 +326,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
     }
   };
 
-  const handleUpdate = (bugId: string, field: keyof Bug, value: any) => {
+  const handleUpdate = (bugId: string, field: 'title' | 'description' | 'status' | 'priority' | 'assignee', value: any) => {
     const bug = filteredBugs.find(b => b.id === bugId);
     if (!bug) return;
 
@@ -377,7 +438,23 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
                 <tr key={bug.id} className={`text-sm text-white ${selectedBugIds.has(bug.id) ? 'bg-gray-800/50' : 'hover:bg-gray-800/30'}`}>
                   <td className="px-4 py-3"><input type="checkbox" checked={selectedBugIds.has(bug.id)} onChange={() => handleSelectOne(bug.id)} className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500" /></td>
                   <td className="px-4 py-3 font-mono text-sm text-gray-400">{bug.bugNumber}</td>
-                  <td className="px-4 py-3"><p className="font-semibold">{bug.title}</p><p className="text-xs text-gray-400 truncate max-w-xs" title={bug.description}>{bug.description}</p></td>
+                  <td className="px-4 py-3 align-top">
+                     <EditableField
+                        value={bug.title}
+                        onSave={(newTitle) => handleUpdate(bug.id, 'title', newTitle)}
+                        textClassName="font-semibold"
+                        inputClassName="px-2 py-1 text-sm font-semibold"
+                        placeholder="Enter a title"
+                    />
+                    <EditableField
+                        value={bug.description}
+                        onSave={(newDescription) => handleUpdate(bug.id, 'description', newDescription)}
+                        isTextArea
+                        textClassName="text-xs text-gray-400 mt-1 truncate max-w-xs"
+                        inputClassName="px-2 py-1 text-xs mt-1"
+                        placeholder="Enter a description"
+                    />
+                  </td>
                   <td className="px-4 py-3"><select value={bug.status} onChange={e => handleUpdate(bug.id, 'status', e.target.value)} className={`text-xs font-semibold border-none rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${getStatusStyle(bug.status)}`}>{columnTitles.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
                   <td className="px-4 py-3"><select value={bug.priority} onChange={e => handleUpdate(bug.id, 'priority', e.target.value)} className={`bg-transparent border text-xs font-semibold rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${priorityStyles[bug.priority]}`}>{Object.values(TaskPriority).map(p => <option key={p} value={p} className="bg-[#1C2326] text-white font-normal">{p}</option>)}</select></td>
                   <td className="px-4 py-3 text-gray-400">{new Date(bug.createdAt).toLocaleDateString()}</td>

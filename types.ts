@@ -142,6 +142,17 @@ export interface AugmentedTask extends Task {
   columnName: string;
 }
 
+// FIX: Add missing Notification type definition for NotificationToast component.
+export interface Notification {
+  id: string;
+  project: {
+    id: string;
+    name: string;
+  };
+  author: User;
+  message: string;
+}
+
 export enum InviteAccessType {
     OPEN = 'open',
 }
@@ -158,13 +169,6 @@ export interface ProjectInviteLink {
   max_uses: number | null;
   current_uses: number;
   is_active: boolean;
-}
-
-export interface Notification {
-  id: string;
-  author: User;
-  message: string;
-  project: Project;
 }
 
 // Types for AI-generated project from CSV

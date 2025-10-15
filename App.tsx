@@ -12,7 +12,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import CallbackPage from './pages/CallbackPage';
 // FIX: Import `Column` type to be used in casting.
-import { User, Task, TaskPriority, NewTaskData, Project, Notification, ChatMessage, FeedbackType, Column } from './types';
+import { User, Task, TaskPriority, NewTaskData, Project, ChatMessage, FeedbackType, Column } from './types';
 import { api } from './services/api';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
@@ -23,7 +23,6 @@ import { interpretVoiceCommand, VoiceCommandAction } from './services/geminiServ
 import { DropResult } from 'react-beautiful-dnd';
 import { ManageInviteLinksModal } from './components/ManageInviteLinksModal';
 import { SettingsModal } from './components/SettingsModal';
-import { NotificationToast } from './components/NotificationToast';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { FeedbackFab } from './components/FeedbackFab';
 import { FeedbackModal } from './components/FeedbackModal';
@@ -107,7 +106,6 @@ const App: React.FC = () => {
   // Real-time features
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const presenceChannelRef = useRef<RealtimeChannel | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const chatMessagesRef = useRef<Record<string, ChatMessage[]>>({});
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
@@ -226,15 +224,6 @@ const App: React.FC = () => {
       }
     }, [session]);
     
-    // Effect for Chat Notifications
-    const addNotification = useCallback((notification: Omit<Notification, 'id'>) => {
-      const id = Date.now().toString();
-      setNotifications(prev => [...prev, { ...notification, id }]);
-      setTimeout(() => {
-        setNotifications(prev => prev.filter(n => n.id !== id));
-      }, 5000);
-    }, []);
-
     useEffect(() => {
       if (activeProject && currentUser) {
           const projectId = activeProject.id;
@@ -250,11 +239,6 @@ const App: React.FC = () => {
                           playReceiveSound();
                       } else {
                           playNotificationSound();
-                          addNotification({
-                              author: newMessage.author,
-                              message: newMessage.text,
-                              project: activeProject,
-                          });
                           setUnreadCounts(prev => ({
                               ...prev,
                               [projectId]: (prev[projectId] || 0) + 1,
@@ -265,7 +249,7 @@ const App: React.FC = () => {
           }
           chatMessagesRef.current[projectId] = currentMessages;
       }
-    }, [activeProject, currentUser, isChatOpen, addNotification]);
+    }, [activeProject, currentUser, isChatOpen]);
 
     // Effect to calculate initial unread counts from localStorage on data load
     useEffect(() => {
@@ -910,12 +894,7 @@ const App: React.FC = () => {
             onCommand={handleVoiceCommand}
           />
       )}
-      <div id="notification-root" className="fixed bottom-4 right-4 z-50 space-y-2">
-        {notifications.map(notification => (
-          <NotificationToast key={notification.id} notification={notification} />
-        ))}
-      </div>
-      {!isChatOpen && <FeedbackFab onClick={() => setFeedbackModalOpen(true)} />}
+      {view === 'dashboard' && !isChatOpen && <FeedbackFab onClick={() => setFeedbackModalOpen(true)} />}
       <FeedbackModal
         isOpen={isFeedbackModalOpen}
         onClose={() => setFeedbackModalOpen(false)}

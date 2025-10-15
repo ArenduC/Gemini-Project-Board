@@ -412,8 +412,12 @@ const updateTask = async (updatedTask: Task, actorId: string) => {
     if (fetchSubtasksError) {
         console.error("Error fetching subtasks for sync:", fetchSubtasksError.message || fetchSubtasksError);
     } else {
-        // FIX: Add a null check for `existingSubtasks` and cast subtask IDs to strings to prevent type errors.
-        const existingSubtaskIds = new Set((existingSubtasks || []).map(s => s.id as string));
+        // FIX: The `as string` cast is insufficient. Use a type guard to ensure all IDs are valid strings.
+        const existingSubtaskIds = new Set(
+            (existingSubtasks || [])
+                .map(s => s.id)
+                .filter((id): id is string => !!id)
+        );
         const incomingSubtaskIds = new Set(updatedTask.subtasks.map(s => s.id));
 
         // Find and delete subtasks that are no longer present
@@ -450,7 +454,11 @@ const updateTask = async (updatedTask: Task, actorId: string) => {
         return;
     }
     
-    const existingTags = existingTaskTags.map((t: any) => t.tags.name);
+    // FIX: Safely extract tag names from the potentially nullable 'tags' relation and filter out invalid entries.
+    // This ensures `existingTags` is a clean `string[]`, preventing type errors in subsequent `.includes()` calls.
+    const existingTags = existingTaskTags
+        .map((t: any) => t.tags?.name)
+        .filter((name): name is string => !!name);
     const newTags = updatedTask.tags;
 
     const tagsToAdd = newTags.filter(t => !existingTags.includes(t));
@@ -704,8 +712,9 @@ const acceptInvite = async (token: string): Promise<Project> => {
 
     if (error) {
         console.error('Error accepting invite:', error);
-        // The `error` object from an RPC call is a PostgrestError, which has a message property.
-        const errorMessage = error.message ?? 'Could not join project. The link may be invalid or expired.';
+        // FIX: The error from supabase.rpc can be an object of unknown shape. Safely access
+        // the message property to avoid a type error when creating a new Error.
+        const errorMessage = (error as any)?.message ?? 'Could not join project. The link may be invalid or expired.';
         throw new Error(errorMessage);
     }
 
@@ -803,10 +812,12 @@ const addBugsBatch = async (bugsData: (Omit<Bug, 'id' | 'createdAt' | 'assignee'
     if (error) throw error;
 };
 
-const updateBug = async (bugId: string, updates: Partial<{ priority: TaskPriority, status: string, assigneeId: string | null }>) => {
+const updateBug = async (bugId: string, updates: Partial<{ title: string; description: string; priority: TaskPriority, status: string, assigneeId: string | null }>) => {
     const { error } = await supabase
         .from('bugs')
         .update({
+            title: updates.title,
+            description: updates.description,
             priority: updates.priority,
             status: updates.status,
             assignee_id: updates.assigneeId,

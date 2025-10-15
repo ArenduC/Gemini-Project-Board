@@ -389,8 +389,10 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, [fetchData, currentUser, state.projects]);
 
   const updateBug = useCallback(async (bugId: string, updates: Partial<Bug>) => {
-    const { priority, status, assignee } = updates;
+    const { title, description, priority, status, assignee } = updates;
     await api.data.updateBug(bugId, {
+        title,
+        description,
         priority,
         status,
         assigneeId: assignee?.id ?? (assignee === undefined ? undefined : null), // Handle unassigning
