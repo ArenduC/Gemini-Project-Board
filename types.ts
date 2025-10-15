@@ -50,6 +50,7 @@ export interface Task {
   tags: string[];
   comments: Comment[];
   history: TaskHistory[];
+  dueDate?: string;
   creatorId: string;
   createdAt: string;
 }
@@ -72,6 +73,7 @@ export type NewTaskData = {
   priority: TaskPriority;
   columnId: string;
   assigneeId?: string;
+  dueDate?: string;
 };
 
 export interface ChatMessage {
@@ -103,6 +105,16 @@ export interface Bug {
   position: number;
 }
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description?: string;
+  start: string; // ISO string
+  end: string; // ISO string
+  creatorId: string;
+  projectId: string;
+  createdAt: string;
+}
 
 export interface Project {
   id: string;
@@ -116,6 +128,8 @@ export interface Project {
   links: ProjectLink[];
   bugs: Record<string, Bug>;
   bugOrder: string[];
+  calendarEvents: Record<string, CalendarEvent>;
+  calendarEventOrder: string[];
 }
 
 export interface AppState {

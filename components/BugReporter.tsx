@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, FormEvent, DragEvent, useRef, useMemo, useEffect } from 'react';
 import { Project, User, Bug, TaskPriority } from '../types';
 import { LifeBuoyIcon, PlusIcon, FileUpIcon, LoaderCircleIcon, SparklesIcon, XIcon, TrashIcon, SearchIcon, DownloadIcon } from './Icons';
@@ -185,6 +182,7 @@ interface BugReporterProps {
   onDeleteBug: (bugId: string) => Promise<void>;
   onAddBugsBatch: (fileContent: string) => Promise<void>;
   onDeleteBugsBatch: (bugIds: string[]) => Promise<void>;
+  initialSearchTerm?: string;
 }
 
 const priorityStyles: Record<TaskPriority, string> = {
@@ -206,12 +204,12 @@ const getStatusStyle = (status: string): string => {
 };
 
 
-export const BugReporter: React.FC<BugReporterProps> = ({ project, users, currentUser, onAddBug, onUpdateBug, onDeleteBug, onAddBugsBatch, onDeleteBugsBatch }) => {
+export const BugReporter: React.FC<BugReporterProps> = ({ project, users, currentUser, onAddBug, onUpdateBug, onDeleteBug, onAddBugsBatch, onDeleteBugsBatch, initialSearchTerm = '' }) => {
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [isExportModalOpen, setExportModalOpen] = useState(false);
   const [selectedBugIds, setSelectedBugIds] = useState<Set<string>>(new Set());
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
@@ -224,6 +222,10 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
   const projectMembers = useMemo(() => project.members.map(id => users.find(u => u.id === id)).filter((u): u is User => !!u), [project.members, users]);
   const columnTitles = useMemo(() => project.board.columnOrder.map(id => project.board.columns[id].title), [project.board]);
   
+  useEffect(() => {
+    setSearchTerm(initialSearchTerm || '');
+  }, [initialSearchTerm]);
+
   const uniqueAssignees = useMemo(() => {
     const assignees = (Object.values(project.bugs || {}) as Bug[])
       .map(bug => bug.assignee)

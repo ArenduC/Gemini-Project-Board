@@ -31,6 +31,7 @@ export interface TaskResponse {
     title: string;
     description: string;
     priority: TaskPriority;
+    dueDate?: string;
 }
 
 const taskResponseSchema = {
@@ -48,6 +49,10 @@ const taskResponseSchema = {
             type: Type.STRING,
             enum: Object.values(TaskPriority),
             description: "An assessment of the task's urgency."
+        },
+        dueDate: {
+            type: Type.STRING,
+            description: "An optional due date for the task in 'YYYY-MM-DD' format if applicable, based on the current date and context."
         }
     },
     required: ["title", "description", "priority"]
@@ -266,6 +271,7 @@ export const generateTaskFromPrompt = async (prompt: string): Promise<TaskRespon
         const fullPrompt = `
             You are an expert project manager. Based on the user's request, create a detailed task.
             Generate a concise title, a helpful description, and suggest an appropriate priority from the available options.
+            If the prompt implies a deadline (e.g., "by Friday", "in two weeks"), suggest a 'dueDate' in 'YYYY-MM-DD' format. The current date is ${new Date().toISOString().split('T')[0]}.
             Ensure the title and description are distinct and provide clear actions.
             
             User Request: "${prompt}"

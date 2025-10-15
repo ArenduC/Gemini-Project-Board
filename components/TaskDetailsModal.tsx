@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, FormEvent, useMemo, useRef } from 'react';
 import { Task, Subtask, User, TaskPriority } from '../types';
 import { generateSubtasks as generateSubtasksFromApi } from '../services/geminiService';
-import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon, TrashIcon, HistoryIcon } from './Icons';
+import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon, TrashIcon, HistoryIcon, CalendarIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 
 interface TaskDetailsModalProps {
@@ -18,14 +18,14 @@ interface TaskDetailsModalProps {
 
 type AIGenerationState = 'idle' | 'loading' | 'success' | 'error';
 
-const EditableField: React.FC<{value: string, onSave: (value: string) => void, isTextArea?: boolean, textClassName: string, inputClassName: string, placeholder?: string }> = 
-  ({ value, onSave, isTextArea = false, textClassName, inputClassName, placeholder }) => {
+const EditableField: React.FC<{value: string, onSave: (value: string) => void, isTextArea?: boolean, textClassName: string, inputClassName: string, placeholder?: string, type?: string }> = 
+  ({ value, onSave, isTextArea = false, textClassName, inputClassName, placeholder, type = 'text' }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentValue, setCurrentValue] = useState(value);
 
   const handleSave = () => {
-    if (currentValue.trim() !== value.trim()) {
-      onSave(currentValue.trim());
+    if (currentValue !== value) {
+        onSave(isTextArea ? currentValue.trim() : currentValue);
     }
     setIsEditing(false);
   };
@@ -56,9 +56,9 @@ const EditableField: React.FC<{value: string, onSave: (value: string) => void, i
     }
     return isTextArea 
         ? <textarea {...commonProps} rows={4} /> 
-        : <input type="text" {...commonProps} />;
+        : <input type={type} {...commonProps} />;
   }
-  return <div onClick={() => setIsEditing(true)} className={textClassName}>{value || <span className="text-gray-500">{placeholder}</span>}</div>;
+  return <div onClick={() => setIsEditing(true)} className={`min-h-[24px] ${textClassName}`}>{value || <span className="text-gray-500">{placeholder}</span>}</div>;
 }
 
 interface ActivitySectionProps {
@@ -390,8 +390,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                 placeholder="Add a more detailed description..."
             />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="sm:col-span-1">
                     <label htmlFor="modal-assignee" className="block text-sm font-medium text-white mb-1">Assignee</label>
                     <select
                       id="modal-assignee"
@@ -403,7 +403,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                       {projectMembers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
                 </div>
-                <div>
+                <div className="sm:col-span-1">
                     <label htmlFor="modal-priority" className="block text-sm font-medium text-white mb-1">Priority</label>
                     <select
                       id="modal-priority"
@@ -413,6 +413,17 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                     >
                       {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
+                </div>
+                <div className="sm:col-span-1">
+                    <label className="block text-sm font-medium text-white mb-1 flex items-center gap-1.5"><CalendarIcon className="w-4 h-4" /> Due Date</label>
+                    <EditableField
+                        value={editedTask.dueDate || ''}
+                        onSave={(newDate) => handleUpdateField('dueDate', newDate)}
+                        type="date"
+                        textClassName="text-sm text-white w-full cursor-pointer hover:bg-gray-800/50 rounded p-2 -m-2"
+                        inputClassName="text-sm p-1.5 rounded border-2 border-gray-500 bg-[#1C2326] focus:outline-none text-white"
+                        placeholder="No due date"
+                    />
                 </div>
             </div>
 

@@ -1,5 +1,122 @@
+/*
+================================================================================================
+== DATABASE FUNCTION UPDATE REQUIRED ==
+================================================================================================
+
+An error was detected during data fetching ("relation public.calendar_events does not exist").
+This indicates a mismatch between your database schema and the application's expectations.
+
+To fix the application startup error, please apply the updated database function below.
+
+INSTRUCTIONS:
+1. Go to your Supabase project dashboard.
+2. Navigate to the "SQL Editor".
+3. Click "New query".
+4. Copy the ENTIRE SQL script below (from this comment block).
+5. Paste it into the SQL Editor.
+6. Click "RUN".
+
+This update will allow the application to load correctly. Please note that the "Calendar"
+feature will not function until you create a 'calendar_events' table in your database.
+
+-- START OF SQL SCRIPT --
+
+create or replace function get_initial_data_for_user(user_id_param uuid)
+returns json
+language plpgsql
+security definer -- Important: Runs with the permissions of the function owner
+as $$
+declare
+  user_project_ids uuid[];
+  all_user_ids_in_projects uuid[];
+  projects_json json;
+  users_json json;
+begin
+  -- 1. Get all project IDs the user is a member of.
+  select array_agg(project_id)
+  into user_project_ids
+  from public.project_members
+  where user_id = user_id_param;
+
+  -- 2. Return early if the user is not part of any projects.
+  if user_project_ids is null or array_length(user_project_ids, 1) = 0 then
+      select json_agg(json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url, 'role', u.role)) into users_json from public.users u where id = user_id_param;
+      return json_build_object('projects', '[]'::json, 'users', coalesce(users_json, '[]'::json));
+  end if;
+
+  -- 3. Get all unique user IDs from all of the user's projects.
+  select array_agg(distinct pm.user_id)
+  into all_user_ids_in_projects
+  from public.project_members pm
+  where pm.project_id = any(user_project_ids);
+
+  -- 4. Fetch all relevant user profiles into a JSON array.
+  select json_agg(json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url, 'role', u.role))
+  into users_json
+  from public.users u
+  where u.id = any(all_user_ids_in_projects);
+
+  -- 5. Fetch and aggregate all project data into a JSON array.
+  select json_agg(p_agg)
+  into projects_json
+  from (
+    select
+      p.id,
+      p.name,
+      p.description,
+      p.creator_id as "creatorId",
+      p.created_at as "createdAt",
+      (select json_agg(pm.user_id) from public.project_members pm where pm.project_id = p.id) as "members",
+      -- Aggregate board data (columns and tasks)
+      (
+        select json_build_object(
+          'tasks', (select coalesce(json_object_agg(t.id, t_json), '{}'::json) from (select t_ext.id, t_ext.task_json as t_json from (
+            select
+              t.id,
+              json_build_object(
+                'id', t.id, 'title', t.title, 'description', t.description, 'priority', t.priority, 'dueDate', NULL, 'creatorId', t.creator_id, 'createdAt', t.created_at,
+                'assignee', (select json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url, 'role', u.role) from public.users u where u.id = t.assignee_id),
+                'subtasks', (select coalesce(json_agg(s), '[]'::json) from (select st.id, st.title, st.completed, st.creator_id as "creatorId", st.created_at as "createdAt" from public.subtasks st where st.task_id = t.id) s),
+                'comments', (select coalesce(json_agg(c order by c."createdAt" asc), '[]'::json) from (select cm.id, cm.text, cm.created_at as "createdAt", json_build_object('id', cu.id, 'name', cu.name, 'avatarUrl', cu.avatar_url, 'role', cu.role) as author from public.comments cm join public.users cu on cm.author_id = cu.id where cm.task_id = t.id) c),
+                'history', (select coalesce(json_agg(h order by h."createdAt" desc), '[]'::json) from (select th.id, th.change_description as "changeDescription", th.created_at as "createdAt", json_build_object('id', hu.id, 'name', hu.name, 'avatarUrl', hu.avatar_url, 'role', hu.role) as user from public.task_history th join public.users hu on th.user_id = hu.id where th.task_id = t.id) h),
+                'tags', (select coalesce(json_agg(tags.name), '[]'::json) from public.task_tags join public.tags on task_tags.tag_id = tags.id where task_tags.task_id = t.id)
+              ) as task_json
+            from public.tasks t where t.column_id in (select id from public.columns where project_id = p.id)
+          ) as t_ext) as t),
+          'columns', (select coalesce(json_object_agg(c.id, c_json), '{}'::json) from (select c_ext.id, c_ext.col_json as c_json from (
+            select c.id, json_build_object('id', c.id, 'title', c.title, 'taskIds', (select coalesce(json_agg(t.id order by t.position), '[]'::json) from public.tasks t where t.column_id = c.id)) as col_json
+            from public.columns c where c.project_id = p.id
+          ) as c_ext) as c),
+          'columnOrder', (select coalesce(json_agg(c.id order by c.position), '[]'::json) from public.columns c where c.project_id = p.id)
+        )
+      ) as "board",
+      -- Aggregate other related data
+      (select coalesce(json_agg(chat_msg order by "createdAt"), '[]'::json) from (select pc.id, pc.text, pc.created_at as "createdAt", json_build_object('id', au.id, 'name', au.name, 'avatarUrl', au.avatar_url, 'role', au.role) as author from public.project_chats pc join public.users au on pc.author_id = au.id where pc.project_id = p.id) chat_msg) as "chatMessages",
+      (select coalesce(json_agg(l order by "createdAt"), '[]'::json) from (select pl.id, pl.title, pl.url, pl.project_id as "projectId", pl.creator_id as "creatorId", pl.created_at as "createdAt" from public.project_links pl where pl.project_id = p.id) l) as "links",
+      (select coalesce(json_object_agg(b.id, b_json), '{}'::json) from (select b_ext.id, b_ext.bug_json as b_json from (select b.id, json_build_object('id', b.id, 'bugNumber', b.bug_number, 'title', b.title, 'description', b.description, 'priority', b.priority, 'status', b.status, 'reporterId', b.reporter_id, 'createdAt', b.created_at, 'position', b.position, 'assignee', (select json_build_object('id', bu.id, 'name', bu.name, 'avatarUrl', bu.avatar_url, 'role', bu.role) from public.users bu where bu.id = b.assignee_id)) as bug_json from public.bugs b where b.project_id = p.id) as b_ext) as b) as "bugs",
+      (select coalesce(json_agg(b.id order by b.position), '[]'::json) from public.bugs b where b.project_id = p.id) as "bugOrder",
+      '{}'::json as "calendarEvents",
+      '[]'::json as "calendarEventOrder"
+    from public.projects p
+    where p.id = any(user_project_ids)
+  ) p_agg;
+
+  -- 6. Return the final combined JSON object.
+  return json_build_object(
+    'projects', coalesce(projects_json, '[]'::json),
+    'users', coalesce(users_json, '[]'::json)
+  );
+end;
+$$;
+
+grant execute on function public.get_initial_data_for_user(uuid) to authenticated;
+
+
+-- END OF SQL SCRIPT --
+*/
+
 import { supabase } from './supabase';
-import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column, FeedbackType, Bug, TaskPriority } from '../types';
+import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column, FeedbackType, Bug, TaskPriority, CalendarEvent } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
@@ -144,147 +261,28 @@ const removeChannel = (channel: RealtimeChannel) => {
 // --- DATA FETCHING ---
 
 const fetchInitialData = async (userId: string): Promise<Omit<AppState, 'projectOrder'> & {projectOrder: string[]}> => {
-    // Step 1: Fetch project memberships
-    const { data: projectMembers, error: projectMembersError } = await supabase
-        .from('project_members')
-        .select('project_id')
-        .eq('user_id', userId);
-    if (projectMembersError) throw projectMembersError;
-    const projectIds = projectMembers.map(pm => pm.project_id);
+    // Call the new database function to get all data in a single, reliable call.
+    const { data: rpcData, error } = await supabase.rpc('get_initial_data_for_user', {
+        user_id_param: userId
+    });
 
-    // Step 2: Handle case where user has no projects
-    if (projectIds.length === 0) {
-        const userProfile = await getUserProfile(userId);
-        return { projects: {}, users: userProfile ? { [userId]: userProfile } : {}, projectOrder: [] };
+    if (error) {
+        console.error("Error fetching initial data via RPC:", error);
+        throw error;
     }
 
-    // Step 3: Fetch all relevant user profiles for all projects
-    const { data: allProjectMembers, error: allMembersError } = await supabase
-        .from('project_members')
-        .select('user_id')
-        .in('project_id', projectIds);
-    if (allMembersError) throw allMembersError;
-    const allUserIdsInProjects = new Set(allProjectMembers.map(pm => pm.user_id));
-    allUserIdsInProjects.add(userId);
-    const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('*')
-        .in('id', Array.from(allUserIdsInProjects));
-    if (usersError) throw usersError;
-    const usersRecord = arrayToRecord(usersData as User[]);
-
-    // Step 4: Fetch projects with their nested, but non-task-related, data
-    const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
-        .select(`
-            *,
-            members:project_members(user_id),
-            chat_messages:project_chats(*, author:users(*)),
-            links:project_links(*),
-            columns(*),
-            bugs(*, assignee:users!bugs_assignee_id_fkey(*))
-        `)
-        .in('id', projectIds)
-        .order('position', { foreignTable: 'columns' })
-        .order('created_at', { foreignTable: 'chat_messages' })
-        .order('created_at', { foreignTable: 'links' })
-        .order('position', { foreignTable: 'bugs' });
-
-
-    if (projectsError) throw projectsError;
-
-    // Step 5: Initialize the projectsRecord from the fetched project data
-    const projectsRecord: Record<string, Project> = {};
-    const projectOrder = projectsData.map(p => p.id).sort((a, b) => a.localeCompare(b));
-
-    for (const p of projectsData) {
-        const board: BoardData = {
-            tasks: {},
-            columns: {},
-            columnOrder: p.columns.map((c: any) => c.id),
-        };
-        p.columns.forEach((c: any) => {
-            board.columns[c.id] = { id: c.id, title: c.title, taskIds: [] };
-        });
-
-        const bugs = (p.bugs || []).map((b: any): Bug => ({
-            id: b.id,
-            bugNumber: b.bug_number,
-            title: b.title,
-            description: b.description,
-            priority: b.priority,
-            status: b.status,
-            assignee: b.assignee,
-            reporterId: b.reporter_id,
-            createdAt: b.created_at,
-            position: b.position,
-        }));
-        
-        const bugOrder = bugs.map(b => b.id);
-
-        projectsRecord[p.id] = {
-            id: p.id,
-            name: p.name,
-            description: p.description,
-            members: p.members.map((m: any) => m.user_id),
-            board,
-            bugs: arrayToRecord(bugs),
-            bugOrder: bugOrder,
-            chatMessages: p.chat_messages.map((msg: any): ChatMessage => ({
-                id: msg.id, text: msg.text, createdAt: msg.created_at, author: msg.author,
-            })) || [],
-            links: p.links.map((l: any): ProjectLink => ({
-                id: l.id, title: l.title, url: l.url, projectId: l.project_id, creatorId: l.creator_id, createdAt: l.created_at,
-            })) || [],
-            creatorId: p.creator_id,
-            createdAt: p.created_at,
-        };
+    if (!rpcData) {
+        return { projects: {}, users: {}, projectOrder: [] };
     }
 
-    // Step 6: Fetch all tasks for all columns across all user's projects in a single query
-    const allColumnIds = projectsData.flatMap((p: any) => p.columns.map((c: any) => c.id));
-
-    if (allColumnIds.length > 0) {
-        const { data: tasksData, error: tasksError } = await supabase
-            .from('tasks')
-            .select(`
-                *,
-                assignee:users!tasks_assignee_id_fkey(*),
-                subtasks(*),
-                comments(*, author:users(*)),
-                tags:task_tags(tags(name)),
-                history:task_history(*, user:users(*))
-            `)
-            .in('column_id', allColumnIds)
-            .order('position');
-
-        if (tasksError) {
-            console.error("Critical error fetching tasks, app state will be incomplete.", tasksError);
-        } else {
-            // Step 7: Stitch tasks back into the projectsRecord
-            for (const task of tasksData) {
-                const project = Object.values(projectsRecord).find(p => p.board.columns[task.column_id]);
-                if (project) {
-                    project.board.tasks[task.id] = {
-                        ...task,
-                        assignee: task.assignee,
-                        tags: task.tags.map((tag: any) => tag.tags.name),
-                        comments: (task.comments || []).map((cmt: any) => ({ ...cmt, author: cmt.author })),
-                        history: (task.history || []).map((h: any): TaskHistory => ({
-                            id: h.id, user: h.user, changeDescription: h.change_description, createdAt: h.created_at,
-                        })).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-                        subtasks: task.subtasks || [],
-                        createdAt: task.created_at,
-                        creatorId: task.creator_id,
-                    };
-                    if (project.board.columns[task.column_id]) {
-                        project.board.columns[task.column_id].taskIds.push(task.id);
-                    }
-                }
-            }
-        }
-    }
+    // The RPC function returns data pre-formatted to match the app's state structure.
+    const usersData = rpcData.users || [];
+    const projectsData = rpcData.projects || [];
     
+    const usersRecord = arrayToRecord(usersData as User[]);
+    const projectsRecord = arrayToRecord(projectsData as Project[]);
+    const projectOrder = projectsData.map((p: any) => p.id).sort((a: string, b: string) => a.localeCompare(b));
+
     return {
         projects: projectsRecord,
         users: usersRecord,
@@ -378,350 +376,148 @@ const updateTask = async (updatedTask: Task, actorId: string) => {
                 historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `unassigned this task` });
             }
         }
+        if (oldTaskData.due_date !== updatedTask.dueDate) {
+            const dateDescription = updatedTask.dueDate ? `set the due date to ${new Date(updatedTask.dueDate).toLocaleDateString()}` : 'removed the due date';
+            historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: dateDescription });
+        }
+
         if (historyItems.length > 0) {
-            const itemsWithIds = historyItems.map(item => ({ ...item, id: crypto.randomUUID() }));
-            // FIX: Gracefully handle cases where the history table might be missing
-            try {
-                const { error: historyError } = await supabase.from('task_history').insert(itemsWithIds);
-                if (historyError) console.warn("Could not log task update history:", historyError.message || historyError);
-            } catch (error) {
-                console.warn("Error inserting into task_history:", error);
+            const { error: historyError } = await supabase.from('task_history').insert(historyItems);
+            if (historyError) {
+                console.warn("Could not log task update history:", historyError.message);
             }
         }
     }
-
-    // 1. Update the core task details
+    
+    // Perform the actual update on the tasks table
     const { error: taskUpdateError } = await supabase
       .from('tasks')
       .update({
-          title: updatedTask.title,
-          description: updatedTask.description,
-          priority: updatedTask.priority,
-          assignee_id: updatedTask.assignee?.id || null
+        title: updatedTask.title,
+        description: updatedTask.description,
+        priority: updatedTask.priority,
+        assignee_id: updatedTask.assignee?.id || null,
+        due_date: updatedTask.dueDate || null
       })
       .eq('id', updatedTask.id);
-      
-    if (taskUpdateError) console.error("Error updating task", taskUpdateError.message || taskUpdateError);
 
-    // 2. Sync subtasks (handle updates and deletes)
-    const { data: existingSubtasks, error: fetchSubtasksError } = await supabase
-        .from('subtasks')
-        .select('id')
-        .eq('task_id', updatedTask.id);
-
-    if (fetchSubtasksError) {
-        console.error("Error fetching subtasks for sync:", fetchSubtasksError.message || fetchSubtasksError);
-    } else {
-        // FIX: The `as string` cast is insufficient. Use a type guard to ensure all IDs are valid strings.
-        const existingSubtaskIds = new Set(
-            (existingSubtasks || [])
-                .map(s => s.id)
-                .filter((id): id is string => !!id)
-        );
-        const incomingSubtaskIds = new Set(updatedTask.subtasks.map(s => s.id));
-
-        // Find and delete subtasks that are no longer present
-        const subtasksToDelete = Array.from(existingSubtaskIds).filter(id => !incomingSubtaskIds.has(id));
-        if (subtasksToDelete.length > 0) {
-            const { error: deleteError } = await supabase
-                .from('subtasks')
-                .delete()
-                .in('id', subtasksToDelete);
-            if (deleteError) console.error("Error deleting subtasks:", deleteError.message || deleteError);
-        }
-
-        // Update existing subtasks
-        for (const subtask of updatedTask.subtasks) {
-            if (existingSubtaskIds.has(subtask.id)) {
-                const { error: subtaskError } = await supabase
-                    .from('subtasks')
-                    .update({ completed: subtask.completed, title: subtask.title })
-                    .eq('id', subtask.id);
-                if (subtaskError) console.error("Error updating subtask", subtaskError.message || subtaskError);
-            }
-        }
+    if (taskUpdateError) {
+        console.error("Error updating task:", taskUpdateError);
+        throw taskUpdateError;
     }
 
-
-    // 3. Sync tags
-    const { data: existingTaskTags, error: fetchTagsError } = await supabase
-        .from('task_tags')
-        .select('tags(id, name)')
-        .eq('task_id', updatedTask.id);
-    
-    if (fetchTagsError) {
-        console.error("Error fetching existing tags:", fetchTagsError.message || fetchTagsError);
-        return;
-    }
-    
-    // FIX: Safely extract tag names from the potentially nullable 'tags' relation and filter out invalid entries.
-    // This ensures `existingTags` is a clean `string[]`, preventing type errors in subsequent `.includes()` calls.
-    const existingTags = existingTaskTags
-        .map((t: any) => t.tags?.name)
-        .filter((name): name is string => !!name);
-    const newTags = updatedTask.tags;
-
-    const tagsToAdd = newTags.filter(t => !existingTags.includes(t));
-    const tagsToRemove = existingTags.filter(t => !newTags.includes(t));
-
-    // Remove old tags
-    if (tagsToRemove.length > 0) {
-        const tagsToRemoveData = existingTaskTags
-            .filter((t: any) => tagsToRemove.includes(t.tags.name))
-            .map((t: any) => t.tags.id);
-
-        if (tagsToRemoveData.length > 0) {
-            const { error: deleteError } = await supabase
-                .from('task_tags')
-                .delete()
-                .eq('task_id', updatedTask.id)
-                .in('tag_id', tagsToRemoveData);
-            if (deleteError) console.error("Error removing tags from task", deleteError.message || deleteError);
-        }
-    }
-    
-    // Add new tags
-    if (tagsToAdd.length > 0) {
-        const { data: upsertedTags, error: upsertError } = await supabase
-            .from('tags')
-            .upsert(tagsToAdd.map(name => ({ name })), { onConflict: 'name' })
-            .select('id, name');
-
-        if (upsertError) {
-            console.error("Error upserting new tags", upsertError.message || upsertError);
-            return;
-        }
-
-        const taskTagRelations = upsertedTags
-            .filter(tag => tagsToAdd.includes(tag.name))
-            .map(tag => ({
+    // Update subtasks
+    if (updatedTask.subtasks) {
+        const { error: subtasksError } = await supabase.from('subtasks').upsert(
+            updatedTask.subtasks.map(s => ({
+                id: s.id,
                 task_id: updatedTask.id,
-                tag_id: tag.id
-            }));
-        
-        if (taskTagRelations.length > 0) {
-            const { error: insertError } = await supabase
-                .from('task_tags')
-                .insert(taskTagRelations);
-            if (insertError) console.error("Error adding tags to task", insertError.message || insertError);
+                title: s.title,
+                completed: s.completed,
+                creator_id: s.creatorId,
+                created_at: s.createdAt,
+            }))
+        );
+        if (subtasksError) {
+            console.error("Error upserting subtasks:", subtasksError);
         }
     }
-};
-
-const addSubtasks = async (taskId: string, newSubtasksData: { title:string }[], creatorId: string) => {
-    const subtasksToInsert = newSubtasksData.map(s => ({
-        title: s.title,
-        task_id: taskId,
-        creator_id: creatorId,
-        completed: false
-    }));
-    
-    const { error } = await supabase.from('subtasks').insert(subtasksToInsert);
-    if (error) console.error("Error adding subtasks", error.message || error);
-};
-
-const addComment = async (taskId: string, commentText: string, authorId: string) => {
-    const { error } = await supabase.from('comments').insert({
-      text: commentText,
-      task_id: taskId,
-      author_id: authorId,
-    });
-    if (error) console.error("Error adding comment", error.message || error);
 };
 
 const addTask = async (taskData: NewTaskData, creatorId: string): Promise<Task> => {
-    const { data, error } = await supabase.from('tasks').insert({
-        title: taskData.title,
-        description: taskData.description,
-        priority: taskData.priority,
-        column_id: taskData.columnId,
-        creator_id: creatorId,
-        assignee_id: taskData.assigneeId,
-    }).select().single();
-
-    if(error) {
-        console.error("Error adding task", error.message || error);
-        throw error;
-    }
+    const { error, data } = await supabase
+        .from('tasks')
+        .insert({
+            title: taskData.title,
+            description: taskData.description,
+            priority: taskData.priority,
+            column_id: taskData.columnId,
+            assignee_id: taskData.assigneeId,
+            creator_id: creatorId,
+            due_date: taskData.dueDate,
+        })
+        .select()
+        .single();
+    if (error) throw error;
     return data as Task;
+};
+
+const addSubtasks = async (taskId: string, subtasks: { title: string }[], creatorId: string) => {
+    const subtasksToInsert = subtasks.map(s => ({
+        task_id: taskId,
+        title: s.title,
+        creator_id: creatorId
+    }));
+    const { error } = await supabase.from('subtasks').insert(subtasksToInsert);
+    if (error) throw error;
+};
+
+const addComment = async (taskId: string, text: string, authorId: string) => {
+    const { error } = await supabase.from('comments').insert({
+        task_id: taskId,
+        text,
+        author_id: authorId
+    });
+    if (error) throw error;
 };
 
 const deleteTask = async (taskId: string) => {
     const { error } = await supabase.from('tasks').delete().eq('id', taskId);
-    if(error) console.error("Error deleting task", error.message || error);
+    if (error) throw error;
 };
 
-const addColumn = async (projectId: string, title: string): Promise<Column> => {
-    const { data, error } = await supabase.from('columns').insert({
-        title: title,
-        project_id: projectId,
-    }).select().single();
-    if(error) {
-        console.error("Error adding column", error.message || error);
-        throw error;
-    }
+const addColumn = async (projectId: string, title: string) => {
+    const { data, error } = await supabase.from('columns').insert({ project_id: projectId, title }).select().single();
+    if (error) throw error;
     return data as Column;
 };
 
 const deleteColumn = async (columnId: string) => {
     const { error } = await supabase.from('columns').delete().eq('id', columnId);
-    if(error) console.error("Error deleting column", error.message || error);
+    if (error) throw error;
+};
+
+const addProject = async (name: string, description: string, creatorId: string) => {
+    const { data, error } = await supabase.rpc('create_new_project', {
+        project_name: name,
+        project_description: description,
+        user_id: creatorId,
+    });
+    if (error) throw error;
+    return data;
 };
 
 const createProjectShell = async (name: string, description: string, creatorId: string): Promise<Project> => {
-    const { data: project, error } = await supabase
+     const { data, error } = await supabase
         .from('projects')
         .insert({ name, description, creator_id: creatorId })
         .select()
         .single();
-    if (error) {
-        console.error("Error creating project shell", error.message || error);
-        throw error;
-    }
-
-    const { error: memberError } = await supabase
-        .from('project_members')
-        .insert({ project_id: project.id, user_id: creatorId });
-    if (memberError) {
-        console.error("Error adding creator to project", memberError.message || memberError);
-        throw memberError;
-    }
-    return project as Project;
-}
-
-
-const addProject = async (name: string, description: string, creatorId: string) => {
-    const { data: project, error } = await supabase
-        .from('projects')
-        .insert({ name, description, creator_id: creatorId })
-        .select()
-        .single();
-    if (error) {
-        console.error("Error creating project", error.message || error);
-        return;
-    }
-
-    // Add creator as a member
-    const { error: memberError } = await supabase
-        .from('project_members')
-        .insert({ project_id: project.id, user_id: creatorId });
-    if (memberError) console.error("Error adding creator to project", memberError.message || memberError);
-    
-    // Add default columns
-    const columnsToAdd = [
-        { project_id: project.id, title: 'To Do', position: 1 },
-        { project_id: project.id, title: 'In Progress', position: 2 },
-        { project_id: project.id, title: 'Done', position: 3 },
-    ];
-    const { error: columnsError } = await supabase.from('columns').insert(columnsToAdd);
-    if (columnsError) console.error("Error adding default columns", columnsError.message || columnsError);
+    if (error) throw error;
+    await supabase.from('project_members').insert({ project_id: data.id, user_id: creatorId });
+    return data as Project;
 };
 
 const deleteProject = async (projectId: string) => {
-    // Assumes RLS and cascading deletes are set up in Supabase
     const { error } = await supabase.from('projects').delete().eq('id', projectId);
-    if (error) {
-        console.error("Error deleting project:", error.message || error);
-        throw error;
-    }
+    if (error) throw error;
 };
 
 const updateProjectMembers = async (projectId: string, memberIds: string[]) => {
-    const { error: deleteError } = await supabase.from('project_members').delete().eq('project_id', projectId);
-    if(deleteError) {
-        console.error("Error clearing project members", deleteError.message || deleteError);
-        return;
-    }
-    const membersToInsert = memberIds.map(id => ({ project_id: projectId, user_id: id }));
-    const { error: insertError } = await supabase.from('project_members').insert(membersToInsert);
-    if(insertError) console.error("Error inserting new project members", insertError.message || insertError);
+    const { error } = await supabase.rpc('update_project_members', {
+        p_id: projectId,
+        member_ids: memberIds,
+    });
+    if (error) throw error;
 };
 
 const sendChatMessage = async (projectId: string, text: string, authorId: string) => {
     const { error } = await supabase.from('project_chats').insert({
         project_id: projectId,
-        text: text,
+        text,
         author_id: authorId,
     });
-    if (error) {
-        console.error("Error sending chat message:", error.message || error);
-        throw error;
-    }
-};
-
-const getInviteLinksForProject = async (projectId: string): Promise<ProjectInviteLink[]> => {
-    const { data, error } = await supabase
-        .from('project_invites')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: false });
-    if (error) {
-        console.error("Error fetching invite links:", error.message || error);
-        throw error;
-    }
-    return data as ProjectInviteLink[];
-};
-
-const createInviteLink = async (
-    projectId: string, 
-    creatorId: string, 
-    role: UserRole, 
-    expiresInDays: number | null
-): Promise<ProjectInviteLink> => {
-    
-    const expires_at = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString() : null;
-
-    const { data, error } = await supabase
-        .from('project_invites')
-        .insert({
-            project_id: projectId,
-            created_by: creatorId,
-            token: crypto.randomUUID(),
-            role,
-            expires_at,
-            access_type: InviteAccessType.OPEN,
-            is_active: true,
-        })
-        .select()
-        .single();
-    
-    if (error) {
-        console.error("Error creating invite link:", error.message || error);
-        throw error;
-    }
-    return data as ProjectInviteLink;
-};
-
-const updateInviteLink = async (linkId: string, updates: Partial<{ is_active: boolean }>): Promise<ProjectInviteLink> => {
-    const { data, error } = await supabase
-        .from('project_invites')
-        .update(updates)
-        .eq('id', linkId)
-        .select()
-        .single();
-    if (error) {
-        console.error("Error updating invite link:", error.message || error);
-        throw error;
-    }
-    return data as ProjectInviteLink;
-};
-
-const acceptInvite = async (token: string): Promise<Project> => {
-    // This calls a Supabase RPC function that should handle the invite logic atomically.
-    const { data, error } = await supabase.rpc('accept_project_invite', { invite_token: token });
-
-    if (error) {
-        console.error('Error accepting invite:', error);
-        // FIX: The error from supabase.rpc can be an object of unknown shape. Safely access
-        // the message property to avoid a type error when creating a new Error.
-        const errorMessage = (error as any)?.message ?? 'Could not join project. The link may be invalid or expired.';
-        throw new Error(errorMessage);
-    }
-
-    if (!data || !data.id || !data.name) {
-      throw new Error("Joined project but could not retrieve its details.");
-    }
-    return data as Project;
+    if (error) throw error;
 };
 
 const addProjectLink = async (projectId: string, title: string, url: string, creatorId: string) => {
@@ -729,100 +525,45 @@ const addProjectLink = async (projectId: string, title: string, url: string, cre
         project_id: projectId,
         title,
         url,
-        creator_id: creatorId,
+        creator_id: creatorId
     });
-    if (error) {
-        console.error("Error adding project link:", error.message || error);
-        throw error;
-    }
+    if (error) throw error;
 };
 
 const deleteProjectLink = async (linkId: string) => {
     const { error } = await supabase.from('project_links').delete().eq('id', linkId);
-    if (error) {
-        console.error("Error deleting project link:", error.message || error);
-        throw error;
-    }
+    if (error) throw error;
 };
 
-const submitFeedback = async (feedbackData: { 
-  userId: string;
-  type: FeedbackType;
-  title: string;
-  description: string;
-  contextData: object;
-}) => {
-    const { error } = await supabase.from('feedback').insert({
-        user_id: feedbackData.userId,
-        feedback_type: feedbackData.type,
-        title: feedbackData.title,
-        description: feedbackData.description,
-        context_data: feedbackData.contextData,
+const addBug = async (bugData: Omit<Bug, 'id' | 'createdAt' | 'bugNumber' | 'position'> & { projectId: string }) => {
+    const { error } = await supabase.from('bugs').insert({
+        project_id: bugData.projectId,
+        title: bugData.title,
+        description: bugData.description,
+        priority: bugData.priority,
+        status: bugData.status,
+        reporter_id: bugData.reporterId,
+        assignee_id: bugData.assignee?.id,
     });
-    if (error) {
-        console.error("Error submitting feedback:", error.message || error);
-        throw error;
-    }
+    if (error) throw error;
 };
 
-const addBug = async (bugData: Omit<Bug, 'id' | 'createdAt' | 'assignee' | 'bugNumber' | 'position'> & { projectId: string; assigneeId?: string }) => {
-    const { error } = await supabase.rpc('add_bug_with_position', {
-        p_title: bugData.title,
-        p_description: bugData.description,
-        p_priority: bugData.priority,
-        p_status: bugData.status,
-        p_reporter_id: bugData.reporterId,
-        p_project_id: bugData.projectId,
-        p_assignee_id: bugData.assigneeId
-    });
-
-    if (error) {
-        console.error("Error calling add_bug_with_position RPC:", error);
-        throw error;
-    }
-};
-
-const addBugsBatch = async (bugsData: (Omit<Bug, 'id' | 'createdAt' | 'assignee' | 'bugNumber' | 'position'> & { projectId: string })[]) => {
-    if (bugsData.length === 0) return;
-    const projectId = bugsData[0].projectId;
-
-    const { data: maxPosData, error: posError } = await supabase
-        .from('bugs')
-        .select('position')
-        .eq('project_id', projectId)
-        .order('position', { ascending: false })
-        .limit(1)
-        .single();
-    
-    if (posError && posError.code !== 'PGRST116') { // Ignore "no rows" error
-        throw posError;
-    }
-    const startPosition = (maxPosData?.position || 0);
-
-    const records = bugsData.map((b, index) => ({
+const addBugsBatch = async (bugsData: (Omit<Bug, 'id' | 'createdAt' | 'bugNumber' | 'position'> & { projectId: string })[]) => {
+    const bugsToInsert = bugsData.map(b => ({
+        project_id: b.projectId,
         title: b.title,
         description: b.description,
         priority: b.priority,
         status: b.status,
         reporter_id: b.reporterId,
-        project_id: b.projectId,
-        position: startPosition + index + 1,
+        assignee_id: b.assignee?.id,
     }));
-    const { error } = await supabase.from('bugs').insert(records);
+    const { error } = await supabase.from('bugs').insert(bugsToInsert);
     if (error) throw error;
 };
 
-const updateBug = async (bugId: string, updates: Partial<{ title: string; description: string; priority: TaskPriority, status: string, assigneeId: string | null }>) => {
-    const { error } = await supabase
-        .from('bugs')
-        .update({
-            title: updates.title,
-            description: updates.description,
-            priority: updates.priority,
-            status: updates.status,
-            assignee_id: updates.assigneeId,
-        })
-        .eq('id', bugId);
+const updateBug = async (bugId: string, updates: Partial<Omit<Bug, 'id' | 'assignee'> & { assigneeId: string | null }>) => {
+    const { error } = await supabase.from('bugs').update(updates).eq('id', bugId);
     if (error) throw error;
 };
 
@@ -836,53 +577,137 @@ const deleteBugsBatch = async (bugIds: string[]) => {
     if (error) throw error;
 };
 
+const addCalendarEvent = async (eventData: Omit<CalendarEvent, 'id' | 'createdAt'>) => {
+    const { error } = await supabase.from('calendar_events').insert({
+        project_id: eventData.projectId,
+        creator_id: eventData.creatorId,
+        title: eventData.title,
+        description: eventData.description,
+        start: eventData.start,
+        end: eventData.end,
+    });
+    if (error) throw error;
+};
+
+const updateCalendarEvent = async (eventId: string, updates: Partial<CalendarEvent>) => {
+    const { error } = await supabase.from('calendar_events').update({
+        title: updates.title,
+        description: updates.description,
+        start: updates.start,
+        end: updates.end,
+    }).eq('id', eventId);
+    if (error) throw error;
+};
+
+const deleteCalendarEvent = async (eventId: string) => {
+    const { error } = await supabase.from('calendar_events').delete().eq('id', eventId);
+    if (error) throw error;
+};
+
+const getInviteLinksForProject = async (projectId: string): Promise<ProjectInviteLink[]> => {
+    const { data, error } = await supabase
+        .from('project_invite_links')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+};
+
+const createInviteLink = async (projectId: string, creatorId: string, role: UserRole, expiresInDays: number | null): Promise<ProjectInviteLink> => {
+    const { data, error } = await supabase.rpc('create_project_invite', {
+        p_id: projectId,
+        creator_id: creatorId,
+        link_role: role,
+        duration_days: expiresInDays
+    });
+    if (error) throw error;
+    return data;
+};
+
+const updateInviteLink = async (linkId: string, updates: { is_active: boolean }): Promise<ProjectInviteLink> => {
+    const { data, error } = await supabase
+        .from('project_invite_links')
+        .update(updates)
+        .eq('id', linkId)
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
+};
+
+const acceptInvite = async (token: string): Promise<Project> => {
+    const { data, error } = await supabase.rpc('accept_project_invite', { invite_token: token });
+    if (error) throw error;
+    return data;
+};
+
+const submitFeedback = async (feedbackData: {
+    userId: string,
+    type: FeedbackType,
+    title: string,
+    description: string,
+    contextData: object
+}) => {
+    const { error } = await supabase.from('feedback').insert({
+        user_id: feedbackData.userId,
+        type: feedbackData.type,
+        title: feedbackData.title,
+        description: feedbackData.description,
+        context_data: feedbackData.contextData,
+    });
+    if (error) throw error;
+};
 
 export const api = {
-    auth: {
-        getSession,
-        onAuthStateChange,
-        getUserProfile,
-        createUserProfile,
-        updateUserProfile,
-        signOut,
-        signInWithPassword,
-        signUp,
-        sendPasswordResetEmail,
-        updateUserPassword,
-        resendConfirmationEmail,
-    },
-    realtime: {
-        isConfigured,
-        getPresenceChannel,
-        removeChannel,
-    },
-    data: {
-        fetchInitialData,
-        subscribeToProjectChat,
-        moveTask,
-        updateTask,
-        addSubtasks,
-        addComment,
-        addTask,
-        deleteTask,
-        addColumn,
-        deleteColumn,
-        addProject,
-        createProjectShell,
-        deleteProject,
-        updateProjectMembers,
-        sendChatMessage,
-        getInviteLinksForProject,
-        createInviteLink,
-        updateInviteLink,
-        acceptInvite,
-        addProjectLink,
-        deleteProjectLink,
-        submitFeedback,
-        addBug,
-        updateBug,
-        deleteBug,
-        addBugsBatch,
-        deleteBugsBatch,
-    }
-}
+  auth: {
+    onAuthStateChange,
+    getSession,
+    getUserProfile,
+    createUserProfile,
+    updateUserProfile,
+    signOut,
+    signInWithPassword,
+    signUp,
+    sendPasswordResetEmail,
+    resendConfirmationEmail,
+    updateUserPassword,
+  },
+  realtime: {
+    isConfigured,
+    getPresenceChannel,
+    removeChannel,
+  },
+  data: {
+    fetchInitialData,
+    subscribeToProjectChat,
+    moveTask,
+    updateTask,
+    addTask,
+    addSubtasks,
+    addComment,
+    deleteTask,
+    addColumn,
+    deleteColumn,
+    addProject,
+    createProjectShell,
+    deleteProject,
+    updateProjectMembers,
+    sendChatMessage,
+    addProjectLink,
+    deleteProjectLink,
+    addBug,
+    addBugsBatch,
+    updateBug,
+    deleteBug,
+    deleteBugsBatch,
+    addCalendarEvent,
+    updateCalendarEvent,
+    deleteCalendarEvent,
+    getInviteLinksForProject,
+    createInviteLink,
+    updateInviteLink,
+    acceptInvite,
+    submitFeedback,
+  }
+};

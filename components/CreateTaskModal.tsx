@@ -15,6 +15,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ columns, users
   const [priority, setPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
   const [columnId, setColumnId] = useState<string>(columns[0]?.id || '');
   const [assigneeId, setAssigneeId] = useState<string>('');
+  const [dueDate, setDueDate] = useState('');
 
 
   const handleSubmit = (e: FormEvent) => {
@@ -29,6 +30,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ columns, users
       priority,
       columnId,
       assigneeId: assigneeId || undefined,
+      dueDate: dueDate || undefined,
     });
   };
   
@@ -90,17 +92,29 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ columns, users
               </select>
             </div>
           </div>
-          <div>
-            <label htmlFor="assignee" className="block text-sm font-medium text-white mb-1">Assignee</label>
-            <select
-              id="assignee"
-              value={assigneeId}
-              onChange={(e) => setAssigneeId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
-            >
-              <option value="">Unassigned</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="assignee" className="block text-sm font-medium text-white mb-1">Assignee</label>
+              <select
+                id="assignee"
+                value={assigneeId}
+                onChange={(e) => setAssigneeId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
+              >
+                <option value="">Unassigned</option>
+                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="dueDate" className="block text-sm font-medium text-white mb-1">Due Date</label>
+              <input
+                type="date"
+                id="dueDate"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
+              />
+            </div>
           </div>
            <div className="pt-2 flex justify-end gap-3">
             <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm">

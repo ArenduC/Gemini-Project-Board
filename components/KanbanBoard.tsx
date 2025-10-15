@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { DragDropContext, DropResult } from 'react-beautiful-dnd';
-import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority } from '../types';
+import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority, CalendarEvent } from '../types';
 import { Column } from './Column';
 import { Filters } from './Filters';
 import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon } from './Icons';
@@ -106,7 +106,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     project, currentUser, users, onlineUsers, aiFeaturesEnabled, onDragEnd, 
     updateTask, addSubtasks, addComment, addAiTask, deleteTask, addColumn, 
     deleteColumn, isChatOpen, onCloseChat, chatMessages, onSendMessage, onTaskClick, 
-    addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch 
+    addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('');
@@ -115,12 +115,27 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [projectView, setProjectView] = useState<'board' | 'table' | 'graph' | 'bugs'>('board');
   const [tableCurrentPage, setTableCurrentPage] = useState(1);
   const TABLE_ITEMS_PER_PAGE = 15;
+  
+  const [initialBugSearch, setInitialBugSearch] = useState<string>('');
 
   const [segments, setSegments] = useState<FilterSegment[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>('all');
   
   const boardData = project.board;
   const storageKey = `project-segments-${project.id}`;
+  
+  const handleNavigateToBug = (bugNumber: string) => {
+    setProjectView('bugs');
+    setInitialBugSearch(bugNumber);
+    onCloseChat();
+  };
+
+  const handleSetProjectView = (view: 'board' | 'table' | 'graph' | 'bugs') => {
+    if (view !== 'bugs') {
+      setInitialBugSearch('');
+    }
+    setProjectView(view);
+  };
 
   useEffect(() => {
     try {
@@ -308,7 +323,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   
   return (
     <>
-      {aiFeaturesEnabled && projectView !== 'bugs' && (
+      {aiFeaturesEnabled && !['bugs'].includes(projectView) && (
       <div className="mb-6">
         <AiTaskCreator onGenerateTask={addAiTask} />
       </div>
@@ -323,7 +338,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       </div>
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        {projectView !== 'bugs' && (
+        {!['bugs'].includes(projectView) && (
             <Filters
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
@@ -348,38 +363,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             <div className="flex-shrink-0">
                 <h4 className="text-sm font-semibold text-gray-400 mb-2 text-right">View</h4>
                 <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
-                    <button
-                        onClick={() => setProjectView('board')}
-                        className={`p-2 rounded-md ${projectView === 'board' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
-                        aria-label="Board View"
-                        title="Board View"
-                    >
-                        <LayoutDashboardIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                        onClick={() => setProjectView('table')}
-                        className={`p-2 rounded-md ${projectView === 'table' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
-                        aria-label="Table View"
-                        title="Table View"
-                    >
-                        <TableIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                        onClick={() => setProjectView('graph')}
-                        className={`p-2 rounded-md ${projectView === 'graph' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
-                        aria-label="Graph View"
-                        title="Graph View"
-                    >
-                        <GitBranchIcon className="w-5 h-5" />
-                    </button>
-                    <button
-                        onClick={() => setProjectView('bugs')}
-                        className={`p-2 rounded-md ${projectView === 'bugs' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`}
-                        aria-label="Bug Tracker"
-                        title="Bug Tracker"
-                    >
-                        <LifeBuoyIcon className="w-5 h-5" />
-                    </button>
+                    <button onClick={() => handleSetProjectView('board')} className={`p-2 rounded-md ${projectView === 'board' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} aria-label="Board View" title="Board View"><LayoutDashboardIcon className="w-5 h-5" /></button>
+                    <button onClick={() => handleSetProjectView('table')} className={`p-2 rounded-md ${projectView === 'table' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} aria-label="Table View" title="Table View"><TableIcon className="w-5 h-5" /></button>
+                    <button onClick={() => handleSetProjectView('graph')} className={`p-2 rounded-md ${projectView === 'graph' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} aria-label="Graph View" title="Graph View"><GitBranchIcon className="w-5 h-5" /></button>
+                    <button onClick={() => handleSetProjectView('bugs')} className={`p-2 rounded-md ${projectView === 'bugs' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} aria-label="Bug Tracker" title="Bug Tracker"><LifeBuoyIcon className="w-5 h-5" /></button>
                 </div>
             </div>
             {projectView === 'board' && (
@@ -400,6 +387,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             onDeleteBug={deleteBug}
             onAddBugsBatch={(fileContent) => addBugsBatch(project.id, fileContent)}
             onDeleteBugsBatch={deleteBugsBatch}
+            initialSearchTerm={initialBugSearch}
         />
       ) : projectView === 'board' ? (
         <DragDropContext onDragEnd={onDragEnd}>
@@ -447,11 +435,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       
        {isChatOpen && (
         <ProjectChat 
+            project={project}
+            users={users}
             messages={chatMessages}
             currentUser={currentUser}
             onlineUsers={onlineUsers}
             onClose={onCloseChat}
             onSendMessage={onSendMessage}
+            onNavigateToBug={handleNavigateToBug}
         />
       )}
     </>

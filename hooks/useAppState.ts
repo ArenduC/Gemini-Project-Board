@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DropResult } from 'react-beautiful-dnd';
-import { AppState, Task, NewTaskData, User, ChatMessage, AiGeneratedProjectPlan, Bug, TaskPriority } from '../types';
+import { AppState, Task, NewTaskData, User, ChatMessage, AiGeneratedProjectPlan, Bug, TaskPriority, CalendarEvent } from '../types';
 import { api } from '../services/api';
 import { generateTaskFromPrompt, generateBugsFromFile, BugResponse } from '../services/geminiService';
 import { Session } from '@supabase/supabase-js';
@@ -213,6 +213,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         description: generatedData.description,
         priority: generatedData.priority,
         columnId: project.board.columnOrder[0], // Add to the first column
+        dueDate: generatedData.dueDate,
     };
 
     await api.data.addTask(taskData, currentUser.id);
@@ -410,6 +411,22 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     await fetchData();
   }, [fetchData]);
 
+  // Calendar Events
+  const addCalendarEvent = useCallback(async (eventData: Omit<CalendarEvent, 'id' | 'createdAt'>) => {
+    await api.data.addCalendarEvent(eventData);
+    await fetchData();
+  }, [fetchData]);
 
-  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch };
+  const updateCalendarEvent = useCallback(async (eventId: string, updates: Partial<CalendarEvent>) => {
+    await api.data.updateCalendarEvent(eventId, updates);
+    await fetchData();
+  }, [fetchData]);
+
+  const deleteCalendarEvent = useCallback(async (eventId: string) => {
+    await api.data.deleteCalendarEvent(eventId);
+    await fetchData();
+  }, [fetchData]);
+
+
+  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch, addCalendarEvent, updateCalendarEvent, deleteCalendarEvent };
 };
