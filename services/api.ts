@@ -562,8 +562,13 @@ const addBugsBatch = async (bugsData: (Omit<Bug, 'id' | 'createdAt' | 'bugNumber
     if (error) throw error;
 };
 
-const updateBug = async (bugId: string, updates: Partial<Omit<Bug, 'id' | 'assignee'> & { assigneeId: string | null }>) => {
-    const { error } = await supabase.from('bugs').update(updates).eq('id', bugId);
+const updateBug = async (bugId: string, updates: Partial<Omit<Bug, 'id' | 'assignee'> & { assigneeId?: string | null }>) => {
+    const { assigneeId, ...otherUpdates } = updates;
+    const dbUpdates: { [key: string]: any } = { ...otherUpdates };
+    if (updates.hasOwnProperty('assigneeId')) {
+        dbUpdates.assignee_id = assigneeId;
+    }
+    const { error } = await supabase.from('bugs').update(dbUpdates).eq('id', bugId);
     if (error) throw error;
 };
 

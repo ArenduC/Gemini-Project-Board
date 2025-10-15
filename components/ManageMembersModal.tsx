@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Project, User } from '../types';
-import { XIcon, TrashIcon } from './Icons';
+import { XIcon, TrashIcon, LoaderCircleIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 
 interface ManageMembersModalProps {
@@ -13,6 +13,8 @@ interface ManageMembersModalProps {
 
 export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ project, allUsers, onlineUsers, onClose, onSave }) => {
   const [currentMemberIds, setCurrentMemberIds] = useState<string[]>(project.members);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const handleRemoveMember = (userIdToRemove: string) => {
     if (userIdToRemove === project.creatorId) {
@@ -22,8 +24,17 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ project,
     setCurrentMemberIds(currentMemberIds.filter(id => id !== userIdToRemove));
   };
 
-  const handleSave = () => {
-    onSave(currentMemberIds);
+  const handleSave = async () => {
+    setIsSaving(true);
+    setError('');
+    try {
+        await onSave(currentMemberIds);
+        onClose();
+    } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred while saving members.');
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   const memberDetails = currentMemberIds
@@ -73,13 +84,17 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ project,
           </div>
         </div>
 
-        <footer className="p-4 border-t border-gray-800 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm">
-            Cancel
-          </button>
-          <button onClick={handleSave} className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm">
-            Save Changes
-          </button>
+        <footer className="p-4 border-t border-gray-800 flex justify-between items-center gap-3">
+          {error && <p className="text-sm text-red-500 flex-grow">{error}</p>}
+          <div className="flex justify-end gap-3 ml-auto">
+            <button type="button" onClick={onClose} disabled={isSaving} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm disabled:opacity-50">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={isSaving} className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center gap-2">
+              {isSaving && <LoaderCircleIcon className="w-5 h-5 animate-spin" />}
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
         </footer>
       </div>
     </div>

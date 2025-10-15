@@ -1,6 +1,6 @@
 import React, { useState, FormEvent } from 'react';
 import { TaskPriority, Column, NewTaskData, User } from '../types';
-import { XIcon } from './Icons';
+import { XIcon, LoaderCircleIcon } from './Icons';
 
 interface CreateTaskModalProps {
   columns: Column[];
@@ -16,22 +16,33 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ columns, users
   const [columnId, setColumnId] = useState<string>(columns[0]?.id || '');
   const [assigneeId, setAssigneeId] = useState<string>('');
   const [dueDate, setDueDate] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !columnId) {
-        alert('Please fill in a title and select a column.');
+        setError('Please fill in a title and select a column.');
         return;
     }
-    onAddTask({
-      title: title.trim(),
-      description: description.trim(),
-      priority,
-      columnId,
-      assigneeId: assigneeId || undefined,
-      dueDate: dueDate || undefined,
-    });
+    setIsSaving(true);
+    setError('');
+    try {
+        await onAddTask({
+          title: title.trim(),
+          description: description.trim(),
+          priority,
+          columnId,
+          assigneeId: assigneeId || undefined,
+          dueDate: dueDate || undefined,
+        });
+        onClose();
+    } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred while creating the task.');
+    } finally {
+        setIsSaving(false);
+    }
   };
   
   return (
@@ -116,12 +127,14 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ columns, users
               />
             </div>
           </div>
+          {error && <p className="text-sm text-red-500">{error}</p>}
            <div className="pt-2 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm">
+            <button type="button" onClick={onClose} disabled={isSaving} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm disabled:opacity-50">
               Cancel
             </button>
-            <button type="submit" className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm">
-              Create Task
+            <button type="submit" disabled={isSaving} className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center gap-2">
+              {isSaving && <LoaderCircleIcon className="w-5 h-5 animate-spin"/>}
+              {isSaving ? 'Creating...' : 'Create Task'}
             </button>
           </div>
         </form>

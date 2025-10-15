@@ -20,6 +20,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, onSave,
   const [endTime, setEndTime] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (event) {
@@ -40,38 +41,51 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, onSave,
       setEndDate(selectedDate);
       setEndTime('11:00');
     }
+    setError('');
   }, [event, selectedDate, isOpen]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!title || !startDate || !startTime || !endDate || !endTime) return;
     setIsSaving(true);
+    setError('');
     
     const startDateTime = new Date(`${startDate}T${startTime}`);
     const endDateTime = new Date(`${endDate}T${endTime}`);
 
     if (startDateTime >= endDateTime) {
-      alert("End time must be after start time.");
+      setError("End time must be after start time.");
       setIsSaving(false);
       return;
     }
 
-    await onSave({
-      title,
-      description,
-      start: startDateTime.toISOString(),
-      end: endDateTime.toISOString(),
-    });
-    setIsSaving(false);
-    onClose();
+    try {
+        await onSave({
+          title,
+          description,
+          start: startDateTime.toISOString(),
+          end: endDateTime.toISOString(),
+        });
+        onClose();
+    } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+    } finally {
+        setIsSaving(false);
+    }
   };
   
   const handleDelete = async () => {
     if (onDelete && window.confirm("Are you sure you want to delete this event?")) {
         setIsDeleting(true);
-        await onDelete();
-        setIsDeleting(false);
-        onClose();
+        setError('');
+        try {
+            await onDelete();
+            onClose();
+        } catch(err) {
+            setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+        } finally {
+            setIsDeleting(false);
+        }
     }
   };
 
@@ -107,6 +121,7 @@ export const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, onSave,
               <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} required className="w-full px-3 py-2 border border-gray-800 rounded-md bg-[#1C2326] text-white" />
             </div>
           </div>
+          {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex justify-between items-center pt-2">
             <div>
                 {event && onDelete && (

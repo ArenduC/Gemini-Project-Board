@@ -1,5 +1,5 @@
 import React, { useState, FormEvent } from 'react';
-import { XIcon } from './Icons';
+import { XIcon, LoaderCircleIcon } from './Icons';
 
 interface CreateProjectModalProps {
   onClose: () => void;
@@ -9,14 +9,25 @@ interface CreateProjectModalProps {
 export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose, onAddProject }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-        alert('Please enter a project name.');
+        setError('Please enter a project name.');
         return;
     }
-    onAddProject(name.trim(), description.trim());
+    setIsSaving(true);
+    setError('');
+    try {
+        await onAddProject(name.trim(), description.trim());
+        onClose();
+    } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+    } finally {
+        setIsSaving(false);
+    }
   };
   
   return (
@@ -53,12 +64,14 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ onClose,
               placeholder="Add a short description of the project..."
             />
           </div>
+           {error && <p className="text-sm text-red-500">{error}</p>}
            <div className="pt-2 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm">
+            <button type="button" onClick={onClose} disabled={isSaving} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm disabled:opacity-50">
               Cancel
             </button>
-            <button type="submit" className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm">
-              Create Project
+            <button type="submit" disabled={isSaving} className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center gap-2">
+              {isSaving && <LoaderCircleIcon className="w-5 h-5 animate-spin"/>}
+              {isSaving ? 'Creating...' : 'Create Project'}
             </button>
           </div>
         </form>

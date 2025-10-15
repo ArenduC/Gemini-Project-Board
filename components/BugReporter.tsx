@@ -69,17 +69,30 @@ const EditableField: React.FC<{
 
 const CreateBugModal: React.FC<{
   onClose: () => void;
-  onAddBug: (bugData: { title: string, description: string, priority: TaskPriority }) => void;
+  onAddBug: (bugData: { title: string, description: string, priority: TaskPriority }) => Promise<void>;
 }> = ({ onClose, onAddBug }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
-    onAddBug({ title, description, priority });
-    onClose();
+    if (!title.trim()) {
+        setError('Please provide a title for the bug.');
+        return;
+    };
+    setIsSaving(true);
+    setError('');
+    try {
+        await onAddBug({ title, description, priority });
+        onClose();
+    } catch(err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
+    } finally {
+        setIsSaving(false);
+    }
   };
 
   return (
@@ -95,9 +108,13 @@ const CreateBugModal: React.FC<{
           <select value={priority} onChange={e => setPriority(e.target.value as TaskPriority)} className="w-full px-3 py-2 border border-gray-800 rounded-md bg-[#1C2326] text-white">
             {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
           </select>
+          {error && <p className="text-sm text-red-500">{error}</p>}
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600">Cancel</button>
-            <button type="submit" className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg hover:bg-gray-400">Add Bug</button>
+            <button type="button" onClick={onClose} disabled={isSaving} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 disabled:opacity-50">Cancel</button>
+            <button type="submit" disabled={isSaving} className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg hover:bg-gray-400 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center gap-2">
+                {isSaving && <LoaderCircleIcon className="w-5 h-5 animate-spin" />}
+                {isSaving ? 'Adding...' : 'Add Bug'}
+            </button>
           </div>
         </form>
       </div>
