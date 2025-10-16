@@ -16,8 +16,7 @@ INSTRUCTIONS:
 5. Paste it into the SQL Editor.
 6. Click "RUN".
 
-This update will allow the application to load correctly. Please note that the "Calendar"
-feature will not function until you create a 'calendar_events' table in your database.
+This update will allow the application to load correctly.
 
 -- START OF SQL SCRIPT --
 
@@ -94,9 +93,7 @@ begin
       (select coalesce(json_agg(chat_msg order by "createdAt"), '[]'::json) from (select pc.id, pc.text, pc.created_at as "createdAt", json_build_object('id', au.id, 'name', au.name, 'avatarUrl', au.avatar_url, 'role', au.role) as author from public.project_chats pc join public.users au on pc.author_id = au.id where pc.project_id = p.id) chat_msg) as "chatMessages",
       (select coalesce(json_agg(l order by "createdAt"), '[]'::json) from (select pl.id, pl.title, pl.url, pl.project_id as "projectId", pl.creator_id as "creatorId", pl.created_at as "createdAt" from public.project_links pl where pl.project_id = p.id) l) as "links",
       (select coalesce(json_object_agg(b.id, b_json), '{}'::json) from (select b_ext.id, b_ext.bug_json as b_json from (select b.id, json_build_object('id', b.id, 'bugNumber', b.bug_number, 'title', b.title, 'description', b.description, 'priority', b.priority, 'status', b.status, 'reporterId', b.reporter_id, 'createdAt', b.created_at, 'position', b.position, 'assignee', (select json_build_object('id', bu.id, 'name', bu.name, 'avatarUrl', bu.avatar_url, 'role', bu.role) from public.users bu where bu.id = b.assignee_id)) as bug_json from public.bugs b where b.project_id = p.id) as b_ext) as b) as "bugs",
-      (select coalesce(json_agg(b.id order by b.position), '[]'::json) from public.bugs b where b.project_id = p.id) as "bugOrder",
-      '{}'::json as "calendarEvents",
-      '[]'::json as "calendarEventOrder"
+      (select coalesce(json_agg(b.id order by b.position), '[]'::json) from public.bugs b where b.project_id = p.id) as "bugOrder"
     from public.projects p
     where p.id = any(user_project_ids)
   ) p_agg;
@@ -116,7 +113,7 @@ grant execute on function public.get_initial_data_for_user(uuid) to authenticate
 */
 
 import { supabase } from './supabase';
-import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column, FeedbackType, Bug, TaskPriority, CalendarEvent } from '../types';
+import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column, FeedbackType, Bug, TaskPriority } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
@@ -582,33 +579,6 @@ const deleteBugsBatch = async (bugIds: string[]) => {
     if (error) throw error;
 };
 
-const addCalendarEvent = async (eventData: Omit<CalendarEvent, 'id' | 'createdAt'>) => {
-    const { error } = await supabase.from('calendar_events').insert({
-        project_id: eventData.projectId,
-        creator_id: eventData.creatorId,
-        title: eventData.title,
-        description: eventData.description,
-        start: eventData.start,
-        end: eventData.end,
-    });
-    if (error) throw error;
-};
-
-const updateCalendarEvent = async (eventId: string, updates: Partial<CalendarEvent>) => {
-    const { error } = await supabase.from('calendar_events').update({
-        title: updates.title,
-        description: updates.description,
-        start: updates.start,
-        end: updates.end,
-    }).eq('id', eventId);
-    if (error) throw error;
-};
-
-const deleteCalendarEvent = async (eventId: string) => {
-    const { error } = await supabase.from('calendar_events').delete().eq('id', eventId);
-    if (error) throw error;
-};
-
 const getInviteLinksForProject = async (projectId: string): Promise<ProjectInviteLink[]> => {
     const { data, error } = await supabase
         .from('project_invite_links')
@@ -706,9 +676,6 @@ export const api = {
     updateBug,
     deleteBug,
     deleteBugsBatch,
-    addCalendarEvent,
-    updateCalendarEvent,
-    deleteCalendarEvent,
     getInviteLinksForProject,
     createInviteLink,
     updateInviteLink,

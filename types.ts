@@ -105,17 +105,6 @@ export interface Bug {
   position: number;
 }
 
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  description?: string;
-  start: string; // ISO string
-  end: string; // ISO string
-  creatorId: string;
-  projectId: string;
-  createdAt: string;
-}
-
 export interface Project {
   id: string;
   name: string;
@@ -128,8 +117,8 @@ export interface Project {
   links: ProjectLink[];
   bugs: Record<string, Bug>;
   bugOrder: string[];
+  // FIX: Add missing calendarEvents for calendar feature.
   calendarEvents: Record<string, CalendarEvent>;
-  calendarEventOrder: string[];
 }
 
 export interface AppState {
@@ -154,6 +143,18 @@ export interface AugmentedTask extends Task {
   projectName: string;
   columnId: string;
   columnName: string;
+}
+
+// FIX: Add missing CalendarEvent type definition for calendar components.
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description?: string;
+  start: string;
+  end: string;
+  projectId: string;
+  creatorId: string;
+  createdAt: string;
 }
 
 // FIX: Add missing Notification type definition for NotificationToast component.

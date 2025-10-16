@@ -3,7 +3,7 @@ import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ManageMembersModal } from './components/ManageMembersModal';
-import { BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon, RotateCwIcon, LifeBuoyIcon, CalendarIcon, VideoIcon } from './components/Icons';
+import { BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon, RotateCwIcon, LifeBuoyIcon, CalendarIcon } from './components/Icons';
 import { useAppState } from './hooks/useAppState';
 import { DashboardPage } from './pages/DashboardPage';
 import { TasksPage } from './pages/TasksPage';
@@ -11,10 +11,8 @@ import { ResourceManagementPage } from './pages/ResourceManagementPage';
 import { LoginPage } from './pages/LoginPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import CallbackPage from './pages/CallbackPage';
-import { CalendarPage } from './pages/CalendarPage';
-import { MeetingsPage } from './pages/MeetingsPage';
 // FIX: Import `Column` type to be used in casting.
-import { User, Task, TaskPriority, NewTaskData, Project, ChatMessage, FeedbackType, Column, CalendarEvent } from './types';
+import { User, Task, TaskPriority, NewTaskData, Project, ChatMessage, FeedbackType, Column } from './types';
 import { api } from './services/api';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
@@ -31,7 +29,7 @@ import { FeedbackModal } from './components/FeedbackModal';
 import { playReceiveSound, playNotificationSound, initAudio } from './utils/sound';
 
 
-type View = 'dashboard' | 'project' | 'tasks' | 'resources' | 'privacy' | 'calendar' | 'meetings';
+type View = 'dashboard' | 'project' | 'tasks' | 'resources' | 'privacy';
 
 const getLastReadTimestamp = (projectId: string, userId: string): string | null => {
   return localStorage.getItem(`lastReadTimestamp_${userId}_${projectId}`);
@@ -88,8 +86,6 @@ const App: React.FC = () => {
     }
     if (path === '/tasks') return { view: 'tasks' as View, activeProjectId: null };
     if (path === '/resources') return { view: 'resources' as View, activeProjectId: null };
-    if (path === '/calendar') return { view: 'calendar' as View, activeProjectId: null };
-    if (path === '/meetings') return { view: 'meetings' as View, activeProjectId: null };
     if (path === '/privacy') return { view: 'privacy' as View, activeProjectId: null };
     
     return { view: 'dashboard' as View, activeProjectId: null };
@@ -115,7 +111,7 @@ const App: React.FC = () => {
 
   const appState = useAppState(session, currentUser, activeProjectId);
   // FIX: Added `updateProjectMembers` to the destructuring to make it available in the component's scope.
-  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, updateUserProfile, deleteProject, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch, updateProjectMembers, addCalendarEvent, updateCalendarEvent, deleteCalendarEvent } = appState;
+  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, updateUserProfile, deleteProject, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch, updateProjectMembers } = appState;
 
   const hasData = useMemo(() => Object.keys(state.projects).length > 0 || Object.keys(state.users).length > 0, [state]);
 
@@ -623,8 +619,6 @@ const App: React.FC = () => {
           <nav className="flex items-center gap-2 px-2 py-1 bg-[#1C2326] rounded-full">
             <button onClick={() => navigate('/')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'dashboard' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><LayoutDashboardIcon className="w-4 h-4" /> Dashboard</button>
             <button onClick={() => navigate('/tasks')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'tasks' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><ClipboardListIcon className="w-4 h-4" /> Tasks</button>
-            <button onClick={() => navigate('/calendar')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'calendar' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><CalendarIcon className="w-4 h-4" /> Calendar</button>
-            <button onClick={() => navigate('/meetings')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'meetings' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><VideoIcon className="w-4 h-4" /> Meetings</button>
             <button onClick={() => navigate('/resources')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'resources' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><UsersIcon className="w-4 h-4" /> Resources</button>
           </nav>
           
@@ -787,19 +781,6 @@ const App: React.FC = () => {
                     currentUser={currentUser}
                     onTaskClick={handleTaskClick}
                   />
-              )}
-              {view === 'calendar' && (
-                  <CalendarPage
-                    projects={state.projects}
-                    currentUser={currentUser}
-                    onTaskClick={handleTaskClick}
-                    addCalendarEvent={addCalendarEvent}
-                    updateCalendarEvent={updateCalendarEvent}
-                    deleteCalendarEvent={deleteCalendarEvent}
-                  />
-              )}
-              {view === 'meetings' && (
-                  <MeetingsPage currentUser={currentUser} />
               )}
               {view === 'resources' && (
                 <ResourceManagementPage
