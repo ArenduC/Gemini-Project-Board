@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, FormEvent, useMemo, useRef } from 'react';
 import { Task, Subtask, User, TaskPriority } from '../types';
 import { generateSubtasks as generateSubtasksFromApi } from '../services/geminiService';
-import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon, TrashIcon, HistoryIcon, CalendarIcon } from './Icons';
+import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon, TrashIcon, HistoryIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 
 interface TaskDetailsModalProps {
@@ -415,7 +415,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                     </select>
                 </div>
                 <div className="sm:col-span-1">
-                    <label className="block text-sm font-medium text-white mb-1 flex items-center gap-1.5"><CalendarIcon className="w-4 h-4" /> Due Date</label>
+                    <label className="block text-sm font-medium text-white mb-1">Due Date</label>
                     <EditableField
                         value={editedTask.dueDate || ''}
                         onSave={(newDate) => handleUpdateField('dueDate', newDate)}

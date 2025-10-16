@@ -3,10 +3,10 @@
 == DATABASE FUNCTION UPDATE REQUIRED ==
 ================================================================================================
 
-An error was detected during data fetching ("relation public.calendar_events does not exist").
+An error may be detected during data fetching if your database schema is out of date.
 This indicates a mismatch between your database schema and the application's expectations.
 
-To fix the application startup error, please apply the updated database function below.
+To fix potential application startup errors, please apply the updated database function below.
 
 INSTRUCTIONS:
 1. Go to your Supabase project dashboard.
