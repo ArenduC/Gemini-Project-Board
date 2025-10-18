@@ -3,24 +3,20 @@
 == DATABASE FUNCTION UPDATE REQUIRED ==
 ================================================================================================
 
-An error may be detected during data fetching or when accepting project invites if your 
-database schema is out of date. This indicates a mismatch between your database schema 
-and the application's expectations.
+An error like "Could not choose the best candidate function" or "column role does not exist"
+indicates that your database functions are out of sync with the application code.
 
-To fix potential application startup errors and invite issues, please apply the updated 
-database functions below.
+To resolve these issues, please run the updated SQL scripts below in your Supabase SQL Editor.
+It is recommended to run these even if you are not currently seeing an error to ensure your
+database is up to date.
 
 INSTRUCTIONS:
-1. Go to your Supabase project dashboard.
-2. Navigate to the "SQL Editor".
-3. Click "New query".
-4. Copy ONE ENTIRE SQL script below (e.g., the `get_initial_data_for_user` function).
-5. Paste it into the SQL Editor and click "RUN".
-6. Repeat for the `accept_project_invite` function.
+1. Go to your Supabase project dashboard and navigate to the "SQL Editor".
+2. Run the "INITIAL DATA" script first.
+3. Run the "ACCEPT INVITE" script second. This script includes cleanup steps to remove old,
+   conflicting functions before creating the correct one.
 
-This will ensure your backend functions are up-to-date with the application code.
-
--- START OF SQL SCRIPT 1: get_initial_data_for_user --
+-- START OF SCRIPT 1: INITIAL DATA --
 
 create or replace function get_initial_data_for_user(user_id_param uuid)
 returns json
@@ -110,11 +106,18 @@ $$;
 
 grant execute on function public.get_initial_data_for_user(uuid) to authenticated;
 
+-- END OF SCRIPT 1 --
 
--- END OF SQL SCRIPT 1 --
 
--- START OF SQL SCRIPT 2: accept_project_invite --
+-- START OF SCRIPT 2: ACCEPT INVITE (COMBINED CLEANUP & CREATE) --
 
+-- This script first removes any old or conflicting versions of the function.
+-- It is safe to run even if the functions don't exist.
+DROP FUNCTION IF EXISTS public.accept_project_invite(uuid);
+DROP FUNCTION IF EXISTS public.accept_project_invite(text, public.user_role);
+DROP FUNCTION IF EXISTS public.accept_project_invite(text);
+
+-- Then, it creates the single, correct version of the function.
 create or replace function accept_project_invite(invite_token text)
 returns json
 language plpgsql
@@ -154,8 +157,7 @@ begin
     return project_data;
   end if;
 
-  -- 4. Add the user to the project. The 'role' from the invite is not used here,
-  -- as user roles are global in the current application design.
+  -- 4. Add the user to the project.
   insert into public.project_members (project_id, user_id)
   values (invite_record.project_id, current_user_id);
 
@@ -171,7 +173,7 @@ begin
     where id = invite_record.id;
   end if;
 
-  -- 6. Return the joined project's data (only id and name are needed by the client)
+  -- 6. Return the joined project's data
   select json_build_object('id', p.id, 'name', p.name) into project_data from public.projects p where id = invite_record.project_id;
   
   if project_data is null then
@@ -182,10 +184,9 @@ begin
 end;
 $$;
 
--- Grant execute permission to authenticated users
 grant execute on function public.accept_project_invite(text) to authenticated;
 
--- END OF SQL SCRIPT 2 --
+-- END OF SCRIPT 2 --
 */
 
 import { supabase } from './supabase';
