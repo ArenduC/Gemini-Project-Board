@@ -280,15 +280,10 @@ const App: React.FC = () => {
                 try {
                     const joinedProject = await api.data.acceptInvite(token);
                     alert(`Successfully joined project: ${joinedProject.name}`);
-                    await fetchData(); 
-
-                    if (window.location.pathname.startsWith('/invite/')) {
-                       // If we were on an invite link, redirect to the new project cleanly
-                       window.location.assign(`/#/projects/${joinedProject.id}`);
-                    } else {
-                       // Otherwise just navigate internally
-                       navigate(`/projects/${joinedProject.id}`);
-                    }
+                    // Force a full page reload to ensure the new project data is fetched correctly.
+                    // This avoids race conditions where the database update from accepting the invite
+                    // hasn't propagated before the app's state is re-fetched.
+                    window.location.assign(`/#/projects/${joinedProject.id}`);
                 } catch (error) {
                     alert(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
                     if (window.location.pathname.startsWith('/invite/')) {
@@ -305,7 +300,7 @@ const App: React.FC = () => {
         };
 
         handleInvite();
-    }, [currentUser, fetchData, navigate]);
+    }, [currentUser]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
