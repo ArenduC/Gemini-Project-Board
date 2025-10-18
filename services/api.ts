@@ -3,22 +3,24 @@
 == DATABASE FUNCTION UPDATE REQUIRED ==
 ================================================================================================
 
-An error may be detected during data fetching if your database schema is out of date.
-This indicates a mismatch between your database schema and the application's expectations.
+An error may be detected during data fetching or when accepting project invites if your 
+database schema is out of date. This indicates a mismatch between your database schema 
+and the application's expectations.
 
-To fix potential application startup errors, please apply the updated database function below.
+To fix potential application startup errors and invite issues, please apply the updated 
+database functions below.
 
 INSTRUCTIONS:
 1. Go to your Supabase project dashboard.
 2. Navigate to the "SQL Editor".
 3. Click "New query".
-4. Copy the ENTIRE SQL script below (from this comment block).
-5. Paste it into the SQL Editor.
-6. Click "RUN".
+4. Copy ONE ENTIRE SQL script below (e.g., the `get_initial_data_for_user` function).
+5. Paste it into the SQL Editor and click "RUN".
+6. Repeat for the `accept_project_invite` function.
 
-This update will allow the application to load correctly.
+This will ensure your backend functions are up-to-date with the application code.
 
--- START OF SQL SCRIPT --
+-- START OF SQL SCRIPT 1: get_initial_data_for_user --
 
 create or replace function get_initial_data_for_user(user_id_param uuid)
 returns json
@@ -109,7 +111,81 @@ $$;
 grant execute on function public.get_initial_data_for_user(uuid) to authenticated;
 
 
--- END OF SQL SCRIPT --
+-- END OF SQL SCRIPT 1 --
+
+-- START OF SQL SCRIPT 2: accept_project_invite --
+
+create or replace function accept_project_invite(invite_token text)
+returns json
+language plpgsql
+security definer
+as $$
+declare
+  invite_record public.project_invites;
+  current_user_id uuid := auth.uid();
+  member_count int;
+  project_data json;
+begin
+  -- 1. Find the invite link and lock it for update
+  select * into invite_record from public.project_invites where token = invite_token for update;
+
+  -- 2. Validate the invite
+  if invite_record is null then
+    raise exception 'Invite token is invalid.';
+  end if;
+
+  if not invite_record.is_active then
+    raise exception 'This invite link is no longer active.';
+  end if;
+
+  if invite_record.expires_at is not null and invite_record.expires_at < now() then
+    raise exception 'This invite link has expired.';
+  end if;
+
+  if invite_record.max_uses is not null and invite_record.current_uses >= invite_record.max_uses then
+    raise exception 'This invite link has reached its maximum number of uses.';
+  end if;
+
+  -- 3. Check if user is already a member
+  select count(*) into member_count from public.project_members where project_id = invite_record.project_id and user_id = current_user_id;
+  if member_count > 0 then
+    -- User is already a member. Silently succeed and return project data.
+    select json_build_object('id', p.id, 'name', p.name) into project_data from public.projects p where id = invite_record.project_id;
+    return project_data;
+  end if;
+
+  -- 4. Add the user to the project. The 'role' from the invite is not used here,
+  -- as user roles are global in the current application design.
+  insert into public.project_members (project_id, user_id)
+  values (invite_record.project_id, current_user_id);
+
+  -- 5. Update the invite link usage count
+  update public.project_invites
+  set current_uses = current_uses + 1
+  where id = invite_record.id;
+  
+  -- Optionally, deactivate if max uses is reached.
+  if invite_record.max_uses is not null and (invite_record.current_uses + 1) >= invite_record.max_uses then
+    update public.project_invites
+    set is_active = false
+    where id = invite_record.id;
+  end if;
+
+  -- 6. Return the joined project's data (only id and name are needed by the client)
+  select json_build_object('id', p.id, 'name', p.name) into project_data from public.projects p where id = invite_record.project_id;
+  
+  if project_data is null then
+    raise exception 'Could not find the project associated with this invite.';
+  end if;
+  
+  return project_data;
+end;
+$$;
+
+-- Grant execute permission to authenticated users
+grant execute on function public.accept_project_invite(text) to authenticated;
+
+-- END OF SQL SCRIPT 2 --
 */
 
 import { supabase } from './supabase';
@@ -665,7 +741,7 @@ const updateInviteLink = async (linkId: string, updates: { is_active: boolean })
     return data;
 };
 
-const acceptInvite = async (token: string): Promise<Project> => {
+const acceptInvite = async (token: string): Promise<{ id: string; name: string; }> => {
     const { data, error } = await supabase.rpc('accept_project_invite', { invite_token: token });
     if (error) throw error;
     return data;
