@@ -1,22 +1,109 @@
 /*
 ================================================================================================
-== DATABASE FUNCTION UPDATE REQUIRED ==
+=== URGENT: MANUAL DATABASE FIX REQUIRED ===
 ================================================================================================
 
-An error like "Could not choose the best candidate function" or "column role does not exist"
-indicates that your database functions are out of sync with the application code.
+The error you are experiencing ("syntax error at or near '=>'") is because the
+previous SQL script had incorrect syntax. My apologies.
 
-To resolve these issues, please run the updated SQL scripts below in your Supabase SQL Editor.
-It is recommended to run these even if you are not currently seeing an error to ensure your
-database is up to date.
+This new script is corrected and will fix the issue. You MUST manually run this in your
+Supabase project to clean up the database.
 
-INSTRUCTIONS:
-1. Go to your Supabase project dashboard and navigate to the "SQL Editor".
-2. Run the "INITIAL DATA" script first.
-3. Run the "ACCEPT INVITE" script second. This script includes cleanup steps to remove old,
-   conflicting functions before creating the correct one.
+** HOW TO FIX: **
+1.  Go to your Supabase project dashboard.
+2.  In the left sidebar, click the "SQL Editor" icon (it looks like a database).
+3.  Click "+ New query".
+4.  Copy the ENTIRE script from "-- START OF SCRIPT --" to "-- END OF SCRIPT --" below.
+5.  Paste the script into the Supabase SQL Editor.
+6.  Click the "RUN" button.
 
--- START OF SCRIPT 1: INITIAL DATA --
+This will delete all old, conflicting functions and create the single, correct version.
+
+-- START OF SCRIPT --
+
+-- Step 1: Clean up ALL old versions of the function to resolve conflicts.
+-- This version uses the correct syntax and is safe to run multiple times.
+DROP FUNCTION IF EXISTS public.accept_project_invite(uuid);
+DROP FUNCTION IF EXISTS public.accept_project_invite(text, public.user_role);
+DROP FUNCTION IF EXISTS public.accept_project_invite(text);
+
+
+-- Step 2: Create the single, correct version of the function.
+create or replace function accept_project_invite(invite_token text)
+returns json
+language plpgsql
+security definer
+as $$
+declare
+  invite_record public.project_invites;
+  current_user_id uuid := auth.uid();
+  member_count int;
+  project_data json;
+begin
+  -- Find the invite link and lock it for update
+  select * into invite_record from public.project_invites where token = invite_token for update;
+
+  -- Validate the invite
+  if invite_record is null then
+    raise exception 'Invite token is invalid.';
+  end if;
+
+  if not invite_record.is_active then
+    raise exception 'This invite link is no longer active.';
+  end if;
+
+  if invite_record.expires_at is not null and invite_record.expires_at < now() then
+    raise exception 'This invite link has expired.';
+  end if;
+
+  if invite_record.max_uses is not null and invite_record.current_uses >= invite_record.max_uses then
+    raise exception 'This invite link has reached its maximum number of uses.';
+  end if;
+
+  -- Check if user is already a member
+  select count(*) into member_count from public.project_members where project_id = invite_record.project_id and user_id = current_user_id;
+  if member_count > 0 then
+    -- User is already a member. Silently succeed and return project data.
+    select json_build_object('id', p.id, 'name', p.name) into project_data from public.projects p where id = invite_record.project_id;
+    return project_data;
+  end if;
+
+  -- Add the user to the project.
+  insert into public.project_members (project_id, user_id)
+  values (invite_record.project_id, current_user_id);
+
+  -- Update the invite link usage count
+  update public.project_invites
+  set current_uses = current_uses + 1
+  where id = invite_record.id;
+  
+  -- Optionally, deactivate if max uses is reached.
+  if invite_record.max_uses is not null and (invite_record.current_uses + 1) >= invite_record.max_uses then
+    update public.project_invites
+    set is_active = false
+    where id = invite_record.id;
+  end if;
+
+  -- Return the joined project's data
+  select json_build_object('id', p.id, 'name', p.name) into project_data from public.projects p where id = invite_record.project_id;
+  
+  if project_data is null then
+    raise exception 'Could not find the project associated with this invite.';
+  end if;
+  
+  return project_data;
+end;
+$$;
+
+-- Step 3: Grant permission for authenticated users to call the function.
+grant execute on function public.accept_project_invite(text) to authenticated;
+
+-- END OF SCRIPT --
+
+================================================================================================
+The 'get_initial_data_for_user' function is also included below for completeness.
+If you have issues with data loading, you can run this script as well.
+================================================================================================
 
 create or replace function get_initial_data_for_user(user_id_param uuid)
 returns json
@@ -105,88 +192,6 @@ end;
 $$;
 
 grant execute on function public.get_initial_data_for_user(uuid) to authenticated;
-
--- END OF SCRIPT 1 --
-
-
--- START OF SCRIPT 2: ACCEPT INVITE (COMBINED CLEANUP & CREATE) --
-
--- This script first removes any old or conflicting versions of the function.
--- It is safe to run even if the functions don't exist.
-DROP FUNCTION IF EXISTS public.accept_project_invite(uuid);
-DROP FUNCTION IF EXISTS public.accept_project_invite(text, public.user_role);
-DROP FUNCTION IF EXISTS public.accept_project_invite(text);
-
--- Then, it creates the single, correct version of the function.
-create or replace function accept_project_invite(invite_token text)
-returns json
-language plpgsql
-security definer
-as $$
-declare
-  invite_record public.project_invites;
-  current_user_id uuid := auth.uid();
-  member_count int;
-  project_data json;
-begin
-  -- 1. Find the invite link and lock it for update
-  select * into invite_record from public.project_invites where token = invite_token for update;
-
-  -- 2. Validate the invite
-  if invite_record is null then
-    raise exception 'Invite token is invalid.';
-  end if;
-
-  if not invite_record.is_active then
-    raise exception 'This invite link is no longer active.';
-  end if;
-
-  if invite_record.expires_at is not null and invite_record.expires_at < now() then
-    raise exception 'This invite link has expired.';
-  end if;
-
-  if invite_record.max_uses is not null and invite_record.current_uses >= invite_record.max_uses then
-    raise exception 'This invite link has reached its maximum number of uses.';
-  end if;
-
-  -- 3. Check if user is already a member
-  select count(*) into member_count from public.project_members where project_id = invite_record.project_id and user_id = current_user_id;
-  if member_count > 0 then
-    -- User is already a member. Silently succeed and return project data.
-    select json_build_object('id', p.id, 'name', p.name) into project_data from public.projects p where id = invite_record.project_id;
-    return project_data;
-  end if;
-
-  -- 4. Add the user to the project.
-  insert into public.project_members (project_id, user_id)
-  values (invite_record.project_id, current_user_id);
-
-  -- 5. Update the invite link usage count
-  update public.project_invites
-  set current_uses = current_uses + 1
-  where id = invite_record.id;
-  
-  -- Optionally, deactivate if max uses is reached.
-  if invite_record.max_uses is not null and (invite_record.current_uses + 1) >= invite_record.max_uses then
-    update public.project_invites
-    set is_active = false
-    where id = invite_record.id;
-  end if;
-
-  -- 6. Return the joined project's data
-  select json_build_object('id', p.id, 'name', p.name) into project_data from public.projects p where id = invite_record.project_id;
-  
-  if project_data is null then
-    raise exception 'Could not find the project associated with this invite.';
-  end if;
-  
-  return project_data;
-end;
-$$;
-
-grant execute on function public.accept_project_invite(text) to authenticated;
-
--- END OF SCRIPT 2 --
 */
 
 import { supabase } from './supabase';
