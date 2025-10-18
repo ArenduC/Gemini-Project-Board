@@ -3,32 +3,33 @@
 === URGENT: MANUAL DATABASE FIX REQUIRED ===
 ================================================================================================
 
-The error you are experiencing ("syntax error at or near '=>'") is because the
-previous SQL script had incorrect syntax. My apologies.
+The new error you're seeing ("operator does not exist: uuid = text") is the final piece
+of the puzzle. It means the database is trying to compare the invite token (text) with
+the token column in the database (which is a UUID type).
 
-This new script is corrected and will fix the issue. You MUST manually run this in your
-Supabase project to clean up the database.
+This new script fixes that by adding a type cast. This should be the final fix needed.
 
 ** HOW TO FIX: **
 1.  Go to your Supabase project dashboard.
-2.  In the left sidebar, click the "SQL Editor" icon (it looks like a database).
+2.  In the left sidebar, click the "SQL Editor" icon.
 3.  Click "+ New query".
 4.  Copy the ENTIRE script from "-- START OF SCRIPT --" to "-- END OF SCRIPT --" below.
-5.  Paste the script into the Supabase SQL Editor.
-6.  Click the "RUN" button.
+5.  Paste it into the editor and click "RUN".
 
-This will delete all old, conflicting functions and create the single, correct version.
+This will replace the function with the corrected version.
 
 -- START OF SCRIPT --
 
 -- Step 1: Clean up ALL old versions of the function to resolve conflicts.
--- This version uses the correct syntax and is safe to run multiple times.
+-- This is safe to run multiple times.
 DROP FUNCTION IF EXISTS public.accept_project_invite(uuid);
 DROP FUNCTION IF EXISTS public.accept_project_invite(text, public.user_role);
 DROP FUNCTION IF EXISTS public.accept_project_invite(text);
 
 
 -- Step 2: Create the single, correct version of the function.
+-- FIX: This version casts the text invite_token to a UUID to match the 'token' column type,
+-- resolving the "operator does not exist: uuid = text" error.
 create or replace function accept_project_invite(invite_token text)
 returns json
 language plpgsql
@@ -40,8 +41,8 @@ declare
   member_count int;
   project_data json;
 begin
-  -- Find the invite link and lock it for update
-  select * into invite_record from public.project_invites where token = invite_token for update;
+  -- Find the invite link and lock it for update. Cast the input token to UUID.
+  select * into invite_record from public.project_invites where token = invite_token::uuid for update;
 
   -- Validate the invite
   if invite_record is null then
