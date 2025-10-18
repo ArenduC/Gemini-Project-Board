@@ -70,11 +70,11 @@ const App: React.FC = () => {
 
 
   // Navigation function using hash
-  const navigate = (path: string) => {
+  const navigate = useCallback((path: string) => {
       // Ensure path starts with a slash
       const safePath = path.startsWith('/') ? path : `/${path}`;
       window.location.hash = safePath;
-  };
+  }, []);
 
   // Derive view and active project ID from the URL hash
   const { view, activeProjectId } = useMemo(() => {

@@ -353,10 +353,11 @@ const updateTask = async (updatedTask: Task, actorId: string) => {
         .eq('id', updatedTask.id)
         .single();
 
+    const historyItems: { task_id: string; user_id: string; change_description: string; }[] = [];
+
     if (fetchError) {
         console.warn("Error fetching old task for history logging:", fetchError.message || fetchError);
     } else {
-        const historyItems: { task_id: string; user_id: string; change_description: string; }[] = [];
         if (oldTaskData.title !== updatedTask.title) {
             historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `changed the title to "${updatedTask.title}"` });
         }
@@ -377,12 +378,33 @@ const updateTask = async (updatedTask: Task, actorId: string) => {
             const dateDescription = updatedTask.dueDate ? `set the due date to ${new Date(updatedTask.dueDate).toLocaleDateString()}` : 'removed the due date';
             historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: dateDescription });
         }
+        
+        // History for tags
+        const { data: oldTagData, error: tagFetchError } = await supabase
+            .from('task_tags')
+            .select('tags!inner(name)')
+            .eq('task_id', updatedTask.id);
 
-        if (historyItems.length > 0) {
-            const { error: historyError } = await supabase.from('task_history').insert(historyItems);
-            if (historyError) {
-                console.warn("Could not log task update history:", historyError.message);
+        if (!tagFetchError && oldTagData) {
+            const oldTags: string[] = oldTagData.map((item: any) => item.tags.name);
+            const newTags = updatedTask.tags || [];
+
+            const tagsAdded = newTags.filter(t => !oldTags.includes(t));
+            const tagsRemoved = oldTags.filter(t => !newTags.includes(t));
+
+            if (tagsAdded.length > 0) {
+                historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `added tags: ${tagsAdded.join(', ')}` });
             }
+            if (tagsRemoved.length > 0) {
+                historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `removed tags: ${tagsRemoved.join(', ')}` });
+            }
+        }
+    }
+
+    if (historyItems.length > 0) {
+        const { error: historyError } = await supabase.from('task_history').insert(historyItems);
+        if (historyError) {
+            console.warn("Could not log task update history:", historyError.message);
         }
     }
     
@@ -402,6 +424,38 @@ const updateTask = async (updatedTask: Task, actorId: string) => {
         console.error("Error updating task:", taskUpdateError);
         throw taskUpdateError;
     }
+
+    // --- TAGS UPDATE LOGIC ---
+    const tagNames = updatedTask.tags || [];
+
+    // Delete existing associations first.
+    const { error: deleteError } = await supabase.from('task_tags').delete().eq('task_id', updatedTask.id);
+    if (deleteError) throw deleteError;
+
+    if (tagNames.length > 0) {
+        // Upsert tags to ensure they exist and get their IDs.
+        const { data: upsertedTagsData, error: upsertTagsError } = await supabase.from('tags').upsert(
+            tagNames.map(name => ({ name })),
+            { onConflict: 'name' }
+        ).select('id, name');
+
+        if (upsertTagsError) throw upsertTagsError;
+        if (!upsertedTagsData) throw new Error("Could not upsert tags.");
+
+        const tagIdMap = new Map(upsertedTagsData.map(t => [t.name, t.id]));
+
+        // Create new associations
+        const newAssociations = tagNames.map(name => ({
+            task_id: updatedTask.id,
+            tag_id: tagIdMap.get(name)
+        })).filter(assoc => assoc.tag_id);
+
+        if (newAssociations.length > 0) {
+            const { error: insertError } = await supabase.from('task_tags').insert(newAssociations);
+            if (insertError) throw insertError;
+        }
+    }
+    // --- END TAGS UPDATE LOGIC ---
 
     // Update subtasks
     if (updatedTask.subtasks) {
@@ -581,7 +635,7 @@ const deleteBugsBatch = async (bugIds: string[]) => {
 
 const getInviteLinksForProject = async (projectId: string): Promise<ProjectInviteLink[]> => {
     const { data, error } = await supabase
-        .from('project_invite_links')
+        .from('project_invites')
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false });
@@ -602,7 +656,7 @@ const createInviteLink = async (projectId: string, creatorId: string, role: User
 
 const updateInviteLink = async (linkId: string, updates: { is_active: boolean }): Promise<ProjectInviteLink> => {
     const { data, error } = await supabase
-        .from('project_invite_links')
+        .from('project_invites')
         .update(updates)
         .eq('id', linkId)
         .select()
