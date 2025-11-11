@@ -924,9 +924,9 @@ const acceptInvite = async (token: string): Promise<{ id: string; name: string; 
     // The `data` from the `rpc` call can be a stringified JSON.
     // The `typeof` check correctly narrows `data` to `string` so `JSON.parse` can be called safely.
     if (typeof data === 'string') {
-        // FIX: The type guard `typeof data === 'string'' is sufficient to narrow the type. The previous cast to 'any' was incorrect.
-        // FIX: Casting `data` to string to resolve the type error, as type narrowing seems to fail in the user's environment.
-        return JSON.parse(data as string);
+        // FIX: The type guard `typeof data === 'string'` correctly narrows the type to `string`,
+        // so the explicit cast `as string` is unnecessary and was causing a type error.
+        return JSON.parse(data);
     }
     return data as { id: string, name: string };
 };

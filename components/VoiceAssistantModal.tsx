@@ -107,8 +107,10 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({ isOpen
         };
 
         return () => {
-            recognition.stop();
-            recognitionRef.current = null;
+            if (recognitionRef.current) {
+              recognitionRef.current.stop();
+              recognitionRef.current = null;
+            }
         };
     }, [isOpen, handleCommand]);
     
@@ -121,4 +123,50 @@ export const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({ isOpen
             setStatus('listening');
             try {
                 recognitionRef.current?.start();
-            } catch
+            } catch (error) {
+                console.error("Speech recognition start error:", error);
+                setStatus('error');
+                setFeedback('Could not start listening. Check microphone permissions.');
+            }
+        }
+    };
+
+    return (
+        <div 
+            className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            onClick={onClose}
+        >
+            <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-lg flex flex-col min-h-[400px]" onClick={(e) => e.stopPropagation()}>
+                <header className="p-4 border-b border-gray-800 flex justify-between items-center">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                        <BotMessageSquareIcon className="w-6 h-6" />
+                        Voice Assistant
+                    </h2>
+                    <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800">
+                        <XIcon className="w-6 h-6" />
+                    </button>
+                </header>
+                <div className="p-6 text-center space-y-4 flex-grow flex flex-col justify-center items-center">
+                    <p className="text-lg font-medium text-white h-12">{feedback}</p>
+                    <p className="text-sm text-gray-400 h-6 italic">{transcript}</p>
+                    <button
+                        onClick={toggleListening}
+                        className={`mt-4 w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300
+                            ${status === 'listening' ? 'bg-red-600 animate-pulse' : 'bg-gray-600 hover:bg-gray-500'}
+                            ${status === 'processing' ? 'bg-gray-500 cursor-not-allowed' : ''}
+                        `}
+                        disabled={status === 'processing' || status === 'error'}
+                    >
+                        {status === 'processing' 
+                            ? <LoaderCircleIcon className="w-10 h-10 text-white animate-spin" />
+                            : <MicrophoneIcon className="w-10 h-10 text-white" />
+                        }
+                    </button>
+                </div>
+                <footer className="p-4 text-xs text-center text-gray-500 border-t border-gray-800">
+                    Try saying: "Create a task to deploy the new feature" or "Move task 'Fix Login Bug' to Done".
+                </footer>
+            </div>
+        </div>
+    );
+};
