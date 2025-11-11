@@ -1,5 +1,5 @@
 // IMPORTANT: Replace with your actual Google Gemini API key.
-export const GEMINI_API_KEY: string = "AIzaSyAaCwCfAcVzzeXefRvHTk0EIa3yIjUnp9c";
+export const GEMINI_API_KEY: string = "AIzaSyBivRDxCpQRGOqjPk43ksuPHCByW6MA1Bo";
 
 // FIX: Added explicit string types to prevent TypeScript from inferring literal types, which causes comparison errors.
 export const SUPABASE_URL: string = "https://gusrrfpuzjpgowblvjkl.supabase.co";
