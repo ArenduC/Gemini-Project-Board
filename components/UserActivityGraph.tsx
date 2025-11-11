@@ -56,8 +56,8 @@ export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, 
                     <div className="flex items-center gap-4 mb-4">
                         <UserAvatar user={user} className="w-12 h-12 text-xl" isOnline={onlineUsers.has(user.id)} />
                         <div>
-                            <h3 className="text-lg font-bold text-white">{user.name}</h3>
-                            <p className="text-sm text-gray-400">{user.role}</p>
+                            <h3 className="text-base font-bold text-white">{user.name}</h3>
+                            <p className="text-xs text-gray-400">{user.role}</p>
                         </div>
                     </div>
                     
@@ -94,7 +94,7 @@ export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, 
                                                         <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-800 flex-shrink-0">
                                                             <div className={`w-2.5 h-2.5 rounded-full ${colorInfo.dot}`}></div>
                                                         </div>
-                                                        <p className="flex-grow text-sm text-white">{task.title}</p>
+                                                        <p className="flex-grow text-xs text-white">{task.title}</p>
                                                         <p className={`text-xs font-medium ${colorInfo.text}`}>{statusName}</p>
                                                     </div>
                                                 </li>
@@ -105,7 +105,7 @@ export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, 
                             ))}
                         </ul>
                     ) : (
-                        <div className="pl-6 text-sm text-gray-500">No tasks assigned to this user.</div>
+                        <div className="pl-6 text-xs text-gray-500">No tasks assigned to this user.</div>
                     )}
                 </div>
             ))}

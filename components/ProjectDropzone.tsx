@@ -83,14 +83,14 @@ export const ProjectDropzone: React.FC<ProjectDropzoneProps> = ({ onFileProcesse
                 {isLoading ? (
                      <div className="flex flex-col items-center justify-center text-white">
                         <LoaderCircleIcon className="w-10 h-10 animate-spin mb-3" />
-                        <h3 className="font-semibold text-base">AI is building your project...</h3>
-                        <p className="text-sm text-gray-400">This may take a moment.</p>
+                        <h3 className="font-semibold text-sm">AI is building your project...</h3>
+                        <p className="text-xs text-gray-400">This may take a moment.</p>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center text-gray-400">
                         <FileUpIcon className="w-10 h-10 mb-3"/>
-                        <h3 className="font-semibold text-base text-white">Create Project from CSV</h3>
-                        <p className="text-sm">
+                        <h3 className="font-semibold text-sm text-white">Create Project from CSV</h3>
+                        <p className="text-xs">
                             <span className="font-semibold text-gray-300">Drop a file</span> or click to upload.
                         </p>
                     </div>

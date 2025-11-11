@@ -22,17 +22,17 @@ export const TaskListRow: React.FC<TaskListRowProps> = ({ task, onClick, users }
   return (
     <div
       onClick={() => onClick(task)}
-      className="grid grid-cols-12 gap-4 items-center bg-[#131C1B] px-4 py-3 border-b border-gray-800 cursor-pointer hover:bg-gray-800 transition-colors duration-200 text-sm"
+      className="grid grid-cols-12 gap-4 items-center bg-[#131C1B] px-4 py-3 border-b border-gray-800 cursor-pointer hover:bg-gray-800 transition-colors duration-200 text-xs"
     >
       <div className="col-span-4 font-semibold text-white">{title}</div>
       <div className="col-span-2 text-gray-400">{projectName}</div>
       <div className="col-span-2">
-        <div className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${priorityStyles[priority]}`}>
+        <div className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full ${priorityStyles[priority]}`}>
             {priority}
         </div>
       </div>
       <div className="col-span-2">
-        <span className="text-xs font-medium bg-gray-800 text-gray-400 px-2 py-1 rounded-full">
+        <span className="text-[11px] font-medium bg-gray-800 text-gray-400 px-2 py-1 rounded-full">
             {columnName}
         </span>
       </div>

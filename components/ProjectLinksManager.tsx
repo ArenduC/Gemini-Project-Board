@@ -2,6 +2,7 @@ import React, { useState, FormEvent, ReactNode } from 'react';
 import { Project } from '../types';
 import { generateProjectLinks } from '../services/geminiService';
 import { LinkIcon, GitHubIcon, FigmaIcon, PlusIcon, TrashIcon, SparklesIcon, LoaderCircleIcon, CopyIcon, CheckIcon } from './Icons';
+import { useConfirmation } from '../App';
 
 interface ProjectLinksManagerProps {
   project: Project;
@@ -27,6 +28,7 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
     const [isGenerating, setIsGenerating] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null);
+    const requestConfirmation = useConfirmation();
 
     const handleAddSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -38,7 +40,8 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
             setUrl('');
         } catch (error) {
             console.error("Failed to add link:", error);
-            alert("Could not add link. Please try again.");
+            // Can't use alert, will log to console
+            console.error("Could not add link. Please try again.");
         } finally {
             setIsAdding(false);
         }
@@ -53,7 +56,7 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
             }
         } catch (error) {
             console.error("Failed to generate links with AI:", error);
-            alert("Could not generate links. Please try again.");
+            console.error("Could not generate links. Please try again.");
         } finally {
             setIsGenerating(false);
         }
@@ -64,11 +67,24 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
         setCopiedLinkId(linkId);
         setTimeout(() => setCopiedLinkId(null), 2000);
     };
+    
+    const handleDelete = (linkId: string, linkTitle: string) => {
+      requestConfirmation({
+        title: 'Delete Link',
+        message: (
+          <>
+            Are you sure you want to delete the link <strong>"{linkTitle}"</strong>?
+          </>
+        ),
+        onConfirm: () => onDeleteLink(linkId),
+        confirmText: 'Delete',
+      });
+    };
 
     return (
         <div className="bg-[#131C1B]/50 border border-gray-800 rounded-xl">
             <button onClick={() => setIsOpen(!isOpen)} className="w-full p-4 flex justify-between items-center">
-                <h3 className="font-semibold text-base text-white">Project Links</h3>
+                <h3 className="font-semibold text-sm text-white">Project Links</h3>
                 <span className="text-gray-400 transform transition-transform duration-200">{isOpen ? 'Hide' : 'Show'}</span>
             </button>
             {isOpen && (
@@ -79,7 +95,7 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
                                 <div key={link.id} className="group flex items-center gap-3 p-2 rounded-md hover:bg-gray-800/50">
                                     {getLinkIcon(link.url)}
                                     <div className="flex-grow">
-                                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="font-medium text-sm text-white hover:underline">{link.title}</a>
+                                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="font-medium text-xs text-white hover:underline">{link.title}</a>
                                         <p className="text-xs text-gray-500 truncate">{link.url}</p>
                                     </div>
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -91,7 +107,7 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
                                             {copiedLinkId === link.id ? <CheckIcon className="w-4 h-4 text-green-500" /> : <CopyIcon className="w-4 h-4" />}
                                         </button>
                                         <button
-                                            onClick={() => onDeleteLink(link.id)}
+                                            onClick={() => handleDelete(link.id, link.title)}
                                             className="p-1.5 rounded-full text-gray-400 hover:bg-red-900/50 hover:text-red-400"
                                             aria-label="Delete link"
                                         >
@@ -102,7 +118,7 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
                             ))}
                         </div>
                     ) : (
-                        <p className="text-sm text-gray-500 text-center py-2">No links added yet.</p>
+                        <p className="text-xs text-gray-500 text-center py-2">No links added yet.</p>
                     )}
 
                     <div className="pt-4 border-t border-gray-800/50 space-y-3">
@@ -112,7 +128,7 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
                                 <input
                                     type="text" value={title} onChange={e => setTitle(e.target.value)}
                                     placeholder="e.g. GitHub Repo"
-                                    className="w-full mt-1 px-3 py-1.5 border border-gray-700 rounded-md bg-[#1C2326] text-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                    className="w-full mt-1 px-3 py-1.5 border border-gray-700 rounded-md bg-[#1C2326] text-white text-xs focus:outline-none focus:ring-2 focus:ring-gray-500"
                                     required
                                 />
                             </div>
@@ -121,11 +137,11 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
                                 <input
                                     type="url" value={url} onChange={e => setUrl(e.target.value)}
                                     placeholder="https://..."
-                                    className="w-full mt-1 px-3 py-1.5 border border-gray-700 rounded-md bg-[#1C2326] text-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                    className="w-full mt-1 px-3 py-1.5 border border-gray-700 rounded-md bg-[#1C2326] text-white text-xs focus:outline-none focus:ring-2 focus:ring-gray-500"
                                     required
                                 />
                             </div>
-                            <button type="submit" disabled={isAdding} className="flex-shrink-0 w-full sm:w-auto px-3 py-1.5 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 disabled:opacity-50 flex items-center justify-center gap-2">
+                            <button type="submit" disabled={isAdding} className="flex-shrink-0 w-full sm:w-auto px-3 py-1.5 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 disabled:opacity-50 flex items-center justify-center gap-2 text-xs">
                                 {isAdding ? <LoaderCircleIcon className="w-5 h-5 animate-spin"/> : <PlusIcon className="w-4 h-4"/>}
                                 Add Link
                             </button>
@@ -133,7 +149,7 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
                          <button
                             onClick={handleAiGenerate}
                             disabled={isGenerating}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-600/50 border border-gray-700 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 transition-all text-sm"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-600/50 border border-gray-700 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 transition-all text-xs"
                         >
                             {isGenerating ? (
                                 <>

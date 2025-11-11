@@ -55,7 +55,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   const pageNumbers = generatePageNumbers(currentPage, totalPages);
 
   return (
-    <div className="flex items-center justify-between mt-4 text-sm">
+    <div className="flex items-center justify-between mt-4 text-xs">
       <div className="text-gray-400">
         Showing <span className="font-semibold text-white">{startItem}</span> to <span className="font-semibold text-white">{endItem}</span> of <span className="font-semibold text-white">{totalItems}</span> results
       </div>

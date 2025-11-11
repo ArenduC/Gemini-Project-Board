@@ -58,7 +58,7 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
   return (
     <div>
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-            <h2 className="text-2xl font-bold text-white">Team Activity</h2>
+            <h2 className="text-xl font-bold text-white">Team Activity</h2>
              <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
                 <button
                     onClick={() => setView('table')}
@@ -95,7 +95,7 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                         </thead>
                         <tbody className="divide-y divide-gray-800">
                             {paginatedUsers.map(user => (
-                                <tr key={user.id} className="text-sm text-white">
+                                <tr key={user.id} className="text-xs text-white">
                                     <td className="px-4 py-3 flex items-center gap-3">
                                         <UserAvatar user={user} className="w-8 h-8" isOnline={onlineUsers.has(user.id)} />
                                         <span className="font-medium">{user.name}</span>
@@ -106,7 +106,7 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                                         </span>
                                     </td>
                                     <td className="px-4 py-3">
-                                        <span className="text-base font-semibold">{userWorkload[user.id]?.assignedTasks || 0}</span>
+                                        <span className="text-sm font-semibold">{userWorkload[user.id]?.assignedTasks || 0}</span>
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex flex-wrap gap-2">

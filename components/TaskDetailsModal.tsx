@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useCallback, FormEvent, useMemo, useRef } from 'react';
-import { Task, Subtask, User, TaskPriority } from '../types';
+import { Task, Subtask, User, TaskPriority, Sprint } from '../types';
 import { generateSubtasks as generateSubtasksFromApi } from '../services/geminiService';
 import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon, TrashIcon, HistoryIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
+import { useConfirmation } from '../App';
 
 interface TaskDetailsModalProps {
   task: Task;
   currentUser: User;
   users: User[];
   projectMembers: User[];
+  allProjectTags: string[];
+  sprints: Sprint[];
   onlineUsers: Set<string>;
   onClose: () => void;
   onUpdateTask: (task: Task) => Promise<void>;
-  onAddSubtasks: (taskId: string, subtasks: { title: string }[]) => Promise<void>;
+  onAddSubtasks: (taskId: string, subtasks: Partial<Subtask>[]) => Promise<void>;
   onAddComment: (taskId: string, commentText: string) => Promise<void>;
 }
 
@@ -159,19 +162,74 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
     }, [task.comments, task.history]);
 
     const renderWithMentions = (text: string) => {
-        const userNames = users.map(u => u.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|');
-        if (!userNames) return text; 
-    
-        const mentionRegex = new RegExp(`@(${userNames})\\b`, 'g');
-        const parts = text.split(mentionRegex);
-    
-        return parts.map((part, index) => {
-            const isMention = index % 2 === 1;
-            if (isMention) {
-                return <strong key={index} className="bg-gray-500/30 text-white font-semibold rounded px-1 py-0.5">@{part}</strong>;
+        const escapeRegex = (str: string) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        
+        const userNames = users.map(u => escapeRegex(u.name)).join('|');
+        
+        const regexParts = [];
+        // Capture group for users if users exist
+        if (userNames) {
+            // Group 1: full mention (@User), Group 2: user name (User)
+            regexParts.push(`(@(${userNames})\\b)`);
+        }
+        // Capture group for URLs
+        // Group 3 if users exist, Group 1 if not
+        regexParts.push(`(https?:\\/\\/\\S+)`);
+        
+        const combinedRegex = new RegExp(regexParts.join('|'), 'g');
+        
+        const elements: React.ReactNode[] = [];
+        let lastIndex = 0;
+        let match;
+
+        while ((match = combinedRegex.exec(text)) !== null) {
+            // Determine which part matched by checking capture groups
+            let userName, url;
+            if (userNames) {
+                userName = match[2];
+                url = match[3];
+            } else {
+                url = match[1];
             }
-            return part;
-        });
+
+            const fullMatch = match[0];
+            const matchIndex = match.index;
+            
+            // Push the text before the match
+            if (matchIndex > lastIndex) {
+                elements.push(text.substring(lastIndex, matchIndex));
+            }
+            
+            if (userName) {
+                elements.push(
+                    <strong key={matchIndex} className="bg-gray-500/30 text-white font-semibold rounded px-1 py-0.5">
+                        @{userName}
+                    </strong>
+                );
+            } else if (url) {
+                elements.push(
+                    <a 
+                        key={matchIndex} 
+                        href={url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:underline"
+                        onClick={(e) => e.stopPropagation()} // Prevent modal from closing if the link is clicked
+                    >
+                        {url}
+                    </a>
+                );
+            }
+
+            lastIndex = matchIndex + fullMatch.length;
+        }
+        
+        // Push any remaining text after the last match
+        if (lastIndex < text.length) {
+            elements.push(text.substring(lastIndex));
+        }
+
+        return <>{elements.length > 0 ? elements : text}</>;
     };
 
     return (
@@ -254,12 +312,17 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
 }
 
 
-export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, currentUser, users, projectMembers, onlineUsers, onClose, onUpdateTask, onAddSubtasks, onAddComment }) => {
+export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, currentUser, users, projectMembers, allProjectTags, sprints, onlineUsers, onClose, onUpdateTask, onAddSubtasks, onAddComment }) => {
   const [editedTask, setEditedTask] = useState<Task>(task);
   const [aiState, setAiState] = useState<AIGenerationState>('idle');
   const [aiError, setAiError] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [newSubtaskAssigneeId, setNewSubtaskAssigneeId] = useState('');
   const [newTag, setNewTag] = useState('');
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  const [isTagInputFocused, setIsTagInputFocused] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+  const requestConfirmation = useConfirmation();
 
   const taskCreator = users.find(u => u.id === task.creatorId);
 
@@ -295,6 +358,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
     const priority = e.target.value as TaskPriority;
     handleUpdateField('priority', priority);
   };
+  
+  const handleSprintChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const sprintId = e.target.value;
+    handleUpdateField('sprintId', sprintId || null);
+  };
 
   const handleSubtaskToggle = (subtaskId: string) => {
     const updatedSubtasks = editedTask.subtasks.map(subtask => 
@@ -303,6 +371,13 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
     handleUpdateField('subtasks', updatedSubtasks);
   };
   
+  const handleSubtaskTitleChange = (subtaskId: string, newTitle: string) => {
+    const updatedSubtasks = editedTask.subtasks.map(subtask => 
+      subtask.id === subtaskId ? { ...subtask, title: newTitle } : subtask
+    );
+    handleUpdateField('subtasks', updatedSubtasks);
+  };
+
   const handleGenerateSubtasks = useCallback(async () => {
     setAiState('loading');
     setAiError(null);
@@ -322,17 +397,77 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
   const handleAddManualSubtask = async (e: FormEvent) => {
     e.preventDefault();
     if (newSubtaskTitle.trim()) {
-        await onAddSubtasks(editedTask.id, [{ title: newSubtaskTitle.trim() }]);
+        const newSubtask: Partial<Subtask> = { 
+          title: newSubtaskTitle.trim(),
+          assigneeId: newSubtaskAssigneeId || undefined,
+        };
+        await onAddSubtasks(editedTask.id, [newSubtask]);
         setNewSubtaskTitle('');
+        setNewSubtaskAssigneeId('');
     }
   }
 
-  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && newTag.trim()) {
-        e.preventDefault();
-        const newTags = [...new Set([...editedTask.tags, newTag.trim()])];
+  const handleSubtaskAssigneeChange = (subtaskId: string, assigneeId: string) => {
+    const newAssignee = projectMembers.find(u => u.id === assigneeId);
+
+    const updatedSubtasks = editedTask.subtasks.map(subtask => {
+        if (subtask.id === subtaskId) {
+            return { 
+                ...subtask, 
+                assigneeId: newAssignee ? newAssignee.id : undefined,
+                assignee: newAssignee || undefined,
+            };
+        }
+        return subtask;
+    });
+
+    handleUpdateField('subtasks', updatedSubtasks);
+  };
+
+  const handleNewTagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewTag(value);
+    if (value) {
+        const filtered = allProjectTags.filter(
+            tag => tag.toLowerCase().includes(value.toLowerCase()) && !editedTask.tags.includes(tag)
+        );
+        setTagSuggestions(filtered);
+        setActiveSuggestionIndex(0);
+    } else {
+        setTagSuggestions([]);
+    }
+  };
+
+  const addTag = (tagToAdd: string) => {
+    if (tagToAdd && !editedTask.tags.includes(tagToAdd)) {
+        const newTags = [...new Set([...editedTask.tags, tagToAdd.trim()])];
         handleUpdateField('tags', newTags);
         setNewTag('');
+        setTagSuggestions([]);
+    }
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (isTagInputFocused && tagSuggestions.length > 0) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActiveSuggestionIndex(prev => (prev + 1) % tagSuggestions.length);
+            return;
+        }
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveSuggestionIndex(prev => (prev - 1 + tagSuggestions.length) % tagSuggestions.length);
+            return;
+        }
+    }
+
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        let tagToAdd = newTag.trim();
+        if (isTagInputFocused && tagSuggestions.length > 0 && tagSuggestions[activeSuggestionIndex]) {
+            tagToAdd = tagSuggestions[activeSuggestionIndex];
+        }
+        addTag(tagToAdd);
     }
   };
 
@@ -342,8 +477,22 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
   };
 
   const handleDeleteSubtask = (subtaskId: string) => {
-    const updatedSubtasks = editedTask.subtasks.filter(subtask => subtask.id !== subtaskId);
-    handleUpdateField('subtasks', updatedSubtasks);
+    const subtaskToDelete = editedTask.subtasks.find(s => s.id === subtaskId);
+    if (subtaskToDelete) {
+      requestConfirmation({
+        title: 'Delete Subtask',
+        message: (
+          <>
+            Are you sure you want to delete the subtask <strong>"{subtaskToDelete.title}"</strong>?
+          </>
+        ),
+        onConfirm: () => {
+          const updatedSubtasks = editedTask.subtasks.filter(subtask => subtask.id !== subtaskId);
+          handleUpdateField('subtasks', updatedSubtasks);
+        },
+        confirmText: 'Delete',
+      });
+    }
   };
 
   const completedSubtasks = editedTask.subtasks.filter(st => st.completed).length;
@@ -390,8 +539,8 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                 placeholder="Add a more detailed description..."
             />
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <div className="sm:col-span-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
                     <label htmlFor="modal-assignee" className="block text-sm font-medium text-white mb-1">Assignee</label>
                     <select
                       id="modal-assignee"
@@ -403,7 +552,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                       {projectMembers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
                 </div>
-                <div className="sm:col-span-1">
+                <div>
                     <label htmlFor="modal-priority" className="block text-sm font-medium text-white mb-1">Priority</label>
                     <select
                       id="modal-priority"
@@ -414,7 +563,19 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                       {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                 </div>
-                <div className="sm:col-span-1">
+                 <div>
+                    <label htmlFor="modal-sprint" className="block text-sm font-medium text-white mb-1">Sprint</label>
+                    <select
+                      id="modal-sprint"
+                      value={editedTask.sprintId || ''}
+                      onChange={handleSprintChange}
+                      className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
+                    >
+                      <option value="">No Sprint</option>
+                      {(sprints || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                </div>
+                <div>
                     <label className="block text-sm font-medium text-white mb-1">Due Date</label>
                     <EditableField
                         value={editedTask.dueDate || ''}
@@ -429,23 +590,43 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
 
              <div>
                 <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white"><TagIcon className="w-5 h-5" /> Tags</h3>
-                <div className="flex flex-wrap gap-2 items-center">
-                    {editedTask.tags.map(tag => (
-                        <span key={tag} className="flex items-center gap-1.5 text-xs font-medium bg-gray-800 text-gray-400 px-2.5 py-1 rounded-full">
-                            {tag}
-                            <button onClick={() => handleRemoveTag(tag)} className="text-gray-400 hover:text-white">
-                                <XIcon className="w-3 h-3"/>
-                            </button>
-                        </span>
-                    ))}
-                     <input 
-                        type="text"
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        onKeyDown={handleAddTag}
-                        placeholder="Add tag..."
-                        className="flex-grow px-2 py-1 text-sm border-b-2 border-transparent focus:border-gray-500 bg-transparent focus:outline-none text-white"
-                    />
+                <div className="relative">
+                    <div className="flex flex-wrap gap-2 items-center">
+                        {editedTask.tags.map(tag => (
+                            <span key={tag} className="flex items-center gap-1.5 text-xs font-medium bg-gray-800 text-gray-400 px-2.5 py-1 rounded-full">
+                                {tag}
+                                <button onClick={() => handleRemoveTag(tag)} className="text-gray-400 hover:text-white">
+                                    <XIcon className="w-3 h-3"/>
+                                </button>
+                            </span>
+                        ))}
+                         <input 
+                            type="text"
+                            value={newTag}
+                            onChange={handleNewTagChange}
+                            onKeyDown={handleTagInputKeyDown}
+                            onFocus={() => setIsTagInputFocused(true)}
+                            onBlur={() => setTimeout(() => setIsTagInputFocused(false), 150)} // Delay to allow click on suggestion
+                            placeholder="Add tag..."
+                            className="flex-grow px-2 py-1 text-sm border-b-2 border-transparent focus:border-gray-500 bg-transparent focus:outline-none text-white"
+                        />
+                    </div>
+                     {isTagInputFocused && tagSuggestions.length > 0 && (
+                      <div className="absolute z-10 w-full bg-[#1C2326] border border-gray-700 rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto custom-scrollbar">
+                          <ul>
+                              {tagSuggestions.map((tag, index) => (
+                                  <li 
+                                      key={tag}
+                                      onClick={() => addTag(tag)}
+                                      onMouseEnter={() => setActiveSuggestionIndex(index)}
+                                      className={`px-3 py-2 cursor-pointer text-sm text-white ${index === activeSuggestionIndex ? 'bg-gray-700' : 'hover:bg-gray-800/50'}`}
+                                  >
+                                      {tag}
+                                  </li>
+                              ))}
+                          </ul>
+                      </div>
+                    )}
                 </div>
             </div>
           
@@ -474,22 +655,46 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                             onChange={() => handleSubtaskToggle(subtask.id)}
                             className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500 flex-shrink-0"
                         />
-                        <label htmlFor={subtask.id} className={`flex-grow text-sm ${subtask.completed ? 'line-through text-gray-500' : 'text-white'}`}>
-                            {subtask.title}
-                        </label>
-                        <UserAvatar 
-                          user={subtaskCreator} 
-                          className="w-6 h-6 text-xs flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" 
-                          title={`Added by ${subtaskCreator?.name || 'Unknown'}`}
-                          isOnline={subtaskCreator ? onlineUsers.has(subtaskCreator.id) : false}
-                        />
-                        <button 
-                            onClick={() => handleDeleteSubtask(subtask.id)}
-                            className="ml-auto p-1 rounded-full text-gray-400 hover:bg-red-900/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                            aria-label="Delete subtask"
-                        >
-                            <TrashIcon className="w-4 h-4" />
-                        </button>
+                        <div className="flex-grow">
+                             <EditableField
+                                value={subtask.title}
+                                onSave={(newTitle) => handleSubtaskTitleChange(subtask.id, newTitle)}
+                                textClassName={`text-sm ${subtask.completed ? 'line-through text-gray-500' : 'text-white'} w-full cursor-pointer hover:bg-gray-800/50 rounded p-1 -m-1`}
+                                inputClassName="text-sm p-1 rounded border-2 border-gray-500 bg-gray-800/50 focus:outline-none text-white"
+                                placeholder="Enter a subtask title..."
+                            />
+                        </div>
+                        <div className="ml-auto flex items-center gap-2">
+                            <select
+                                value={subtask.assigneeId || ''}
+                                onChange={(e) => handleSubtaskAssigneeChange(subtask.id, e.target.value)}
+                                className="text-xs bg-gray-700 border border-transparent hover:border-gray-600 text-white rounded py-1 px-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                title="Assign subtask"
+                            >
+                                <option value="" className="bg-gray-800 text-gray-400">Unassigned</option>
+                                {projectMembers.map(u => <option key={u.id} value={u.id} className="bg-gray-800">{u.name}</option>)}
+                            </select>
+                            
+                            <UserAvatar 
+                                user={subtask.assignee}
+                                className="w-6 h-6 text-xs flex-shrink-0" 
+                                isOnline={subtask.assignee ? onlineUsers.has(subtask.assignee.id) : false}
+                            />
+                            
+                            <UserAvatar 
+                                user={subtaskCreator} 
+                                className="w-6 h-6 text-xs flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" 
+                                title={`Added by ${subtaskCreator?.name || 'Unknown'}`}
+                                isOnline={subtaskCreator ? onlineUsers.has(subtaskCreator.id) : false}
+                            />
+                            <button 
+                                onClick={() => handleDeleteSubtask(subtask.id)}
+                                className="p-1 rounded-full text-gray-400 hover:bg-red-900/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                aria-label="Delete subtask"
+                            >
+                                <TrashIcon className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
                 )
               })}
@@ -503,6 +708,14 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                     placeholder="Add a new subtask..."
                     className="flex-grow px-3 py-1.5 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 bg-[#1C2326] text-white text-sm"
                 />
+                <select
+                    value={newSubtaskAssigneeId}
+                    onChange={(e) => setNewSubtaskAssigneeId(e.target.value)}
+                    className="px-3 py-1.5 border border-gray-800 rounded-md bg-[#1C2326] text-white text-sm"
+                >
+                    <option value="">Assign to...</option>
+                    {projectMembers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
                 <button type="submit" className="p-2 bg-gray-600 text-white rounded-md hover:bg-gray-500" aria-label="Add subtask">
                     <PlusIcon className="w-5 h-5"/>
                 </button>

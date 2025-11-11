@@ -93,7 +93,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search tasks, projects, users..."
-                        className="w-full bg-transparent text-base focus:outline-none text-white"
+                        className="w-full bg-transparent text-sm focus:outline-none text-white"
                         autoFocus
                     />
                     <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
@@ -121,8 +121,8 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                     {!isLoading && !error && !debouncedQuery && (
                         <div className="p-10 flex flex-col items-center justify-center text-center text-gray-400">
                             <BotMessageSquareIcon className="w-12 h-12 mb-4"/>
-                             <h3 className="text-lg font-semibold text-white">AI-Powered Global Search</h3>
-                            <p className="max-w-md text-sm">Find anything across your projects. Try searching for a task ID, a project name, or ask a question like "urgent tasks assigned to Alice".</p>
+                             <h3 className="text-base font-semibold text-white">AI-Powered Global Search</h3>
+                            <p className="max-w-md text-xs">Find anything across your projects. Try searching for a task ID, a project name, or ask a question like "urgent tasks assigned to Alice".</p>
                         </div>
                     )}
                     {results && (
@@ -131,7 +131,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                                 <div>
                                     <h3 className="px-3 py-1 text-xs font-semibold uppercase text-gray-400 flex items-center gap-2"><LayoutDashboardIcon className="w-4 h-4" /> Projects</h3>
                                     {results.projects.map(id => projects[id] && (
-                                        <button key={id} onClick={() => onSelectProject(id)} className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-800 text-sm">
+                                        <button key={id} onClick={() => onSelectProject(id)} className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-800 text-xs">
                                             {projects[id].name}
                                         </button>
                                     ))}
@@ -141,7 +141,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                                 <div>
                                     <h3 className="px-3 py-1 text-xs font-semibold uppercase text-gray-400 flex items-center gap-2"><CheckSquareIcon className="w-4 h-4" /> Tasks</h3>
                                     {results.tasks.map(id => allTasks[id] && (
-                                        <button key={id} onClick={() => onSelectTask(allTasks[id])} className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-800 text-sm">
+                                        <button key={id} onClick={() => onSelectTask(allTasks[id])} className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-800 text-xs">
                                             {allTasks[id].title}
                                         </button>
                                     ))}
@@ -151,7 +151,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                                 <div>
                                     <h3 className="px-3 py-1 text-xs font-semibold uppercase text-gray-400 flex items-center gap-2"><UserIcon className="w-4 h-4" /> Users</h3>
                                     {results.users.map(id => users[id] && (
-                                        <div key={id} className="flex items-center gap-3 px-3 py-2 rounded-md text-sm">
+                                        <div key={id} className="flex items-center gap-3 px-3 py-2 rounded-md text-xs">
                                             <UserAvatar user={users[id]} className="w-7 h-7" />
                                             <span>{users[id].name}</span>
                                         </div>

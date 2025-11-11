@@ -67,7 +67,8 @@ const ChatBubble: React.FC<{
                     <strong
                         key={offset}
                         className="bg-purple-800/50 text-purple-300 font-semibold rounded px-1 py-0.5 cursor-pointer hover:underline"
-                        onClick={() => onNavigateToBug(bugNumber)}
+                        // FIX: Add a guard to ensure `bugNumber` is a string before calling `onNavigateToBug`.
+                        onClick={() => bugNumber && onNavigateToBug(bugNumber)}
                     >
                         #{bugNumber}
                     </strong>
@@ -92,7 +93,7 @@ const ChatBubble: React.FC<{
                     <UserAvatar user={message.author} className="w-7 h-7 flex-shrink-0 text-xs" isOnline={isOnline} />
                 )}
                 <div className={`px-4 py-2 rounded-2xl ${bubbleColor}`}>
-                    <p className="text-sm whitespace-pre-wrap">{renderTextWithTags(message.text)}</p>
+                    <p className="text-xs whitespace-pre-wrap">{renderTextWithTags(message.text)}</p>
                 </div>
             </div>
              <div className={`flex gap-2 items-center text-xs text-gray-500 mt-1 ${isCurrentUser ? 'mr-1' : 'ml-9'}`}>
@@ -217,7 +218,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
     return (
         <div className="fixed top-0 right-0 h-full w-full max-w-md bg-[#131C1B] shadow-2xl z-30 flex flex-col transform transition-transform duration-300 ease-in-out">
              <header className="p-4 border-b border-gray-800 flex justify-between items-center flex-shrink-0">
-                <h3 className="text-lg font-bold text-white">Project Chat</h3>
+                <h3 className="text-base font-bold text-white">Project Chat</h3>
                 <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
                     <XIcon className="w-6 h-6" />
                 </button>
@@ -242,7 +243,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
                         <ul>
                             {filteredSuggestions.map((item, index) => (
                                 <li key={item.id} onClick={() => handleSuggestionSelect(item)} onMouseEnter={() => setActiveIndex(index)}
-                                    className={`px-3 py-2 cursor-pointer flex items-center gap-2 text-sm ${index === activeIndex ? 'bg-gray-700' : 'hover:bg-gray-800/50'}`}>
+                                    className={`px-3 py-2 cursor-pointer flex items-center gap-2 text-xs ${index === activeIndex ? 'bg-gray-700' : 'hover:bg-gray-800/50'}`}>
                                     {suggestionState.type === 'user' && <UserAvatar user={item as User} className="w-6 h-6 flex-shrink-0" />}
                                     {suggestionState.type === 'bug' && <span className="font-mono text-xs bg-gray-800 px-1.5 py-0.5 rounded">{(item as Bug).bugNumber}</span>}
                                     <span className="text-white truncate">{'name' in item ? item.name : item.title}</span>
@@ -258,7 +259,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
                         onChange={handleNewMessageChange}
                         onKeyDown={handleKeyDown}
                         placeholder="Message... (@mention, #bug)"
-                        className="chat-textarea w-full px-4 py-2 border border-gray-800 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 bg-[#1C2326] text-sm text-white resize-none"
+                        className="chat-textarea w-full px-4 py-2 border border-gray-800 rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 bg-[#1C2326] text-xs text-white resize-none"
                         rows={1}
                         style={{ height: 'auto', maxHeight: '120px' }}
                         onInput={(e) => {

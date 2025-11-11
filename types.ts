@@ -10,6 +10,8 @@ export interface Subtask {
   completed: boolean;
   creatorId: string;
   createdAt: string;
+  assigneeId?: string;
+  assignee?: User;
 }
 
 export enum TaskPriority {
@@ -40,6 +42,18 @@ export interface TaskHistory {
   createdAt: string;
 }
 
+export interface Sprint {
+  id: string;
+  projectId: string;
+  name: string;
+  startDate: string | null;
+  endDate: string | null;
+  goal: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  status: 'active' | 'completed';
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -53,6 +67,7 @@ export interface Task {
   dueDate?: string;
   creatorId: string;
   createdAt: string;
+  sprintId?: string | null;
 }
 
 export interface Column {
@@ -74,6 +89,7 @@ export type NewTaskData = {
   columnId: string;
   assigneeId?: string;
   dueDate?: string;
+  sprintId?: string | null;
 };
 
 export interface ChatMessage {
@@ -117,6 +133,8 @@ export interface Project {
   links: ProjectLink[];
   bugs: Record<string, Bug>;
   bugOrder: string[];
+  sprints: Sprint[];
+  filterSegments: FilterSegment[];
 }
 
 export interface AppState {
@@ -128,11 +146,17 @@ export interface AppState {
 export interface FilterSegment {
   id: string;
   name: string;
+  projectId: string;
+  creatorId: string;
   filters: {
     searchTerm: string;
-    priorityFilter: string;
-    assigneeFilter: string;
-    statusFilter: string;
+    priorityFilter: string[];
+    assigneeFilter: string[];
+    statusFilter: string[];
+    tagFilter: string[];
+    startDate: string;
+    endDate: string;
+    sprintFilter: string[];
   };
 }
 
@@ -190,6 +214,15 @@ export interface AiGeneratedProjectPlan {
   description: string;
   columns: AiGeneratedColumn[];
 }
+
+// Type for AI-generated tasks from file
+export interface AiGeneratedTaskFromFile {
+  title: string;
+  description: string;
+  priority: TaskPriority;
+  status: string; // The name of the column/status
+}
+
 
 export enum FeedbackType {
   BUG = 'Bug Report',

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 // FIX: Import `Column` type to be used in casting.
-import { Project, User, AugmentedTask, Task, FilterSegment, Column } from '../types';
+import { Project, User, AugmentedTask, Task, FilterSegment, Column, Sprint } from '../types';
 import { DownloadIcon } from '../components/Icons';
 import { exportAugmentedTasksToCsv } from '../utils/export';
 import { TaskListRow } from '../components/TaskListRow';
@@ -19,9 +19,13 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   
   // Filtering state
   const [searchTerm, setSearchTerm] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState<string>('');
-  const [assigneeFilter, setAssigneeFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+  const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [sprintFilter, setSprintFilter] = useState<string[]>([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [segments, setSegments] = useState<FilterSegment[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>('all');
   
@@ -50,13 +54,16 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
     }
   };
 
-  const handleAddSegment = (name: string) => {
+  // FIX: Corrected signature to accept filters and added missing properties `projectId` and `creatorId` to satisfy the `FilterSegment` type.
+  const handleAddSegment = async (name: string, filters: FilterSegment['filters']) => {
     if (!name.trim()) return;
 
     const newSegment: FilterSegment = {
       id: Date.now().toString(),
       name: name.trim(),
-      filters: { searchTerm, priorityFilter, assigneeFilter, statusFilter },
+      projectId: "global", // Global segments aren't tied to a project
+      creatorId: currentUser.id,
+      filters: filters,
     };
     const updatedSegments = [...segments, newSegment];
     setSegments(updatedSegments);
@@ -64,7 +71,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
     setActiveSegmentId(newSegment.id);
   };
 
-  const handleDeleteSegment = (segmentId: string) => {
+  const handleDeleteSegment = async (segmentId: string) => {
     const updatedSegments = segments.filter(s => s.id !== segmentId);
     setSegments(updatedSegments);
     saveSegmentsToStorage(updatedSegments);
@@ -73,20 +80,43 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
     }
   };
 
+  const handleUpdateSegment = async (segmentId: string, updates: { name?: string, filters?: FilterSegment['filters'] }) => {
+      const updatedSegments = segments.map(s => {
+          if (s.id === segmentId) {
+              return {
+                  ...s,
+                  name: updates.name ?? s.name,
+                  filters: updates.filters ?? s.filters,
+              };
+          }
+          return s;
+      });
+      setSegments(updatedSegments);
+      saveSegmentsToStorage(updatedSegments);
+  };
+
   const handleApplySegment = (segmentId: string | null) => {
     setActiveSegmentId(segmentId);
     if (segmentId === 'all' || segmentId === null) {
       setSearchTerm('');
-      setPriorityFilter('');
-      setAssigneeFilter('');
-      setStatusFilter('');
+      setPriorityFilter([]);
+      setAssigneeFilter([]);
+      setStatusFilter([]);
+      setTagFilter([]);
+      setSprintFilter([]);
+      setStartDate('');
+      setEndDate('');
     } else {
       const segment = segments.find(s => s.id === segmentId);
       if (segment) {
         setSearchTerm(segment.filters.searchTerm || '');
-        setPriorityFilter(segment.filters.priorityFilter || '');
-        setAssigneeFilter(segment.filters.assigneeFilter || '');
-        setStatusFilter(segment.filters.statusFilter || '');
+        setPriorityFilter(segment.filters.priorityFilter || []);
+        setAssigneeFilter(segment.filters.assigneeFilter || []);
+        setStatusFilter(segment.filters.statusFilter || []);
+        setTagFilter(segment.filters.tagFilter || []);
+        setSprintFilter(segment.filters.sprintFilter || []);
+        setStartDate(segment.filters.startDate || '');
+        setEndDate(segment.filters.endDate || '');
       }
     }
   };
@@ -132,6 +162,28 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
     return Array.from(statusSet).sort();
   }, [projects]);
 
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    allTasks.forEach(task => {
+        task.tags.forEach(tag => tags.add(tag));
+    });
+    return Array.from(tags).sort();
+  }, [allTasks]);
+
+  const allSprints = useMemo((): Sprint[] => {
+    const sprints: Sprint[] = [];
+    const sprintIds = new Set<string>();
+    (Object.values(projects) as Project[]).forEach(project => {
+        (project.sprints || []).forEach(sprint => {
+            if (!sprintIds.has(sprint.id)) {
+                sprints.push(sprint);
+                sprintIds.add(sprint.id);
+            }
+        });
+    });
+    return sprints;
+  }, [projects]);
+
 
   const filteredTasks = useMemo(() => {
     let tasks = allTasks;
@@ -146,20 +198,37 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
       );
     }
 
-    if (priorityFilter) {
-      tasks = tasks.filter(task => task.priority === priorityFilter);
+    if (priorityFilter.length > 0) {
+      tasks = tasks.filter(task => priorityFilter.includes(task.priority));
     }
 
-    if (assigneeFilter) {
-      tasks = tasks.filter(task => task.assignee?.name === assigneeFilter);
+    if (assigneeFilter.length > 0) {
+      tasks = tasks.filter(task => assigneeFilter.includes(task.assignee?.name || ''));
     }
 
-    if (statusFilter) {
-        tasks = tasks.filter(task => task.columnName === statusFilter);
+    if (statusFilter.length > 0) {
+        tasks = tasks.filter(task => statusFilter.includes(task.columnName));
+    }
+
+    if (tagFilter.length > 0) {
+      tasks = tasks.filter(task => task.tags.some(tag => tagFilter.includes(tag)));
+    }
+
+    if (sprintFilter.length > 0) {
+      tasks = tasks.filter(task => task.sprintId ? sprintFilter.includes(task.sprintId) : false);
+    }
+
+    if (startDate) {
+      const start = new Date(startDate).setHours(0, 0, 0, 0);
+      tasks = tasks.filter(task => new Date(task.createdAt).getTime() >= start);
+    }
+    if (endDate) {
+      const end = new Date(endDate).setHours(23, 59, 59, 999);
+      tasks = tasks.filter(task => new Date(task.createdAt).getTime() <= end);
     }
 
     return tasks;
-  }, [allTasks, viewMode, currentUser.id, searchTerm, priorityFilter, assigneeFilter, statusFilter]);
+  }, [allTasks, viewMode, currentUser.id, searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate]);
   
   // Reset to first page when filters change
   useEffect(() => {
@@ -180,19 +249,19 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   return (
     <div>
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-        <h2 className="text-2xl font-bold text-white">Tasks</h2>
+        <h2 className="text-xl font-bold text-white">Tasks</h2>
         <div className="flex items-center gap-2">
           {/* View Toggle */}
           <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
             <button
               onClick={() => setViewMode('all')}
-              className={`px-3 py-1.5 text-sm font-semibold rounded-md ${viewMode === 'all' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50 text-white'}`}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md ${viewMode === 'all' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50 text-white'}`}
             >
               All Tasks
             </button>
             <button
               onClick={() => setViewMode('my')}
-              className={`px-3 py-1.5 text-sm font-semibold rounded-md ${viewMode === 'my' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50 text-white'}`}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md ${viewMode === 'my' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50 text-white'}`}
             >
               My Tasks
             </button>
@@ -200,7 +269,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
           {/* Export Button */}
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 text-white font-semibold rounded-lg shadow-sm hover:bg-gray-700 transition-all text-sm"
+            className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 text-white font-semibold rounded-lg shadow-sm hover:bg-gray-700 transition-all text-xs"
           >
             <DownloadIcon className="w-4 h-4" />
             <span>Export</span>
@@ -210,6 +279,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
       
       <div className="mb-6">
         <Filters
+            projectId="all-tasks"
+            currentUser={currentUser}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             priorityFilter={priorityFilter}
@@ -218,12 +289,22 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
             setAssigneeFilter={setAssigneeFilter}
             statusFilter={statusFilter}
             setStatusFilter={setStatusFilter}
+            tagFilter={tagFilter}
+            setTagFilter={setTagFilter}
+            sprintFilter={sprintFilter}
+            setSprintFilter={setSprintFilter}
+            sprints={allSprints}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
             assignees={uniqueAssignees}
             statuses={allStatuses}
+            tags={allTags}
             segments={segments}
             activeSegmentId={activeSegmentId}
-            currentFilters={{ searchTerm, priorityFilter, assigneeFilter, statusFilter }}
             onAddSegment={handleAddSegment}
+            onUpdateSegment={handleUpdateSegment}
             onDeleteSegment={handleDeleteSegment}
             onApplySegment={handleApplySegment}
             onClearFilters={handleClearFilters}

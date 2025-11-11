@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, ReactNode } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ManageMembersModal } from './components/ManageMembersModal';
-import { BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon, RotateCwIcon, LifeBuoyIcon } from './components/Icons';
+import { BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon, RotateCwIcon, LifeBuoyIcon, XIcon } from './components/Icons';
 import { useAppState } from './hooks/useAppState';
 import { DashboardPage } from './pages/DashboardPage';
 import { TasksPage } from './pages/TasksPage';
@@ -12,7 +12,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import CallbackPage from './pages/CallbackPage';
 // FIX: Import `Column` type to be used in casting.
-import { User, Task, TaskPriority, NewTaskData, Project, ChatMessage, FeedbackType, Column } from './types';
+import { User, Task, TaskPriority, NewTaskData, Project, ChatMessage, FeedbackType, Column, Subtask, AiGeneratedTaskFromFile, Sprint } from './types';
 import { api } from './services/api';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
@@ -28,6 +28,112 @@ import { FeedbackFab } from './components/FeedbackFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { playReceiveSound, playNotificationSound, initAudio } from './utils/sound';
 
+// --- Confirmation Modal ---
+interface ConfirmationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  message: React.ReactNode;
+  confirmText?: string;
+  isConfirming?: boolean;
+}
+
+const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', isConfirming = false }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <header className="p-4 border-b border-gray-800 flex justify-between items-center">
+          <h2 className="text-lg font-bold text-white">{title}</h2>
+          <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
+            <XIcon className="w-6 h-6" />
+          </button>
+        </header>
+        <div className="p-6">
+          <div className="text-sm text-gray-300">{message}</div>
+        </div>
+        <footer className="p-4 bg-[#1C2326]/50 rounded-b-xl flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isConfirming}
+            className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isConfirming}
+            className="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] transition-all text-sm disabled:bg-red-400/50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {isConfirming && <LoaderCircleIcon className="w-5 h-5 animate-spin" />}
+            {isConfirming ? 'Confirming...' : confirmText}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+
+type ConfirmationOptions = {
+  title: string;
+  message: React.ReactNode;
+  onConfirm: () => void;
+  confirmText?: string;
+};
+
+const ConfirmationContext = createContext<(options: ConfirmationOptions) => void>(() => {});
+
+export const useConfirmation = () => {
+  return useContext(ConfirmationContext);
+};
+
+const ConfirmationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [options, setOptions] = useState<ConfirmationOptions | null>(null);
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  const requestConfirmation = (newOptions: ConfirmationOptions) => {
+    setOptions(newOptions);
+  };
+
+  const handleClose = () => {
+    if (isConfirming) return;
+    setOptions(null);
+  };
+
+  const handleConfirm = async () => {
+    if (options) {
+      setIsConfirming(true);
+      try {
+        await Promise.resolve(options.onConfirm());
+      } catch (e) {
+        console.error("Confirmation callback error:", e);
+      } finally {
+        setIsConfirming(false);
+        setOptions(null);
+      }
+    }
+  };
+
+  return (
+    <ConfirmationContext.Provider value={requestConfirmation}>
+      {children}
+      <ConfirmationModal
+        isOpen={!!options}
+        onClose={handleClose}
+        onConfirm={handleConfirm}
+        title={options?.title || ''}
+        message={options?.message || ''}
+        confirmText={options?.confirmText}
+        isConfirming={isConfirming}
+      />
+    </ConfirmationContext.Provider>
+  );
+};
+
 
 type View = 'dashboard' | 'project' | 'tasks' | 'resources' | 'privacy';
 
@@ -40,7 +146,7 @@ const setLastReadTimestamp = (projectId: string, userId: string, timestamp: stri
 };
 
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [locationHash, setLocationHash] = useState(window.location.hash);
   
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -78,7 +184,8 @@ const App: React.FC = () => {
 
   // Derive view and active project ID from the URL hash
   const { view, activeProjectId } = useMemo(() => {
-    const path = (locationHash.startsWith('#') ? locationHash.substring(1) : locationHash) || '/';
+    const path = (locationHash.startsWith('#') ? locationHash.substring(1) : locationHash).split('?')[0] || '/';
+
 
     if (path.startsWith('/projects/')) {
         const id = path.split('/')[2];
@@ -111,7 +218,7 @@ const App: React.FC = () => {
 
   const appState = useAppState(session, currentUser, activeProjectId);
   // FIX: Added `updateProjectMembers` to the destructuring to make it available in the component's scope.
-  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, updateUserProfile, deleteProject, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch, updateProjectMembers } = appState;
+  const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, updateUserProfile, deleteProject, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch, updateProjectMembers, addTasksBatch, addSprint, updateSprint, deleteSprint, bulkUpdateTaskSprint, completeSprint, addFilterSegment, updateFilterSegment, deleteFilterSegment } = appState;
 
   const hasData = useMemo(() => Object.keys(state.projects).length > 0 || Object.keys(state.users).length > 0, [state]);
 
@@ -279,13 +386,14 @@ const App: React.FC = () => {
                 localStorage.removeItem('project_invite_token'); 
                 try {
                     const joinedProject = await api.data.acceptInvite(token);
-                    alert(`Successfully joined project: ${joinedProject.name}`);
+                    // Can't use alert, will just log.
+                    console.log(`Successfully joined project: ${joinedProject.name}`);
                     // Force a full page reload by adding a query parameter. This ensures the new project
                     // data is fetched correctly and avoids race conditions where the database update from
                     // accepting the invite hasn't propagated before the app's state is re-fetched.
                     window.location.assign(`/?c=${Date.now()}#/projects/${joinedProject.id}`);
                 } catch (error) {
-                    alert(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                    console.error(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
                     if (window.location.pathname.startsWith('/invite/')) {
                        window.location.assign('/#/'); // Redirect home on failure
                     }
@@ -380,6 +488,16 @@ const App: React.FC = () => {
   const projectMembersForModal = projectForSelectedTask
     ? projectForSelectedTask.members.map(id => state.users[id]).filter(Boolean)
     : [];
+  
+  const allProjectTagsForModal = useMemo(() => {
+    if (!projectForSelectedTask) return [];
+    const tags = new Set<string>();
+    // FIX: Cast Object.values to the correct type to avoid type inference issues.
+    (Object.values(projectForSelectedTask.board.tasks) as Task[]).forEach(task => {
+        task.tags.forEach(tag => tags.add(tag));
+    });
+    return Array.from(tags).sort();
+  }, [projectForSelectedTask]);
 
   const handleUpdateTask = async (updatedTaskData: Task) => {
     const project = findProjectForTask(updatedTaskData.id);
@@ -388,7 +506,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddSubtasks = async (taskId: string, subtasks: { title: string }[]) => {
+  const handleAddSubtasks = async (taskId: string, subtasks: Partial<Subtask>[]) => {
       const project = findProjectForTask(taskId);
       if (project && currentUser) {
           await addSubtasks(project.id, taskId, subtasks, currentUser.id);
@@ -550,7 +668,7 @@ const App: React.FC = () => {
                 <ArrowLeftIcon className="w-5 h-5"/>
             </button>
             <BotMessageSquareIcon className="w-7 h-7 text-gray-400" />
-            <h1 className="text-xl font-bold tracking-tight text-white">
+            <h1 className="text-lg font-bold tracking-tight text-white">
               {activeProject.name}
             </h1>
           </div>
@@ -562,7 +680,7 @@ const App: React.FC = () => {
                 <button onClick={() => navigate('/')} className="p-2 rounded-full hover:bg-gray-800 transition-colors" aria-label="Back to dashboard">
                     <ArrowLeftIcon className="w-5 h-5"/>
                 </button>
-                <h1 className="text-xl font-bold tracking-tight text-white">
+                <h1 className="text-lg font-bold tracking-tight text-white">
                     Privacy Policy
                 </h1>
             </div>
@@ -571,7 +689,7 @@ const App: React.FC = () => {
      return (
         <div className="flex items-center gap-3">
             <BotMessageSquareIcon className="w-7 h-7 text-gray-400" />
-            <h1 className="text-xl font-bold tracking-tight text-white">
+            <h1 className="text-lg font-bold tracking-tight text-white">
               Gemini Project Board
             </h1>
         </div>
@@ -585,7 +703,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1C2326]">
         <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
-        <p className="ml-4 text-base font-semibold text-gray-400">Restoring your session...</p>
+        <p className="ml-4 text-sm font-semibold text-gray-400">Restoring your session...</p>
       </div>
     );
   }
@@ -612,16 +730,16 @@ const App: React.FC = () => {
           <HeaderContent />
 
           <nav className="flex items-center gap-2 px-2 py-1 bg-[#1C2326] rounded-full">
-            <button onClick={() => navigate('/')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'dashboard' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><LayoutDashboardIcon className="w-4 h-4" /> Dashboard</button>
-            <button onClick={() => navigate('/tasks')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'tasks' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><ClipboardListIcon className="w-4 h-4" /> Tasks</button>
-            <button onClick={() => navigate('/resources')} className={`px-3 py-1 text-sm font-medium rounded-full flex items-center gap-2 ${view === 'resources' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><UsersIcon className="w-4 h-4" /> Resources</button>
+            <button onClick={() => navigate('/')} className={`px-3 py-1 text-xs font-medium rounded-full flex items-center gap-2 ${view === 'dashboard' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><LayoutDashboardIcon className="w-4 h-4" /> Dashboard</button>
+            <button onClick={() => navigate('/tasks')} className={`px-3 py-1 text-xs font-medium rounded-full flex items-center gap-2 ${view === 'tasks' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><ClipboardListIcon className="w-4 h-4" /> Tasks</button>
+            <button onClick={() => navigate('/resources')} className={`px-3 py-1 text-xs font-medium rounded-full flex items-center gap-2 ${view === 'resources' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50'}`}><UsersIcon className="w-4 h-4" /> Resources</button>
           </nav>
           
           <div className="flex items-center gap-2">
             {view === 'project' && (
               <button
                 onClick={() => setCreateTaskModalOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-gray-300 text-black text-sm font-semibold rounded-lg shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-300 text-black text-xs font-semibold rounded-lg shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
               >
                 <PlusIcon className="w-4 h-4" />
                 New Task
@@ -699,18 +817,18 @@ const App: React.FC = () => {
               {isUserMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-[#131C1B] rounded-md shadow-lg ring-1 ring-black ring-opacity-5 py-1 z-30">
                   <div className="px-4 py-2 border-b border-gray-800">
-                    <p className="text-sm font-medium text-white truncate">{currentUser.name}</p>
-                    <p className="text-xs text-gray-400">{currentUser.role}</p>
+                    <p className="text-xs font-medium text-white truncate">{currentUser.name}</p>
+                    <p className="text-[11px] text-gray-400">{currentUser.role}</p>
                   </div>
                    <button
                     onClick={() => { setSettingsModalOpen(true); setIsUserMenuOpen(false); }}
-                    className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-800"
+                    className="block w-full text-left px-4 py-2 text-xs text-white hover:bg-gray-800"
                   >
                     Settings
                   </button>
                   <button
                     onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2 text-sm text-white hover:bg-gray-800"
+                    className="block w-full text-left px-4 py-2 text-xs text-white hover:bg-gray-800"
                   >
                     Logout
                   </button>
@@ -723,7 +841,7 @@ const App: React.FC = () => {
           {appStateLoading && !hasData ? (
             <div className="flex items-center justify-center pt-20">
               <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
-              <p className="ml-4 text-base font-semibold text-gray-400">Loading your data...</p>
+              <p className="ml-4 text-sm font-semibold text-gray-400">Loading your data...</p>
             </div>
           ) : (
             <>
@@ -767,6 +885,15 @@ const App: React.FC = () => {
                   deleteBug={deleteBug}
                   addBugsBatch={addBugsBatch}
                   deleteBugsBatch={deleteBugsBatch}
+                  addTasksBatch={(tasks, sprintId) => addTasksBatch(activeProject.id, tasks, sprintId)}
+                  addSprint={(sprintData) => addSprint(activeProject.id, sprintData)}
+                  updateSprint={(sprintId, updates) => updateSprint(activeProject.id, sprintId, updates)}
+                  deleteSprint={(sprintId) => deleteSprint(activeProject.id, sprintId)}
+                  bulkUpdateTaskSprint={(taskIds, sprintId) => bulkUpdateTaskSprint(taskIds, sprintId)}
+                  completeSprint={(sprintId, moveToSprintId) => completeSprint(sprintId, moveToSprintId)}
+                  addFilterSegment={(name, filters) => addFilterSegment(activeProject.id, name, filters, currentUser.id)}
+                  updateFilterSegment={(segmentId, updates) => updateFilterSegment(segmentId, updates)}
+                  deleteFilterSegment={(segmentId) => deleteFilterSegment(segmentId)}
                 />
               )}
               {view === 'tasks' && (
@@ -790,11 +917,11 @@ const App: React.FC = () => {
               )}
               {view === 'project' && !activeProject && (
                 <div className="text-center pt-20 text-gray-400">
-                  <h2 className="text-xl font-bold text-white">Project Not Found</h2>
+                  <h2 className="text-lg font-bold text-white">Project Not Found</h2>
                   <p className="mt-2">The project may have been deleted or you don't have access.</p>
                   <button 
                     onClick={handleBackToDashboard} 
-                    className="mt-6 px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all text-sm"
+                    className="mt-6 px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all text-xs"
                   >
                     Go to Dashboard
                   </button>
@@ -829,9 +956,13 @@ const App: React.FC = () => {
         <CreateTaskModal
           columns={Object.values(activeProject.board.columns)}
           users={activeProject.members.map(id => state.users[id]).filter(Boolean)}
+          sprints={activeProject.sprints}
           onAddTask={async (taskData) => {
             await addTask(activeProject.id, taskData, currentUser.id);
             setCreateTaskModalOpen(false);
+          }}
+          onAddSprint={async (sprintData) => {
+             return await addSprint(activeProject.id, sprintData);
           }}
           onClose={() => setCreateTaskModalOpen(false)}
         />
@@ -864,12 +995,14 @@ const App: React.FC = () => {
             onClose={handleCloseInviteModal}
         />
       )}
-      {selectedTask && (
+      {selectedTask && projectForSelectedTask && (
         <TaskDetailsModal
           task={selectedTask}
           currentUser={currentUser}
           users={Object.values(state.users)}
           projectMembers={projectMembersForModal}
+          allProjectTags={allProjectTagsForModal}
+          sprints={projectForSelectedTask.sprints}
           onlineUsers={onlineUsers}
           onClose={handleCloseTaskModal}
           onUpdateTask={handleUpdateTask}
@@ -907,6 +1040,14 @@ const App: React.FC = () => {
         onSubmit={handleFeedbackSubmit}
       />
     </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <ConfirmationProvider>
+      <AppContent />
+    </ConfirmationProvider>
   );
 };
 

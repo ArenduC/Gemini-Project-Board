@@ -4,6 +4,7 @@ import { LifeBuoyIcon, PlusIcon, FileUpIcon, LoaderCircleIcon, SparklesIcon, XIc
 import { UserAvatar } from './UserAvatar';
 import { ExportBugsModal } from './ExportBugsModal';
 import { Pagination } from './Pagination';
+import { useConfirmation } from '../App';
 
 // --- HELPER COMPONENTS ---
 
@@ -235,6 +236,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
+  const requestConfirmation = useConfirmation();
 
   const projectMembers = useMemo(() => project.members.map(id => users.find(u => u.id === id)).filter((u): u is User => !!u), [project.members, users]);
   const columnTitles = useMemo(() => project.board.columnOrder.map(id => project.board.columns[id].title), [project.board]);
@@ -329,20 +331,27 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
     });
   };
 
-  const handleDeleteSelected = async () => {
+  const handleDeleteSelected = () => {
     if (selectedBugIds.size === 0 || isDeleting) return;
-    if (window.confirm(`Are you sure you want to delete ${selectedBugIds.size} selected bug(s)?`)) {
-      setIsDeleting(true);
-      try {
-        await onDeleteBugsBatch(Array.from(selectedBugIds));
-        setSelectedBugIds(new Set());
-      } catch (error) {
-        console.error("Failed to delete bugs:", error);
-        alert(`Error: Could not delete the selected bugs. You may not have the required permissions.`);
-      } finally {
-        setIsDeleting(false);
-      }
-    }
+
+    requestConfirmation({
+      title: `Delete ${selectedBugIds.size} Bug(s)`,
+      message: <>Are you sure you want to permanently delete {selectedBugIds.size} selected bug(s)? This action cannot be undone.</>,
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        setIsDeleting(true);
+        try {
+          await onDeleteBugsBatch(Array.from(selectedBugIds));
+          setSelectedBugIds(new Set());
+        } catch (error) {
+          console.error("Failed to delete bugs:", error);
+          // Can't use alert in sandboxed environment.
+          // A proper app-wide notification system would go here.
+        } finally {
+          setIsDeleting(false);
+        }
+      },
+    });
   };
 
   const handleUpdate = (bugId: string, field: 'title' | 'description' | 'status' | 'priority' | 'assignee', value: any) => {
@@ -357,6 +366,15 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
     }
   };
   
+  const handleDeleteOne = (bug: Bug) => {
+    requestConfirmation({
+        title: "Delete Bug",
+        message: <>Are you sure you want to delete the bug <strong>"{bug.title}"</strong>?</>,
+        onConfirm: () => onDeleteBug(bug.id),
+        confirmText: "Delete",
+    });
+  };
+
   const hasActiveFilters = searchTerm || statusFilter || priorityFilter || assigneeFilter || startDate || endDate;
   const bugsExist = Object.keys(project.bugs || {}).length > 0;
   
@@ -478,7 +496,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
                   <td className="px-4 py-3"><select value={bug.priority} onChange={e => handleUpdate(bug.id, 'priority', e.target.value)} className={`bg-transparent border text-xs font-semibold rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${priorityStyles[bug.priority]}`}>{Object.values(TaskPriority).map(p => <option key={p} value={p} className="bg-[#1C2326] text-white font-normal">{p}</option>)}</select></td>
                   <td className="px-4 py-3 text-gray-400">{new Date(bug.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3"><select value={bug.assignee?.id || ''} onChange={e => handleUpdate(bug.id, 'assignee', e.target.value)} className="w-full bg-[#1C2326] text-white text-sm border border-gray-800 focus:ring-2 focus:ring-gray-500 rounded-md px-2 py-1"><option value="">Unassigned</option>{projectMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
-                  <td className="px-4 py-3 text-right"><button onClick={() => onDeleteBug(bug.id)} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-900/50 rounded-full"><TrashIcon className="w-4 h-4" /></button></td>
+                  <td className="px-4 py-3 text-right"><button onClick={() => handleDeleteOne(bug)} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-900/50 rounded-full"><TrashIcon className="w-4 h-4" /></button></td>
                 </tr>
               )) : (
                 <tr>

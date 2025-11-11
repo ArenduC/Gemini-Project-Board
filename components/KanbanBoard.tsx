@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { DragDropContext, DropResult } from 'react-beautiful-dnd';
-import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority } from '../types';
+import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority, AiGeneratedTaskFromFile, Sprint } from '../types';
 import { Column } from './Column';
 import { Filters } from './Filters';
-import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon } from './Icons';
+import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon, RocketIcon, DownloadIcon } from './Icons';
 import { ProjectChat } from './ProjectChat';
 import { AiTaskCreator } from './AiTaskCreator';
 import { TaskGraphView } from './TaskGraphView';
@@ -11,6 +11,16 @@ import { ProjectLinksManager } from './ProjectLinksManager';
 import { TaskTableView } from './TaskTableView';
 import { BugReporter } from './BugReporter';
 import { Pagination } from './Pagination';
+import { TaskImportDropzone } from './TaskImportDropzone';
+import { generateTasksFromFile } from '../services/geminiService';
+import { TaskConfirmationModal } from './TaskConfirmationModal';
+import { SprintsPage } from './SprintsPage';
+import { BulkActionsBar } from './BulkActionsBar';
+import { BulkUpdateSprintModal } from './BulkUpdateSprintModal';
+import { CompleteSprintModal } from './CompleteSprintModal';
+import { exportAugmentedTasksToCsv } from '../utils/export';
+import { AugmentedTask } from '../types';
+
 
 interface KanbanBoardProps {
   project: Project;
@@ -20,7 +30,7 @@ interface KanbanBoardProps {
   aiFeaturesEnabled: boolean;
   onDragEnd: (result: DropResult) => Promise<void>;
   updateTask: (task: Task) => Promise<void>;
-  addSubtasks: (taskId: string, subtasks: { title: string }[], creatorId: string) => Promise<void>;
+  addSubtasks: (taskId: string, subtasks: Partial<Subtask>[], creatorId: string) => Promise<void>;
   addComment: (taskId: string, commentText: string) => Promise<void>;
   addAiTask: (prompt: string) => Promise<void>;
   deleteTask: (taskId: string, columnId: string) => Promise<void>;
@@ -38,6 +48,15 @@ interface KanbanBoardProps {
   deleteBug: (bugId: string) => Promise<void>;
   addBugsBatch: (projectId: string, fileContent: string) => Promise<void>;
   deleteBugsBatch: (bugIds: string[]) => Promise<void>;
+  addTasksBatch: (tasks: AiGeneratedTaskFromFile[], sprintId: string | null) => Promise<void>;
+  addSprint: (sprintData: Omit<Sprint, 'id' | 'projectId' | 'createdAt' | 'status' | 'isDefault'> & { isDefault?: boolean }) => Promise<Sprint>;
+  updateSprint: (sprintId: string, updates: Partial<Sprint>) => Promise<void>;
+  deleteSprint: (sprintId: string) => Promise<void>;
+  bulkUpdateTaskSprint: (taskIds: string[], sprintId: string | null) => Promise<void>;
+  completeSprint: (sprintId: string, moveToSprintId: string | null) => Promise<void>;
+  addFilterSegment: (name: string, filters: FilterSegment['filters']) => Promise<void>;
+  updateFilterSegment: (segmentId: string, updates: { name?: string, filters?: FilterSegment['filters'] }) => Promise<void>;
+  deleteFilterSegment: (segmentId: string) => Promise<void>;
 }
 
 const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColumn }) => {
@@ -77,7 +96,7 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
       <button
         ref={buttonRef}
         onClick={() => setIsEditing(true)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 text-white text-sm font-semibold rounded-lg shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
+        className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 text-white text-xs font-semibold rounded-lg shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
       >
         <PlusIcon className="w-4 h-4" />
         Add Column
@@ -90,11 +109,11 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
             placeholder="Enter column title..."
-            className="w-full p-2 border-2 border-gray-600 rounded-lg bg-[#1C2326] focus:outline-none text-white text-sm"
+            className="w-full p-2 border-2 border-gray-600 rounded-lg bg-[#1C2326] focus:outline-none text-white text-xs"
           />
           <div className="mt-2 flex items-center gap-2">
-            <button onClick={handleSubmit} className="px-4 py-1.5 bg-gray-300 text-black font-semibold rounded-md text-sm hover:bg-gray-400">Add</button>
-            <button onClick={() => setIsEditing(false)} className="px-2 py-1.5 text-gray-400 hover:bg-gray-800 rounded-md text-sm">Cancel</button>
+            <button onClick={handleSubmit} className="px-4 py-1.5 bg-gray-300 text-black font-semibold rounded-md text-xs hover:bg-gray-400">Add</button>
+            <button onClick={() => setIsEditing(false)} className="px-2 py-1.5 text-gray-400 hover:bg-gray-800 rounded-md text-xs">Cancel</button>
           </div>
         </div>
       )}
@@ -106,23 +125,34 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     project, currentUser, users, onlineUsers, aiFeaturesEnabled, onDragEnd, 
     updateTask, addSubtasks, addComment, addAiTask, deleteTask, addColumn, 
     deleteColumn, isChatOpen, onCloseChat, chatMessages, onSendMessage, onTaskClick, 
-    addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch
+    addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch,
+    addTasksBatch, addSprint, updateSprint, deleteSprint, bulkUpdateTaskSprint, completeSprint,
+    addFilterSegment, updateFilterSegment, deleteFilterSegment
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState<string>('');
-  const [assigneeFilter, setAssigneeFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [projectView, setProjectView] = useState<'board' | 'table' | 'graph' | 'bugs'>('board');
+  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+  const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [sprintFilter, setSprintFilter] = useState<string[]>([]);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [projectView, setProjectView] = useState<'board' | 'table' | 'graph' | 'bugs' | 'sprints'>('board');
   const [tableCurrentPage, setTableCurrentPage] = useState(1);
   const TABLE_ITEMS_PER_PAGE = 15;
   
   const [initialBugSearch, setInitialBugSearch] = useState<string>('');
 
-  const [segments, setSegments] = useState<FilterSegment[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>('all');
   
+  const [tasksToConfirm, setTasksToConfirm] = useState<AiGeneratedTaskFromFile[] | null>(null);
+  const [isAiParsing, setIsAiParsing] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+  const [isBulkSprintModalOpen, setBulkSprintModalOpen] = useState(false);
+  const [isCompleteSprintModalOpen, setCompleteSprintModalOpen] = useState(false);
+  const [sprintToComplete, setSprintToComplete] = useState<Sprint | null>(null);
+
   const boardData = project.board;
-  const storageKey = `project-segments-${project.id}`;
   
   const handleNavigateToBug = (bugNumber: string) => {
     setProjectView('bugs');
@@ -130,122 +160,170 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     onCloseChat();
   };
 
-  const handleSetProjectView = (view: 'board' | 'table' | 'graph' | 'bugs') => {
+  const handleSetProjectView = (view: 'board' | 'table' | 'graph' | 'bugs' | 'sprints') => {
     if (view !== 'bugs') {
       setInitialBugSearch('');
     }
     setProjectView(view);
   };
+  
+  const applySegmentFilters = useCallback((segment: FilterSegment) => {
+    setSearchTerm(segment.filters.searchTerm || '');
+    setPriorityFilter(segment.filters.priorityFilter || []);
+    setAssigneeFilter(segment.filters.assigneeFilter || []);
+    setStatusFilter(segment.filters.statusFilter || []);
+    setTagFilter(segment.filters.tagFilter || []);
+    setSprintFilter(segment.filters.sprintFilter || []);
+    setStartDate(segment.filters.startDate || '');
+    setEndDate(segment.filters.endDate || '');
+  }, []);
 
+  // Handle shareable view links
   useEffect(() => {
-    try {
-      const savedSegments = localStorage.getItem(storageKey);
-      if (savedSegments) {
-        setSegments(JSON.parse(savedSegments));
-      }
-    } catch (error) {
-      console.error("Failed to load filter segments from localStorage", error);
+    const hash = window.location.hash;
+    const urlParams = new URLSearchParams(hash.split('?')[1]);
+    const viewId = urlParams.get('view');
+
+    if (viewId) {
+        const segment = (project.filterSegments || []).find(s => s.id === viewId);
+        if (segment) {
+            applySegmentFilters(segment);
+            setActiveSegmentId(segment.id);
+        }
     }
-  }, [storageKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.filterSegments, applySegmentFilters]); // Only run once when segments are loaded
   
   // Reset page when filters change
   useEffect(() => {
     setTableCurrentPage(1);
-  }, [searchTerm, priorityFilter, assigneeFilter, statusFilter]);
-
-  const saveSegmentsToStorage = (updatedSegments: FilterSegment[]) => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(updatedSegments));
-    } catch (error) {
-      console.error("Failed to save filter segments to localStorage", error);
-    }
-  };
-
-  const handleAddSegment = (name: string) => {
-    if (!name.trim()) return;
-
-    const newSegment: FilterSegment = {
-      id: Date.now().toString(),
-      name: name.trim(),
-      filters: {
-        searchTerm,
-        priorityFilter,
-        assigneeFilter,
-        statusFilter,
-      },
-    };
-    const updatedSegments = [...segments, newSegment];
-    setSegments(updatedSegments);
-    saveSegmentsToStorage(updatedSegments);
-    setActiveSegmentId(newSegment.id);
-  };
-
-  const handleDeleteSegment = (segmentId: string) => {
-    const updatedSegments = segments.filter(s => s.id !== segmentId);
-    setSegments(updatedSegments);
-    saveSegmentsToStorage(updatedSegments);
-    if (activeSegmentId === segmentId) {
-        handleClearFilters();
-    }
-  };
+  }, [searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate]);
 
   const handleApplySegment = (segmentId: string | null) => {
       setActiveSegmentId(segmentId);
       if (segmentId === 'all' || segmentId === null) {
           setSearchTerm('');
-          setPriorityFilter('');
-          setAssigneeFilter('');
-          setStatusFilter('');
+          setPriorityFilter([]);
+          setAssigneeFilter([]);
+          setStatusFilter([]);
+          setTagFilter([]);
+          setSprintFilter([]);
+          setStartDate('');
+          setEndDate('');
       } else {
-          const segment = segments.find(s => s.id === segmentId);
+          const segment = (project.filterSegments || []).find(s => s.id === segmentId);
           if (segment) {
-              setSearchTerm(segment.filters.searchTerm || '');
-              setPriorityFilter(segment.filters.priorityFilter || '');
-              setAssigneeFilter(segment.filters.assigneeFilter || '');
-              setStatusFilter(segment.filters.statusFilter || '');
+            applySegmentFilters(segment)
           }
       }
   };
 
   useEffect(() => {
-    const activeSegment = segments.find(s => s.id === activeSegmentId);
+    const arraysEqual = (a: string[], b: string[]) => {
+      if (a.length !== b.length) return false;
+      const sortedA = [...a].sort();
+      const sortedB = [...b].sort();
+      return sortedA.every((val, index) => val === sortedB[index]);
+    }
+
     if (activeSegmentId === 'all') {
-        if (searchTerm || priorityFilter || assigneeFilter || statusFilter) {
+        if (searchTerm || priorityFilter.length > 0 || assigneeFilter.length > 0 || statusFilter.length > 0 || tagFilter.length > 0 || sprintFilter.length > 0 || startDate || endDate) {
             setActiveSegmentId(null);
         }
         return;
     }
+    
+    const activeSegment = (project.filterSegments || []).find(s => s.id === activeSegmentId);
     if (!activeSegment) {
         return;
     };
     
     const filtersMatch = 
         activeSegment.filters.searchTerm === searchTerm &&
-        activeSegment.filters.priorityFilter === priorityFilter &&
-        activeSegment.filters.assigneeFilter === assigneeFilter &&
-        activeSegment.filters.statusFilter === statusFilter;
+        arraysEqual(activeSegment.filters.priorityFilter, priorityFilter) &&
+        arraysEqual(activeSegment.filters.assigneeFilter, assigneeFilter) &&
+        arraysEqual(activeSegment.filters.statusFilter, statusFilter) &&
+        arraysEqual(activeSegment.filters.tagFilter, tagFilter) &&
+        arraysEqual(activeSegment.filters.sprintFilter, sprintFilter) &&
+        activeSegment.filters.startDate === startDate &&
+        activeSegment.filters.endDate === endDate;
 
     if (!filtersMatch) {
         setActiveSegmentId(null);
     }
-  }, [searchTerm, priorityFilter, assigneeFilter, statusFilter, segments, activeSegmentId]);
+  }, [searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, project.filterSegments, activeSegmentId]);
   
   const handleClearFilters = () => {
     handleApplySegment('all');
   }
 
+  const handleFileProcessed = async (fileData: { content: string; mimeType: string; }) => {
+    setIsAiParsing(true);
+    try {
+        const columnNames = project.board.columnOrder.map(id => project.board.columns[id].title);
+        const tasks = await generateTasksFromFile(fileData, columnNames);
+        if (tasks.length > 0) {
+            setTasksToConfirm(tasks);
+        } else {
+            alert("AI could not find any tasks in the provided file.");
+        }
+    } catch (err) {
+        alert(`AI Error: ${err instanceof Error ? err.message : "An unknown error occurred."}`);
+    } finally {
+        setIsAiParsing(false);
+    }
+  };
+
+  const handleConfirmTaskCreation = async (sprintId: string | null) => {
+    if (!tasksToConfirm) return;
+    await addTasksBatch(tasksToConfirm, sprintId);
+    setTasksToConfirm(null); // Close modal
+  };
+
+  const handleTaskSelect = (task: Task, e?: React.MouseEvent) => {
+    if (e?.ctrlKey || e?.metaKey) {
+        setSelectedTaskIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(task.id)) {
+                newSet.delete(task.id);
+            } else {
+                newSet.add(task.id);
+            }
+            return newSet;
+        });
+    } else {
+        onTaskClick(task);
+    }
+  };
+
+  const handleBulkUpdateSprint = async (sprintId: string | null) => {
+    if (selectedTaskIds.size === 0) return;
+    await bulkUpdateTaskSprint(Array.from(selectedTaskIds), sprintId);
+    setSelectedTaskIds(new Set());
+  };
+
+  const handleOpenCompleteSprint = (sprint: Sprint) => {
+    setSprintToComplete(sprint);
+    setCompleteSprintModalOpen(true);
+  };
+
+  const handleConfirmCompleteSprint = async (moveToSprintId: string | null) => {
+    if (!sprintToComplete) return;
+    await completeSprint(sprintToComplete.id, moveToSprintId);
+    setCompleteSprintModalOpen(false);
+    setSprintToComplete(null);
+  };
+
   const filteredBoardData: BoardData = useMemo(() => {
     if (!boardData.tasks || !boardData.columns) return boardData;
 
     const taskIdToColumnIdMap = new Map<string, string>();
-    // FIX: Cast Object.values to the correct type to avoid type inference issues.
     for (const column of Object.values(boardData.columns) as ColumnType[]) {
         for (const taskId of column.taskIds) {
             taskIdToColumnIdMap.set(taskId, column.id);
         }
     }
 
-    // FIX: Cast Object.values to the correct type to avoid type inference issues.
     const tasks = Object.values(boardData.tasks) as Task[];
     let filteredTasks = tasks;
 
@@ -256,26 +334,43 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       );
     }
 
-    if (priorityFilter) {
-      filteredTasks = filteredTasks.filter(task => task.priority === priorityFilter);
+    if (priorityFilter.length > 0) {
+      filteredTasks = filteredTasks.filter(task => priorityFilter.includes(task.priority));
     }
 
-    if (assigneeFilter) {
-      filteredTasks = filteredTasks.filter(task => task.assignee?.name === assigneeFilter);
+    if (assigneeFilter.length > 0) {
+      filteredTasks = filteredTasks.filter(task => assigneeFilter.includes(task.assignee?.name || ''));
     }
     
-    if (statusFilter) {
+    if (statusFilter.length > 0) {
         filteredTasks = filteredTasks.filter(task => {
             const columnId = taskIdToColumnIdMap.get(task.id);
             if (!columnId) return false;
             const column = boardData.columns[columnId];
-            return column.title === statusFilter;
+            return statusFilter.includes(column.title);
         });
+    }
+
+    if (tagFilter.length > 0) {
+      filteredTasks = filteredTasks.filter(task => task.tags.some(tag => tagFilter.includes(tag)));
+    }
+
+    if (sprintFilter.length > 0) {
+      filteredTasks = filteredTasks.filter(task => task.sprintId ? sprintFilter.includes(task.sprintId) : false);
+    }
+
+    if (startDate) {
+        const start = new Date(startDate).setHours(0, 0, 0, 0);
+        filteredTasks = filteredTasks.filter(task => new Date(task.createdAt).getTime() >= start);
+    }
+
+    if (endDate) {
+        const end = new Date(endDate).setHours(23, 59, 59, 999);
+        filteredTasks = filteredTasks.filter(task => new Date(task.createdAt).getTime() <= end);
     }
 
     const filteredTaskIds = new Set(filteredTasks.map(t => t.id));
     
-    // FIX: Cast Object.entries to the correct type to avoid type inference issues.
     const newColumns = Object.fromEntries(
       (Object.entries(boardData.columns) as [string, ColumnType][]).map(([columnId, column]) => [
         columnId,
@@ -291,10 +386,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       columns: newColumns,
       tasks: boardData.tasks, // Pass all tasks so details can still be looked up
     };
-  }, [boardData, searchTerm, priorityFilter, assigneeFilter, statusFilter]);
+  }, [boardData, searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate]);
   
   const uniqueAssignees = useMemo(() => {
-      // FIX: Cast Object.values to the correct type to avoid type inference issues.
       const assignees = (Object.values(boardData.tasks) as Task[])
           .map(task => task.assignee?.name)
           .filter((name): name is string => !!name);
@@ -303,9 +397,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const uniqueStatuses = useMemo(() => {
       if (!boardData.columns) return [];
-      // FIX: Cast Object.values to the correct type to avoid type inference issues.
       return [...new Set((Object.values(boardData.columns) as ColumnType[]).map(c => c.title))];
   }, [boardData.columns]);
+
+  const uniqueTags = useMemo(() => {
+    const tags = new Set<string>();
+    (Object.values(boardData.tasks) as Task[]).forEach(task => {
+        task.tags.forEach(tag => tags.add(tag));
+    });
+    return Array.from(tags).sort();
+  }, [boardData.tasks]);
 
   const filteredTasksForTable = useMemo(() => {
     return filteredBoardData.columnOrder.flatMap(columnId => {
@@ -320,13 +421,35 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     (tableCurrentPage - 1) * TABLE_ITEMS_PER_PAGE,
     tableCurrentPage * TABLE_ITEMS_PER_PAGE
   );
+
+  const handleExport = () => {
+    const augmentedTasks: AugmentedTask[] = filteredTasksForTable.map(task => {
+        // FIX: Cast Object.values to the correct type to avoid type inference issues.
+        const column = (Object.values(project.board.columns) as ColumnType[]).find(c => c.taskIds.includes(task.id));
+        return {
+            ...task,
+            projectId: project.id,
+            projectName: project.name,
+            columnId: column?.id || '',
+            columnName: column?.title || 'Uncategorized',
+        };
+    });
+
+    const usersRecord = users.reduce((acc, user) => {
+        acc[user.id] = user;
+        return acc;
+    }, {} as Record<string, User>);
+
+    exportAugmentedTasksToCsv(augmentedTasks, usersRecord);
+  };
   
   return (
     <>
-      {aiFeaturesEnabled && !['bugs'].includes(projectView) && (
-      <div className="mb-6">
-        <AiTaskCreator onGenerateTask={addAiTask} />
-      </div>
+      {aiFeaturesEnabled && !['bugs', 'sprints'].includes(projectView) && (
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+          <AiTaskCreator onGenerateTask={addAiTask} />
+          <TaskImportDropzone onFileProcessed={handleFileProcessed} isLoading={isAiParsing} />
+        </div>
       )}
       
       <div className="mb-6">
@@ -337,9 +460,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         />
       </div>
 
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        {!['bugs'].includes(projectView) && (
+      <div className="relative z-20 mb-6 flex flex-wrap items-start justify-between gap-4">
+        {!['bugs', 'sprints'].includes(projectView) && (
             <Filters
+                projectId={project.id}
+                currentUser={currentUser}
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
                 priorityFilter={priorityFilter}
@@ -348,32 +473,53 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 setAssigneeFilter={setAssigneeFilter}
                 statusFilter={statusFilter}
                 setStatusFilter={setStatusFilter}
+                tagFilter={tagFilter}
+                setTagFilter={setTagFilter}
+                sprintFilter={sprintFilter}
+                setSprintFilter={setSprintFilter}
+                sprints={project.sprints || []}
+                startDate={startDate}
+                setStartDate={setStartDate}
+                endDate={endDate}
+                setEndDate={setEndDate}
                 assignees={uniqueAssignees}
                 statuses={uniqueStatuses}
-                segments={segments}
+                tags={uniqueTags}
+                segments={project.filterSegments}
                 activeSegmentId={activeSegmentId}
-                currentFilters={{ searchTerm, priorityFilter, assigneeFilter, statusFilter }}
-                onAddSegment={handleAddSegment}
-                onDeleteSegment={handleDeleteSegment}
+                onAddSegment={addFilterSegment}
+                onUpdateSegment={updateFilterSegment}
+                onDeleteSegment={deleteFilterSegment}
                 onApplySegment={handleApplySegment}
                 onClearFilters={handleClearFilters}
             />
         )}
          <div className="flex items-center gap-4 ml-auto">
             <div className="flex-shrink-0">
-                <h4 className="text-sm font-semibold text-gray-400 mb-2 text-right">View</h4>
+                <h4 className="text-xs font-semibold text-gray-400 mb-2 text-right">View</h4>
                 <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
                     <button onClick={() => handleSetProjectView('board')} className={`p-2 rounded-md ${projectView === 'board' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} aria-label="Board View" title="Board View"><LayoutDashboardIcon className="w-5 h-5" /></button>
                     <button onClick={() => handleSetProjectView('table')} className={`p-2 rounded-md ${projectView === 'table' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} aria-label="Table View" title="Table View"><TableIcon className="w-5 h-5" /></button>
                     <button onClick={() => handleSetProjectView('graph')} className={`p-2 rounded-md ${projectView === 'graph' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} aria-label="Graph View" title="Graph View"><GitBranchIcon className="w-5 h-5" /></button>
                     <button onClick={() => handleSetProjectView('bugs')} className={`p-2 rounded-md ${projectView === 'bugs' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} aria-label="Bug Tracker" title="Bug Tracker"><LifeBuoyIcon className="w-5 h-5" /></button>
+                    <button onClick={() => handleSetProjectView('sprints')} className={`p-2 rounded-md ${projectView === 'sprints' ? 'bg-gray-700 shadow-sm text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} aria-label="Sprints" title="Sprints"><RocketIcon className="w-5 h-5" /></button>
                 </div>
             </div>
-            {projectView === 'board' && (
-                <div className="self-end">
+            <div className="self-end flex items-center gap-2">
+                {!['bugs', 'sprints'].includes(projectView) && (
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 text-white text-xs font-semibold rounded-lg shadow-sm hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all"
+                        title="Export filtered tasks to CSV"
+                    >
+                        <DownloadIcon className="w-4 h-4" />
+                        <span>Export</span>
+                    </button>
+                )}
+                {projectView === 'board' && (
                     <AddColumn onAddColumn={addColumn} />
-                </div>
-            )}
+                )}
+            </div>
         </div>
       </div>
       
@@ -389,6 +535,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             onDeleteBugsBatch={deleteBugsBatch}
             initialSearchTerm={initialBugSearch}
         />
+      ) : projectView === 'sprints' ? (
+        <SprintsPage
+            project={project}
+            onAddSprint={addSprint}
+            onUpdateSprint={updateSprint}
+            onDeleteSprint={deleteSprint}
+            onCompleteSprint={handleOpenCompleteSprint}
+        />
       ) : projectView === 'board' ? (
         <DragDropContext onDragEnd={onDragEnd}>
             <div className="flex gap-6 items-start pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto custom-scrollbar">
@@ -401,8 +555,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     <Column 
                         column={column} 
                         tasks={tasks}
+                        sprints={project.sprints}
+                        users={users}
                         onlineUsers={onlineUsers}
-                        onTaskClick={onTaskClick}
+                        selectedTaskIds={selectedTaskIds}
+                        onTaskClick={handleTaskSelect}
                         deleteTask={deleteTask}
                         deleteColumn={deleteColumn}
                     />
@@ -444,6 +601,38 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             onSendMessage={onSendMessage}
             onNavigateToBug={handleNavigateToBug}
         />
+      )}
+      {tasksToConfirm && (
+        <TaskConfirmationModal
+            tasks={tasksToConfirm}
+            sprints={project.sprints}
+            onConfirm={handleConfirmTaskCreation}
+            onCancel={() => setTasksToConfirm(null)}
+        />
+      )}
+      {selectedTaskIds.size > 0 && (
+        <BulkActionsBar
+            selectedCount={selectedTaskIds.size}
+            onClear={() => setSelectedTaskIds(new Set())}
+            onChangeSprint={() => setBulkSprintModalOpen(true)}
+        />
+      )}
+      <BulkUpdateSprintModal
+        isOpen={isBulkSprintModalOpen}
+        onClose={() => setBulkSprintModalOpen(false)}
+        sprints={project.sprints}
+        onConfirm={handleBulkUpdateSprint}
+        taskCount={selectedTaskIds.size}
+      />
+      {sprintToComplete && (
+          <CompleteSprintModal
+            isOpen={isCompleteSprintModalOpen}
+            onClose={() => { setCompleteSprintModalOpen(false); setSprintToComplete(null); }}
+            sprint={sprintToComplete}
+            projectTasks={Object.values(project.board.tasks)}
+            projectSprints={project.sprints}
+            onConfirm={handleConfirmCompleteSprint}
+          />
       )}
     </>
   );

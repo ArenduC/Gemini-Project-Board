@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Project, User } from '../types';
 import { XIcon, TrashIcon, LoaderCircleIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
+import { useConfirmation } from '../App';
 
 interface ManageMembersModalProps {
   project: Project;
@@ -15,13 +16,27 @@ export const ManageMembersModal: React.FC<ManageMembersModalProps> = ({ project,
   const [currentMemberIds, setCurrentMemberIds] = useState<string[]>(project.members);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const requestConfirmation = useConfirmation();
 
   const handleRemoveMember = (userIdToRemove: string) => {
     if (userIdToRemove === project.creatorId) {
-        alert("You cannot remove the project creator.");
+        // This case should not be reachable as the button is disabled, but as a safeguard, we do nothing.
+        console.warn("Attempted to remove the project creator.");
         return;
     }
-    setCurrentMemberIds(currentMemberIds.filter(id => id !== userIdToRemove));
+    const userToRemove = allUsers.find(u => u.id === userIdToRemove);
+    requestConfirmation({
+      title: 'Remove Member',
+      message: (
+        <>
+          Are you sure you want to remove <strong>{userToRemove?.name || 'this member'}</strong> from the project?
+        </>
+      ),
+      onConfirm: () => {
+        setCurrentMemberIds(current => current.filter(id => id !== userIdToRemove));
+      },
+      confirmText: 'Remove',
+    });
   };
 
   const handleSave = async () => {

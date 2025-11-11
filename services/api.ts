@@ -1,13 +1,11 @@
 /*
 ================================================================================================
-=== URGENT: MANUAL DATABASE FIX REQUIRED ===
+=== URGENT: MANUAL DATABASE FIX REQUIRED (FEEDBACK TABLE) ===
 ================================================================================================
 
-The new error you're seeing ("operator does not exist: uuid = text") is the final piece
-of the puzzle. It means the database is trying to compare the invite token (text) with
-the token column in the database (which is a UUID type).
-
-This new script fixes that by adding a type cast. This should be the final fix needed.
+The error "null value in column 'feedback_type' violates not-null constraint" indicates a 
+mismatch between your database schema and the application code. The code expects to use a 
+column named 'type', but your database has a 'feedback_type' column that is blocking inserts.
 
 ** HOW TO FIX: **
 1.  Go to your Supabase project dashboard.
@@ -16,100 +14,88 @@ This new script fixes that by adding a type cast. This should be the final fix n
 4.  Copy the ENTIRE script from "-- START OF SCRIPT --" to "-- END OF SCRIPT --" below.
 5.  Paste it into the editor and click "RUN".
 
-This will replace the function with the corrected version.
+This will safely correct your database schema to match the application code.
 
 -- START OF SCRIPT --
 
--- Step 1: Clean up ALL old versions of the function to resolve conflicts.
--- This is safe to run multiple times.
-DROP FUNCTION IF EXISTS public.accept_project_invite(uuid);
-DROP FUNCTION IF EXISTS public.accept_project_invite(text, public.user_role);
-DROP FUNCTION IF EXISTS public.accept_project_invite(text);
+-- Step 1: Correct the column name from 'feedback_type' to 'type'.
+-- This script handles multiple scenarios to safely align your database with the code.
+DO $$
+BEGIN
+  -- Check if 'feedback_type' column exists
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='feedback' AND column_name='feedback_type' AND table_schema='public') THEN
+    -- If 'type' also exists (e.g., from a previous failed attempt), drop it before renaming
+    ALTER TABLE public.feedback DROP COLUMN IF EXISTS type;
+    ALTER TABLE public.feedback RENAME COLUMN feedback_type TO type;
+    RAISE NOTICE 'Renamed column "feedback_type" to "type".';
+  END IF;
+END $$;
+
+-- Step 2: Ensure the 'type' column exists. If it wasn't renamed, create it now.
+ALTER TABLE public.feedback ADD COLUMN IF NOT EXISTS type TEXT;
+
+-- Step 3: Update any existing rows where 'type' is NULL. This is required before making the column non-nullable.
+UPDATE public.feedback SET type = 'General Feedback' WHERE type IS NULL;
+
+-- Step 4: Enforce that the 'type' column cannot be empty.
+ALTER TABLE public.feedback ALTER COLUMN type SET NOT NULL;
 
 
--- Step 2: Create the single, correct version of the function.
--- FIX: This version casts the text invite_token to a UUID to match the 'token' column type,
--- resolving the "operator does not exist: uuid = text" error.
-create or replace function accept_project_invite(invite_token text)
-returns json
-language plpgsql
-security definer
-as $$
-declare
-  invite_record public.project_invites;
-  current_user_id uuid := auth.uid();
-  member_count int;
-  project_data json;
-begin
-  -- Find the invite link and lock it for update. Cast the input token to UUID.
-  select * into invite_record from public.project_invites where token = invite_token::uuid for update;
+-- Step 5: Ensure Row Level Security (RLS) is enabled for the feedback table.
+alter table public.feedback enable row level security;
 
-  -- Validate the invite
-  if invite_record is null then
-    raise exception 'Invite token is invalid.';
-  end if;
 
-  if not invite_record.is_active then
-    raise exception 'This invite link is no longer active.';
-  end if;
+-- Step 6: Create security policies for accessing the feedback table.
+-- Policy 1: Allow users to insert their own feedback.
+drop policy if exists "Allow authenticated users to insert feedback" on public.feedback;
+create policy "Allow authenticated users to insert feedback"
+on public.feedback for insert to authenticated
+with check (auth.uid() = user_id);
 
-  if invite_record.expires_at is not null and invite_record.expires_at < now() then
-    raise exception 'This invite link has expired.';
-  end if;
-
-  if invite_record.max_uses is not null and invite_record.current_uses >= invite_record.max_uses then
-    raise exception 'This invite link has reached its maximum number of uses.';
-  end if;
-
-  -- Check if user is already a member
-  select count(*) into member_count from public.project_members where project_id = invite_record.project_id and user_id = current_user_id;
-  if member_count > 0 then
-    -- User is already a member. Silently succeed and return project data.
-    select json_build_object('id', p.id, 'name', p.name) into project_data from public.projects p where id = invite_record.project_id;
-    return project_data;
-  end if;
-
-  -- Add the user to the project.
-  insert into public.project_members (project_id, user_id)
-  values (invite_record.project_id, current_user_id);
-
-  -- Update the invite link usage count
-  update public.project_invites
-  set current_uses = current_uses + 1
-  where id = invite_record.id;
-  
-  -- Optionally, deactivate if max uses is reached.
-  if invite_record.max_uses is not null and (invite_record.current_uses + 1) >= invite_record.max_uses then
-    update public.project_invites
-    set is_active = false
-    where id = invite_record.id;
-  end if;
-
-  -- Return the joined project's data
-  select json_build_object('id', p.id, 'name', p.name) into project_data from public.projects p where id = invite_record.project_id;
-  
-  if project_data is null then
-    raise exception 'Could not find the project associated with this invite.';
-  end if;
-  
-  return project_data;
-end;
-$$;
-
--- Step 3: Grant permission for authenticated users to call the function.
-grant execute on function public.accept_project_invite(text) to authenticated;
+-- Policy 2: Allow admin users to read all feedback.
+drop policy if exists "Allow admin users to read all feedback" on public.feedback;
+create policy "Allow admin users to read all feedback"
+on public.feedback for select
+using (
+  (select role from public.users where id = auth.uid()) = 'Admin'::user_role
+);
 
 -- END OF SCRIPT --
 
 ================================================================================================
-The 'get_initial_data_for_user' function is also included below for completeness.
-If you have issues with data loading, you can run this script as well.
+*/
+/*
+================================================================================================
+=== URGENT: MANUAL DATABASE FIX REQUIRED ===
 ================================================================================================
 
+To enable subtask assignments, you need to add a new column to the `subtasks` table
+and update the database function that fetches all the data.
+
+** HOW TO FIX: **
+1.  Go to your Supabase project dashboard.
+2.  In the left sidebar, click the "SQL Editor" icon.
+3.  Click "+ New query".
+4.  Copy the ENTIRE script from "-- START OF SCRIPT --" to "-- END OF SCRIPT --" below.
+5.  Paste it into the editor and click "RUN".
+
+This will safely update your database schema and functions.
+
+-- START OF SCRIPT --
+
+-- Step 1: Add the assignee_id column to the subtasks table.
+-- This column will store who the subtask is assigned to.
+alter table public.subtasks
+add column if not exists assignee_id uuid null references public.users(id) on delete set null;
+
+-- Step 2: Update the main data-fetching function to include subtask assignee data.
+-- This replaces the old function with a new version that joins the users table
+-- to get assignee details for each subtask.
+drop function if exists get_initial_data_for_user(uuid);
 create or replace function get_initial_data_for_user(user_id_param uuid)
 returns json
 language plpgsql
-security definer -- Important: Runs with the permissions of the function owner
+security definer
 as $$
 declare
   user_project_ids uuid[];
@@ -146,22 +132,24 @@ begin
   into projects_json
   from (
     select
-      p.id,
-      p.name,
-      p.description,
-      p.creator_id as "creatorId",
-      p.created_at as "createdAt",
+      p.id, p.name, p.description, p.creator_id as "creatorId", p.created_at as "createdAt",
       (select json_agg(pm.user_id) from public.project_members pm where pm.project_id = p.id) as "members",
-      -- Aggregate board data (columns and tasks)
+      -- Board data
       (
         select json_build_object(
           'tasks', (select coalesce(json_object_agg(t.id, t_json), '{}'::json) from (select t_ext.id, t_ext.task_json as t_json from (
             select
               t.id,
               json_build_object(
-                'id', t.id, 'title', t.title, 'description', t.description, 'priority', t.priority, 'dueDate', NULL, 'creatorId', t.creator_id, 'createdAt', t.created_at,
+                'id', t.id, 'title', t.title, 'description', t.description, 'priority', t.priority, 'dueDate', t.due_date, 'creatorId', t.creator_id, 'createdAt', t.created_at, 'sprintId', t.sprint_id,
                 'assignee', (select json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url, 'role', u.role) from public.users u where u.id = t.assignee_id),
-                'subtasks', (select coalesce(json_agg(s), '[]'::json) from (select st.id, st.title, st.completed, st.creator_id as "creatorId", st.created_at as "createdAt" from public.subtasks st where st.task_id = t.id) s),
+                'subtasks', (select coalesce(json_agg(s), '[]'::json) from (
+                  select
+                    st.id, st.title, st.completed, st.creator_id as "creatorId", st.created_at as "createdAt",
+                    st.assignee_id as "assigneeId",
+                    (select json_build_object('id', u.id, 'name', u.name, 'avatarUrl', u.avatar_url, 'role', u.role) from public.users u where u.id = st.assignee_id) as assignee
+                  from public.subtasks st where st.task_id = t.id
+                ) s),
                 'comments', (select coalesce(json_agg(c order by c."createdAt" asc), '[]'::json) from (select cm.id, cm.text, cm.created_at as "createdAt", json_build_object('id', cu.id, 'name', cu.name, 'avatarUrl', cu.avatar_url, 'role', cu.role) as author from public.comments cm join public.users cu on cm.author_id = cu.id where cm.task_id = t.id) c),
                 'history', (select coalesce(json_agg(h order by h."createdAt" desc), '[]'::json) from (select th.id, th.change_description as "changeDescription", th.created_at as "createdAt", json_build_object('id', hu.id, 'name', hu.name, 'avatarUrl', hu.avatar_url, 'role', hu.role) as user from public.task_history th join public.users hu on th.user_id = hu.id where th.task_id = t.id) h),
                 'tags', (select coalesce(json_agg(tags.name), '[]'::json) from public.task_tags join public.tags on task_tags.tag_id = tags.id where task_tags.task_id = t.id)
@@ -175,11 +163,16 @@ begin
           'columnOrder', (select coalesce(json_agg(c.id order by c.position), '[]'::json) from public.columns c where c.project_id = p.id)
         )
       ) as "board",
-      -- Aggregate other related data
+      -- Other related data
       (select coalesce(json_agg(chat_msg order by "createdAt"), '[]'::json) from (select pc.id, pc.text, pc.created_at as "createdAt", json_build_object('id', au.id, 'name', au.name, 'avatarUrl', au.avatar_url, 'role', au.role) as author from public.project_chats pc join public.users au on pc.author_id = au.id where pc.project_id = p.id) chat_msg) as "chatMessages",
       (select coalesce(json_agg(l order by "createdAt"), '[]'::json) from (select pl.id, pl.title, pl.url, pl.project_id as "projectId", pl.creator_id as "creatorId", pl.created_at as "createdAt" from public.project_links pl where pl.project_id = p.id) l) as "links",
       (select coalesce(json_object_agg(b.id, b_json), '{}'::json) from (select b_ext.id, b_ext.bug_json as b_json from (select b.id, json_build_object('id', b.id, 'bugNumber', b.bug_number, 'title', b.title, 'description', b.description, 'priority', b.priority, 'status', b.status, 'reporterId', b.reporter_id, 'createdAt', b.created_at, 'position', b.position, 'assignee', (select json_build_object('id', bu.id, 'name', bu.name, 'avatarUrl', bu.avatar_url, 'role', bu.role) from public.users bu where bu.id = b.assignee_id)) as bug_json from public.bugs b where b.project_id = p.id) as b_ext) as b) as "bugs",
-      (select coalesce(json_agg(b.id order by b.position), '[]'::json) from public.bugs b where b.project_id = p.id) as "bugOrder"
+      (select coalesce(json_agg(b.id order by b.position), '[]'::json) from public.bugs b where b.project_id = p.id) as "bugOrder",
+      (select coalesce(json_agg(s order by "createdAt"), '[]'::json) from (select sp.id, sp.project_id as "projectId", sp.name, sp.start_date as "startDate", sp.end_date as "endDate", sp.goal, sp.is_default as "isDefault", sp.status, sp.created_at as "createdAt" from public.sprints sp where sp.project_id = p.id) s) as "sprints",
+      (select coalesce(json_agg(fs order by "createdAt"), '[]'::json) from (
+          select fs.id, fs.project_id as "projectId", fs.creator_id as "creatorId", fs.name, fs.filters, fs.created_at as "createdAt"
+          from public.filter_segments fs where fs.project_id = p.id
+      ) fs) as "filterSegments"
     from public.projects p
     where p.id = any(user_project_ids)
   ) p_agg;
@@ -193,10 +186,54 @@ end;
 $$;
 
 grant execute on function public.get_initial_data_for_user(uuid) to authenticated;
+
+
+-- END OF SCRIPT --
+
+
+================================================================================================
+The 'accept_project_invite' function is also included below for completeness.
+If you have issues with project invites, you can run this script as well.
+================================================================================================
+DROP FUNCTION IF EXISTS public.accept_project_invite(uuid);
+DROP FUNCTION IF EXISTS public.accept_project_invite(text, public.user_role);
+DROP FUNCTION IF EXISTS public.accept_project_invite(text);
+create or replace function accept_project_invite(invite_token text)
+returns json
+language plpgsql
+security definer
+as $$
+declare
+  invite_record public.project_invites;
+  current_user_id uuid := auth.uid();
+  member_count int;
+  project_data json;
+begin
+  select * into invite_record from public.project_invites where token = invite_token::uuid for update;
+  if invite_record is null then raise exception 'Invite token is invalid.'; end if;
+  if not invite_record.is_active then raise exception 'This invite link is no longer active.'; end if;
+  if invite_record.expires_at is not null and invite_record.expires_at < now() then raise exception 'This invite link has expired.'; end if;
+  if invite_record.max_uses is not null and invite_record.current_uses >= invite_record.max_uses then raise exception 'This invite link has reached its maximum number of uses.'; end if;
+  select count(*) into member_count from public.project_members where project_id = invite_record.project_id and user_id = current_user_id;
+  if member_count > 0 then
+    select json_build_object('id', p.id, 'name', p.name) into project_data from public.projects p where id = invite_record.project_id;
+    return project_data;
+  end if;
+  insert into public.project_members (project_id, user_id) values (invite_record.project_id, current_user_id);
+  update public.project_invites set current_uses = current_uses + 1 where id = invite_record.id;
+  if invite_record.max_uses is not null and (invite_record.current_uses + 1) >= invite_record.max_uses then
+    update public.project_invites set is_active = false where id = invite_record.id;
+  end if;
+  select json_build_object('id', p.id, 'name', p.name) into project_data from public.projects p where id = invite_record.project_id;
+  if project_data is null then raise exception 'Could not find the project associated with this invite.'; end if;
+  return project_data;
+end;
+$$;
+grant execute on function public.accept_project_invite(text) to authenticated;
 */
 
-import { supabase } from './supabase';
-import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column, FeedbackType, Bug, TaskPriority } from '../types';
+import { supabase, Json } from './supabase';
+import { User, Project, BoardData, NewTaskData, Task, AppState, ChatMessage, TaskHistory, ProjectInviteLink, UserRole, InviteAccessType, ProjectLink, Column, FeedbackType, Bug, TaskPriority, Subtask, Sprint, FilterSegment } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
 
 // Helper to transform array from DB into the state's Record<string, T> format
@@ -428,11 +465,11 @@ const moveTask = async (taskId: string, newColumnId: string, newPosition: number
     if (error) console.error("Error moving task:", error.message || error);
 };
 
-const updateTask = async (updatedTask: Task, actorId: string) => {
+const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) => {
     // Fetch old task data for comparison to create history logs
     const { data: oldTaskData, error: fetchError } = await supabase
         .from('tasks')
-        .select('*, assignee:users!tasks_assignee_id_fkey(*)') // FIX: Explicitly define relationship to resolve ambiguity
+        .select('*, assignee:users!tasks_assignee_id_fkey(*), subtasks(*, assignee:users!subtasks_assignee_id_fkey(*))')
         .eq('id', updatedTask.id)
         .single();
 
@@ -461,6 +498,68 @@ const updateTask = async (updatedTask: Task, actorId: string) => {
             const dateDescription = updatedTask.dueDate ? `set the due date to ${new Date(updatedTask.dueDate).toLocaleDateString()}` : 'removed the due date';
             historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: dateDescription });
         }
+        // History for sprint change
+        if (oldTaskData.sprint_id !== updatedTask.sprintId) {
+            const { data: columnData } = await supabase.from('columns').select('project_id').eq('id', oldTaskData.column_id).single();
+            const projectId = columnData?.project_id;
+            if (projectId) {
+                const { data: allSprints } = await supabase.from('sprints').select('id, name').eq('project_id', projectId);
+                const oldSprintName = allSprints?.find(s => s.id === oldTaskData.sprint_id)?.name;
+                const newSprintName = allSprints?.find(s => s.id === updatedTask.sprintId)?.name;
+                
+                let change_description = '';
+                if (newSprintName && oldSprintName) {
+                     change_description = `moved this task from sprint "${oldSprintName}" to "${newSprintName}"`;
+                } else if (newSprintName) {
+                    change_description = `moved this task to sprint "${newSprintName}"`;
+                } else if (oldSprintName) {
+                    change_description = `removed this task from sprint "${oldSprintName}"`;
+                }
+    
+                if (change_description) {
+                    historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description });
+                }
+            }
+        }
+
+
+        // History for subtasks
+        const oldSubtasks: Subtask[] = oldTaskData.subtasks || [];
+        const newSubtasks = updatedTask.subtasks || [];
+        
+        // Deleted
+        const subtasksDeleted = oldSubtasks.filter(os => !newSubtasks.some(ns => ns.id === os.id));
+        subtasksDeleted.forEach(s => {
+            historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `deleted subtask: "${s.title}"` });
+        });
+        
+        oldSubtasks.forEach(os => {
+            const matchingNew = newSubtasks.find(ns => ns.id === os.id);
+            if (!matchingNew) return;
+
+            // Renamed
+            if (os.title !== matchingNew.title) {
+                historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `renamed subtask from "${os.title}" to "${matchingNew.title}"` });
+            }
+
+            // Toggled completion
+            if (os.completed !== matchingNew.completed) {
+                const action = matchingNew.completed ? 'completed' : 'un-completed';
+                historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: `${action} subtask: "${matchingNew.title}"` });
+            }
+
+            // Assigned/Unassigned
+            if (os.assigneeId !== matchingNew.assigneeId) {
+                let changeDescription = '';
+                if (matchingNew.assigneeId) {
+                    const assigneeName = allUsers.find(u => u.id === matchingNew.assigneeId)?.name || 'a user';
+                    changeDescription = `assigned subtask "${matchingNew.title}" to ${assigneeName}`;
+                } else {
+                    changeDescription = `unassigned subtask "${matchingNew.title}"`;
+                }
+                historyItems.push({ task_id: updatedTask.id, user_id: actorId, change_description: changeDescription });
+            }
+        });
         
         // History for tags
         const { data: oldTagData, error: tagFetchError } = await supabase
@@ -499,7 +598,8 @@ const updateTask = async (updatedTask: Task, actorId: string) => {
         description: updatedTask.description,
         priority: updatedTask.priority,
         assignee_id: updatedTask.assignee?.id || null,
-        due_date: updatedTask.dueDate || null
+        due_date: updatedTask.dueDate || null,
+        sprint_id: updatedTask.sprintId,
       })
       .eq('id', updatedTask.id);
 
@@ -542,24 +642,54 @@ const updateTask = async (updatedTask: Task, actorId: string) => {
 
     // Update subtasks
     if (updatedTask.subtasks) {
-        const { error: subtasksError } = await supabase.from('subtasks').upsert(
-            updatedTask.subtasks.map(s => ({
-                id: s.id,
-                task_id: updatedTask.id,
-                title: s.title,
-                completed: s.completed,
-                creator_id: s.creatorId,
-                created_at: s.createdAt,
-            }))
-        );
-        if (subtasksError) {
-            console.error("Error upserting subtasks:", subtasksError);
+        const { data: currentSubtasks, error: fetchSubtasksError } = await supabase
+            .from('subtasks')
+            .select('id')
+            .eq('task_id', updatedTask.id);
+
+        if (fetchSubtasksError) {
+            console.error("Error fetching current subtasks:", fetchSubtasksError);
+            throw fetchSubtasksError;
+        }
+
+        const currentSubtaskIds = new Set(currentSubtasks.map(s => s.id));
+        const updatedSubtaskIds = new Set(updatedTask.subtasks.map(s => s.id));
+        const subtasksToDelete = Array.from(currentSubtaskIds).filter(id => !updatedSubtaskIds.has(id));
+
+        if (subtasksToDelete.length > 0) {
+            const { error: deleteSubtasksError } = await supabase
+                .from('subtasks')
+                .delete()
+                .in('id', subtasksToDelete);
+            
+            if (deleteSubtasksError) {
+                console.error("Error deleting subtasks:", deleteSubtasksError);
+                throw deleteSubtasksError;
+            }
+        }
+
+        if (updatedTask.subtasks.length > 0) {
+            const { error: subtasksError } = await supabase.from('subtasks').upsert(
+                updatedTask.subtasks.map(s => ({
+                    id: s.id,
+                    task_id: updatedTask.id,
+                    title: s.title,
+                    completed: s.completed,
+                    creator_id: s.creatorId,
+                    created_at: s.createdAt,
+                    assignee_id: s.assigneeId || null,
+                }))
+            );
+            if (subtasksError) {
+                console.error("Error upserting subtasks:", subtasksError);
+                throw subtasksError;
+            }
         }
     }
 };
 
 const addTask = async (taskData: NewTaskData, creatorId: string): Promise<Task> => {
-    const { error, data } = await supabase
+    const { data, error } = await supabase
         .from('tasks')
         .insert({
             title: taskData.title,
@@ -569,6 +699,7 @@ const addTask = async (taskData: NewTaskData, creatorId: string): Promise<Task> 
             assignee_id: taskData.assigneeId,
             creator_id: creatorId,
             due_date: taskData.dueDate,
+            sprint_id: taskData.sprintId,
         })
         .select()
         .single();
@@ -576,14 +707,44 @@ const addTask = async (taskData: NewTaskData, creatorId: string): Promise<Task> 
     return data as Task;
 };
 
-const addSubtasks = async (taskId: string, subtasks: { title: string }[], creatorId: string) => {
+const addTasksBatch = async (tasksData: (NewTaskData & { creator_id: string })[]): Promise<any[]> => {
+    const tasksToInsert = tasksData.map(t => ({
+        title: t.title,
+        description: t.description,
+        priority: t.priority,
+        column_id: t.columnId,
+        assignee_id: t.assigneeId,
+        creator_id: t.creator_id,
+        due_date: t.dueDate,
+        sprint_id: t.sprintId,
+    }));
+    const { data, error } = await supabase.from('tasks').insert(tasksToInsert).select();
+    if (error) throw error;
+    return data;
+};
+
+const addSubtasks = async (taskId: string, subtasks: Partial<Subtask>[], creatorId: string) => {
     const subtasksToInsert = subtasks.map(s => ({
         task_id: taskId,
         title: s.title,
-        creator_id: creatorId
+        creator_id: creatorId,
+        assignee_id: s.assigneeId,
     }));
     const { error } = await supabase.from('subtasks').insert(subtasksToInsert);
     if (error) throw error;
+
+    const historyItems = subtasks.map(s => ({
+        task_id: taskId,
+        user_id: creatorId,
+        change_description: `added subtask: "${s.title}"`
+    }));
+
+    if (historyItems.length > 0) {
+        const { error: historyError } = await supabase.from('task_history').insert(historyItems);
+        if (historyError) {
+            console.warn("Could not log subtask creation history:", historyError.message);
+        }
+    }
 };
 
 const addComment = async (taskId: string, text: string, authorId: string) => {
@@ -734,7 +895,10 @@ const createInviteLink = async (projectId: string, creatorId: string, role: User
         duration_days: expiresInDays
     });
     if (error) throw error;
-    return data;
+    // A Supabase RPC call might return an array with a single item. This handles that case.
+    const result = Array.isArray(data) ? data[0] : data;
+    // The type of `result` from rpc is `any`, which we cast to `ProjectInviteLink` for safety.
+    return result as ProjectInviteLink;
 };
 
 const updateInviteLink = async (linkId: string, updates: { is_active: boolean }): Promise<ProjectInviteLink> => {
@@ -749,9 +913,22 @@ const updateInviteLink = async (linkId: string, updates: { is_active: boolean })
 };
 
 const acceptInvite = async (token: string): Promise<{ id: string; name: string; }> => {
-    const { data, error } = await supabase.rpc('accept_project_invite', { invite_token: token });
+    // FIX: Removed the generic from rpc() to default data to `any`, which allows the `typeof` guard to work without type checker issues.
+    // FIX: By adding the `Json` generic, we provide a strong type for `data`, resolving the `unknown` type error with `JSON.parse`.
+    const { data, error } = await supabase.rpc<Json>('accept_project_invite', { invite_token: token });
     if (error) throw error;
-    return data;
+    if (!data) {
+        throw new Error('Invite acceptance returned no data.');
+    }
+    
+    // The `data` from the `rpc` call can be a stringified JSON.
+    // The `typeof` check correctly narrows `data` to `string` so `JSON.parse` can be called safely.
+    if (typeof data === 'string') {
+        // FIX: The type guard `typeof data === 'string'' is sufficient to narrow the type. The previous cast to 'any' was incorrect.
+        // FIX: Casting `data` to string to resolve the type error, as type narrowing seems to fail in the user's environment.
+        return JSON.parse(data as string);
+    }
+    return data as { id: string, name: string };
 };
 
 const submitFeedback = async (feedbackData: {
@@ -768,6 +945,110 @@ const submitFeedback = async (feedbackData: {
         description: feedbackData.description,
         context_data: feedbackData.contextData,
     });
+    if (error) throw error;
+};
+
+// FIX: Add sprint management functions
+const addSprint = async (sprintData: {
+    projectId: string;
+    name: string;
+    goal: string | null;
+    startDate: string | null;
+    endDate: string | null;
+    isDefault?: boolean;
+}): Promise<Sprint> => {
+    const { data, error } = await supabase
+        .from('sprints')
+        .insert({
+            project_id: sprintData.projectId,
+            name: sprintData.name,
+            goal: sprintData.goal,
+            start_date: sprintData.startDate,
+            end_date: sprintData.endDate,
+            is_default: sprintData.isDefault,
+        })
+        .select()
+        .single();
+    if (error) throw error;
+    return {
+        id: data.id,
+        projectId: data.project_id,
+        name: data.name,
+        startDate: data.start_date,
+        endDate: data.end_date,
+        goal: data.goal,
+        isDefault: data.is_default,
+        createdAt: data.created_at,
+        status: data.status,
+    } as Sprint;
+};
+
+const updateSprint = async (sprintId: string, updates: Partial<Sprint>): Promise<void> => {
+    const dbUpdates: Record<string, any> = {};
+    if (updates.hasOwnProperty('name')) dbUpdates.name = updates.name;
+    if (updates.hasOwnProperty('goal')) dbUpdates.goal = updates.goal;
+    if (updates.hasOwnProperty('startDate')) dbUpdates.start_date = updates.startDate;
+    if (updates.hasOwnProperty('endDate')) dbUpdates.end_date = updates.endDate;
+    if (updates.hasOwnProperty('isDefault')) dbUpdates.is_default = updates.isDefault;
+
+    if (updates.isDefault === true) {
+        const { data: sprint, error: fetchError } = await supabase.from('sprints').select('project_id').eq('id', sprintId).single();
+        if (fetchError) throw fetchError;
+        if (sprint) {
+            const { error: unsetError } = await supabase
+                .from('sprints')
+                .update({ is_default: false })
+                .eq('project_id', sprint.project_id)
+                .neq('id', sprintId);
+            if (unsetError) throw unsetError;
+        }
+    }
+
+    if (Object.keys(dbUpdates).length > 0) {
+        const { error } = await supabase.from('sprints').update(dbUpdates).eq('id', sprintId);
+        if (error) throw error;
+    }
+};
+
+const deleteSprint = async (sprintId: string): Promise<void> => {
+    const { error } = await supabase.from('sprints').delete().eq('id', sprintId);
+    if (error) throw error;
+};
+
+const bulkUpdateTaskSprint = async (taskIds: string[], sprintId: string | null) => {
+    const { error } = await supabase
+        .from('tasks')
+        .update({ sprint_id: sprintId })
+        .in('id', taskIds);
+    if (error) throw error;
+};
+
+const completeSprint = async (sprintId: string, moveToSprintId: string | null) => {
+    const { error } = await supabase.rpc('complete_sprint', {
+        sprint_id_to_complete: sprintId,
+        move_to_sprint_id: moveToSprintId,
+    });
+    if (error) throw error;
+};
+
+// FIX: Added missing functions for managing filter segments.
+const addFilterSegment = async (projectId: string, name: string, filters: FilterSegment['filters'], creatorId: string) => {
+    const { error } = await supabase.from('filter_segments').insert({
+        project_id: projectId,
+        name,
+        filters,
+        creator_id: creatorId,
+    });
+    if (error) throw error;
+};
+
+const updateFilterSegment = async (segmentId: string, updates: { name?: string, filters?: FilterSegment['filters'] }) => {
+    const { error } = await supabase.from('filter_segments').update(updates).eq('id', segmentId);
+    if (error) throw error;
+};
+
+const deleteFilterSegment = async (segmentId: string) => {
+    const { error } = await supabase.from('filter_segments').delete().eq('id', segmentId);
     if (error) throw error;
 };
 
@@ -796,6 +1077,7 @@ export const api = {
     moveTask,
     updateTask,
     addTask,
+    addTasksBatch,
     addSubtasks,
     addComment,
     deleteTask,
@@ -818,5 +1100,13 @@ export const api = {
     updateInviteLink,
     acceptInvite,
     submitFeedback,
+    addSprint,
+    updateSprint,
+    deleteSprint,
+    bulkUpdateTaskSprint,
+    completeSprint,
+    addFilterSegment,
+    updateFilterSegment,
+    deleteFilterSegment,
   }
 };

@@ -37,7 +37,7 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, 
     >
       {/* Project Name & Description */}
       <div className="col-span-4">
-        <h3 className="font-bold text-white truncate text-sm">{project.name}</h3>
+        <h3 className="font-bold text-white truncate text-xs">{project.name}</h3>
         <p className="text-xs text-gray-400 truncate">{project.description}</p>
       </div>
 
@@ -54,8 +54,8 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, 
 
       {/* Task Count */}
       <div className="col-span-2 text-center">
-        <span className="font-semibold text-white text-sm">{completedTasks} / {totalTasks}</span>
-        <span className="block text-xs text-gray-400">Tasks Done</span>
+        <span className="font-semibold text-white text-xs">{completedTasks} / {totalTasks}</span>
+        <span className="block text-[11px] text-gray-400">Tasks Done</span>
       </div>
 
       {/* Members */}
@@ -78,11 +78,11 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, 
 
       {/* Action Buttons */}
       <div className="col-span-2 flex items-center justify-end gap-3">
-        <button onClick={handleShareClick} className="flex items-center gap-1.5 text-sm font-semibold text-white hover:text-gray-300 hover:underline">
+        <button onClick={handleShareClick} className="flex items-center gap-1.5 text-xs font-semibold text-white hover:text-gray-300 hover:underline">
           <Share2Icon className="w-4 h-4" />
           Share
         </button>
-        <button onClick={handleManageClick} className="flex items-center gap-1.5 text-sm font-semibold text-white hover:text-gray-300 hover:underline">
+        <button onClick={handleManageClick} className="flex items-center gap-1.5 text-xs font-semibold text-white hover:text-gray-300 hover:underline">
           <UsersIcon className="w-4 h-4" />
           Manage
         </button>

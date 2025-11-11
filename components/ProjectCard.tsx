@@ -39,7 +39,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, online
     >
       <div>
         <div className="flex justify-between items-start mb-2">
-            <h3 className="text-lg font-bold text-white">{project.name}</h3>
+            <h3 className="text-base font-bold text-white">{project.name}</h3>
             {creator && (
                  <UserAvatar 
                     user={creator} 
@@ -49,17 +49,17 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, online
                  />
             )}
         </div>
-        <p className="text-gray-400 text-sm mb-4 h-10 overflow-hidden">{project.description}</p>
+        <p className="text-gray-400 text-xs mb-4 h-10 overflow-hidden">{project.description}</p>
       </div>
       <div>
-        <div className="flex justify-between items-center text-sm text-gray-400 mb-1">
+        <div className="flex justify-between items-center text-xs text-gray-400 mb-1">
             <span>Progress</span>
             <span>{progress}%</span>
         </div>
         <div className="w-full bg-gray-800 rounded-full h-2">
             <div className="bg-gray-500 h-2 rounded-full" style={{ width: `${progress}%` }}></div>
         </div>
-        <div className="mt-4 text-sm text-gray-400">
+        <div className="mt-4 text-xs text-gray-400">
             <span>{completedTasks} / {totalTasks} tasks completed</span>
         </div>
       </div>
@@ -82,11 +82,11 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, online
                   )}
               </div>
                <div className="flex items-center gap-4">
-                  <button onClick={handleShareClick} className="flex items-center gap-1.5 text-sm font-semibold text-white hover:text-gray-300 hover:underline">
+                  <button onClick={handleShareClick} className="flex items-center gap-1.5 text-xs font-semibold text-white hover:text-gray-300 hover:underline">
                       <Share2Icon className="w-4 h-4" />
                       Share
                   </button>
-                  <button onClick={handleManageClick} className="flex items-center gap-1.5 text-sm font-semibold text-white hover:text-gray-300 hover:underline">
+                  <button onClick={handleManageClick} className="flex items-center gap-1.5 text-xs font-semibold text-white hover:text-gray-300 hover:underline">
                       <UsersIcon className="w-4 h-4" />
                       Manage
                   </button>

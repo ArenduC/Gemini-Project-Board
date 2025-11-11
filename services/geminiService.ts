@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { TaskPriority, Project, User, ProjectLink, AiGeneratedProjectPlan } from "../types";
+import { TaskPriority, Project, User, ProjectLink, AiGeneratedProjectPlan, AiGeneratedTaskFromFile } from "../types";
 
 // FIX: Switched to using process.env.API_KEY and updated the credential check
 // to align with @google/genai guidelines. This resolves the original type error.
@@ -204,6 +204,33 @@ const bugsFromFileResponseSchema = {
             }
         },
         required: ["title", "description"],
+    },
+};
+
+export const tasksFromFileResponseSchema = {
+    type: Type.ARRAY,
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            title: {
+                type: Type.STRING,
+                description: "A concise title for the task, extracted or summarized from the source."
+            },
+            description: {
+                type: Type.STRING,
+                description: "A detailed description of the task, including any relevant context from the source file."
+            },
+            priority: {
+                type: Type.STRING,
+                enum: Object.values(TaskPriority),
+                description: "The priority of the task. Default to 'Medium' if not specified."
+            },
+            status: {
+                type: Type.STRING,
+                description: "The status of the task, which should match one of the provided column names."
+            }
+        },
+        required: ["title", "description", "priority", "status"],
     },
 };
 
@@ -583,5 +610,61 @@ export const generateBugsFromFile = async (fileContent: string): Promise<BugResp
             throw new Error("The Gemini API key is invalid or missing.");
         }
         throw new Error("AI failed to parse bugs from the file. Please check the file format and try again.");
+    }
+};
+
+/**
+ * Parses tasks from a text, CSV, PDF, or DOC file.
+ * @param fileData An object containing the file content (string or base64) and its MIME type.
+ * @param columnNames An array of possible column names for the 'status' field.
+ * @returns A promise that resolves to an array of task objects.
+ */
+export const generateTasksFromFile = async (fileData: { content: string; mimeType: string }, columnNames: string[]): Promise<AiGeneratedTaskFromFile[]> => {
+    try {
+        const isTextFile = fileData.mimeType === 'text/csv' || fileData.mimeType === 'text/plain';
+
+        const promptText = `
+            You are a task management assistant. A user has provided a file (CSV, plain text, PDF, or Word document) containing a list of tasks.
+            Your task is to parse the file's content and structure it into a JSON array of task objects. Each object must have a 'title', 'description', 'priority', and 'status'.
+            - For CSVs, look for columns like 'title', 'task', 'description', 'priority', 'status'.
+            - For text files, each line or paragraph may represent a different task. Use the first line as the title and subsequent lines as the description.
+            - For PDF or Word documents, intelligently extract the key information that represents tasks.
+            - Infer priority from keywords if possible (e.g., 'urgent', 'important'), otherwise default to 'Medium'.
+            - The 'status' for each task MUST be one of the following available column names: ${JSON.stringify(columnNames)}. Assign tasks to the most logical column. If a task's status is unclear, assign it to the first column name in the list ('${columnNames[0]}').
+            - Be robust and handle messy data gracefully. If a row/line is unclear, skip it.
+            - Ensure the output is ONLY the JSON array. Do not include any other text.
+            ${isTextFile ? `\nHere is the file content:\n---\n${fileData.content}\n---` : ''}
+        `;
+
+        const contents = isTextFile 
+            ? promptText
+            : { parts: [
+                { text: promptText },
+                { inlineData: { mimeType: fileData.mimeType, data: fileData.content } }
+            ]};
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: contents,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: tasksFromFileResponseSchema,
+            },
+        });
+
+        const jsonText = response.text.trim();
+        if (!jsonText) {
+            console.warn("Gemini API returned an empty response for task parsing.");
+            return [];
+        }
+        const parsedResponse = JSON.parse(jsonText);
+        return parsedResponse as AiGeneratedTaskFromFile[];
+
+    } catch (error) {
+        console.error("Error calling Gemini API for task parsing:", error);
+        if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
+            throw new Error("The Gemini API key is invalid or missing.");
+        }
+        throw new Error("AI failed to parse tasks from the file. Please check the file format and try again.");
     }
 };

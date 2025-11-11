@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DropResult } from 'react-beautiful-dnd';
-import { AppState, Task, NewTaskData, User, ChatMessage, AiGeneratedProjectPlan, Bug, TaskPriority } from '../types';
+import { AppState, Task, NewTaskData, User, ChatMessage, AiGeneratedProjectPlan, Bug, TaskPriority, Subtask, AiGeneratedTaskFromFile, Sprint, FilterSegment } from '../types';
 import { api } from '../services/api';
 import { generateTaskFromPrompt, generateBugsFromFile, BugResponse } from '../services/geminiService';
 import { Session } from '@supabase/supabase-js';
@@ -178,11 +178,11 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   
   const updateTask = useCallback(async (projectId: string, updatedTask: Task) => {
       if (!currentUser) return;
-      await api.data.updateTask(updatedTask, currentUser.id);
+      await api.data.updateTask(updatedTask, currentUser.id, Object.values(state.users));
       await fetchData();
-  }, [fetchData, currentUser]);
+  }, [fetchData, currentUser, state.users]);
 
-  const addSubtasks = useCallback(async (projectId: string, taskId: string, newSubtasksData: { title:string }[], creatorId: string) => {
+  const addSubtasks = useCallback(async (projectId: string, taskId: string, newSubtasksData: Partial<Subtask>[], creatorId: string) => {
     await api.data.addSubtasks(taskId, newSubtasksData, creatorId);
     await fetchData();
   }, [fetchData]);
@@ -194,9 +194,61 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, [fetchData]);
 
   const addTask = useCallback(async (projectId: string, taskData: NewTaskData, creatorId: string) => {
-    await api.data.addTask(taskData, creatorId);
+    const newTask = await api.data.addTask(taskData, creatorId);
+    if (newTask && currentUser) {
+      // Move the new task to the top of its column.
+      await api.data.moveTask(newTask.id, taskData.columnId, 1, currentUser.id);
+    }
     await fetchData();
-  }, [fetchData]);
+  }, [fetchData, currentUser]);
+
+  const addTasksBatch = useCallback(async (projectId: string, tasksToCreate: AiGeneratedTaskFromFile[], sprintId: string | null) => {
+    if (!currentUser) return;
+    const project = state.projects[projectId];
+    if (!project) return;
+    
+    // Create a map of column names to column IDs for quick lookup
+    const columnMap = new Map<string, string>();
+    for (const colId of project.board.columnOrder) {
+        const col = project.board.columns[colId];
+        columnMap.set(col.title.toLowerCase(), col.id);
+    }
+    
+    const firstColumnId = project.board.columnOrder[0];
+
+    const tasksData: (NewTaskData & { creator_id: string })[] = tasksToCreate.map(task => ({
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        columnId: columnMap.get(task.status.toLowerCase()) || firstColumnId,
+        creator_id: currentUser.id,
+        sprintId: sprintId,
+    }));
+
+    if (tasksData.length > 0) {
+        const newTasks: any[] = await api.data.addTasksBatch(tasksData);
+        if (newTasks) {
+            const tasksByColumn: { [key: string]: any[] } = newTasks.reduce((acc, task) => {
+                const columnId = task.column_id;
+                if (!acc[columnId]) {
+                    acc[columnId] = [];
+                }
+                acc[columnId].push(task);
+                return acc;
+            }, {} as { [key: string]: any[] });
+            
+            for (const columnId of Object.keys(tasksByColumn)) {
+                const tasksForColumn = tasksByColumn[columnId];
+                // Reverse iterate to maintain order when inserting at position 1
+                for (let i = tasksForColumn.length - 1; i >= 0; i--) {
+                    const task = tasksForColumn[i];
+                    await api.data.moveTask(task.id, columnId, 1, currentUser.id);
+                }
+            }
+        }
+        await fetchData();
+    }
+  }, [fetchData, currentUser, state.projects]);
 
   const addAiTask = useCallback(async (projectId: string, prompt: string) => {
     if (!currentUser) throw new Error("User must be logged in to create a task.");
@@ -216,7 +268,10 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         dueDate: generatedData.dueDate,
     };
 
-    await api.data.addTask(taskData, currentUser.id);
+    const newTask = await api.data.addTask(taskData, currentUser.id);
+    if (newTask) {
+      await api.data.moveTask(newTask.id, taskData.columnId, 1, currentUser.id);
+    }
     await fetchData();
   }, [fetchData, state.projects, currentUser]);
 
@@ -411,6 +466,48 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     await fetchData();
   }, [fetchData]);
 
+  const addSprint = useCallback(async (projectId: string, sprintData: Omit<Sprint, 'id' | 'projectId' | 'createdAt' | 'isDefault'> & { isDefault?: boolean }): Promise<Sprint> => {
+    const newSprint = await api.data.addSprint({ ...sprintData, projectId });
+    await fetchData();
+    return newSprint;
+  }, [fetchData]);
 
-  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch };
+  const updateSprint = useCallback(async (projectId: string, sprintId: string, updates: Partial<Sprint>) => {
+    await api.data.updateSprint(sprintId, updates);
+    await fetchData();
+  }, [fetchData]);
+
+  const deleteSprint = useCallback(async (projectId: string, sprintId: string) => {
+    await api.data.deleteSprint(sprintId);
+    await fetchData();
+  }, [fetchData]);
+
+  const bulkUpdateTaskSprint = useCallback(async (taskIds: string[], sprintId: string | null) => {
+    await api.data.bulkUpdateTaskSprint(taskIds, sprintId);
+    await fetchData();
+  }, [fetchData]);
+
+  const completeSprint = useCallback(async (sprintId: string, moveToSprintId: string | null) => {
+    await api.data.completeSprint(sprintId, moveToSprintId);
+    await fetchData();
+  }, [fetchData]);
+
+  // Filter Segment Management
+  const addFilterSegment = useCallback(async (projectId: string, name: string, filters: FilterSegment['filters'], creatorId: string) => {
+    await api.data.addFilterSegment(projectId, name, filters, creatorId);
+    await fetchData();
+  }, [fetchData]);
+
+  const updateFilterSegment = useCallback(async (segmentId: string, updates: { name?: string, filters?: FilterSegment['filters'] }) => {
+    await api.data.updateFilterSegment(segmentId, updates);
+    await fetchData();
+  }, [fetchData]);
+
+  const deleteFilterSegment = useCallback(async (segmentId: string) => {
+    await api.data.deleteFilterSegment(segmentId);
+    await fetchData();
+  }, [fetchData]);
+
+
+  return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch, addTasksBatch, addSprint, updateSprint, deleteSprint, bulkUpdateTaskSprint, completeSprint, addFilterSegment, updateFilterSegment, deleteFilterSegment };
 };

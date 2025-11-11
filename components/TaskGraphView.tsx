@@ -32,7 +32,7 @@ const TaskTree: React.FC<TaskTreeProps> = ({ task, column, users, onTaskClick })
                 </div>
                 <div className="flex-grow">
                     <p className="font-semibold text-white">{task.title}</p>
-                    <p className={`text-sm font-medium ${colorInfo.text}`}>{status}</p>
+                    <p className={`text-xs font-medium ${colorInfo.text}`}>{status}</p>
                 </div>
                 {task.assignee && <UserAvatar user={task.assignee} className="w-9 h-9 flex-shrink-0" />}
             </div>
@@ -53,7 +53,7 @@ const TaskTree: React.FC<TaskTreeProps> = ({ task, column, users, onTaskClick })
                                 <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-800/50 flex-shrink-0">
                                     <div className={`w-3 h-3 rounded-full ${subtask.completed ? statusColors['Done'].dot : statusColors['To Do'].dot}`}></div>
                                 </div>
-                                <p className={`flex-grow text-sm ${subtask.completed ? 'line-through text-gray-500' : 'text-white'}`}>{subtask.title}</p>
+                                <p className={`flex-grow text-xs ${subtask.completed ? 'line-through text-gray-500' : 'text-white'}`}>{subtask.title}</p>
                                 {task.assignee && <UserAvatar user={task.assignee} className="w-7 h-7 flex-shrink-0 opacity-60" title={`Assigned to ${task.assignee.name}`}/>}
                             </div>
                         </li>
@@ -85,7 +85,7 @@ export const TaskGraphView: React.FC<TaskGraphViewProps> = ({ boardData, users, 
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
                 {tasksByColumn.map(({ column, tasks }) => (
                     <div key={column.id}>
-                        <h3 className="text-base font-semibold mb-4 flex items-center gap-2 text-white">
+                        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2 text-white">
                            <span>{column.title}</span>
                            <span className="text-xs font-medium bg-gray-700 text-white rounded-full px-2 py-0.5">
                                {tasks.length}
@@ -108,7 +108,7 @@ export const TaskGraphView: React.FC<TaskGraphViewProps> = ({ boardData, users, 
             {totalTasks === 0 && (
                 <div className="text-center py-12 text-gray-400">
                     <p className="font-semibold">No tasks to display in the graph view.</p>
-                    <p className="text-sm mt-1">Try creating some tasks or clearing your filters.</p>
+                    <p className="text-xs mt-1">Try creating some tasks or clearing your filters.</p>
                 </div>
             )}
         </div>

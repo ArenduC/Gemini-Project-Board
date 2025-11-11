@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Project, User, AiGeneratedProjectPlan } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
 import { ProjectListRow } from '../components/ProjectListRow';
@@ -24,15 +24,15 @@ interface DashboardPageProps {
 const NoProjects: React.FC<{ onCreateProject: () => void }> = ({ onCreateProject }) => (
   <div className="text-center py-20 px-6 bg-[#131C1B] rounded-xl border border-dashed border-gray-800">
     <LayoutDashboardIcon className="mx-auto h-12 w-12 text-gray-500" />
-    <h3 className="mt-4 text-lg font-semibold text-white">No Projects Yet</h3>
-    <p className="mt-1 text-sm text-gray-400">
+    <h3 className="mt-4 text-base font-semibold text-white">No Projects Yet</h3>
+    <p className="mt-1 text-xs text-gray-400">
       Get started by creating your first project.
     </p>
     <div className="mt-6">
       <button
         onClick={onCreateProject}
         type="button"
-        className="inline-flex items-center gap-2 px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all text-sm"
+        className="inline-flex items-center gap-2 px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all text-xs"
       >
         <PlusIcon className="w-4 h-4" />
         Create Project
@@ -40,6 +40,28 @@ const NoProjects: React.FC<{ onCreateProject: () => void }> = ({ onCreateProject
     </div>
   </div>
 );
+
+const getProjectLastActivity = (project: Project): number => {
+    const timestamps: number[] = [new Date(project.createdAt || 0).getTime()];
+
+    const tasks = Object.values(project.board.tasks);
+    tasks.forEach(task => {
+        timestamps.push(new Date(task.createdAt || 0).getTime());
+        task.comments.forEach(comment => timestamps.push(new Date(comment.createdAt || 0).getTime()));
+        task.subtasks.forEach(subtask => timestamps.push(new Date(subtask.createdAt || 0).getTime()));
+        task.history.forEach(historyItem => timestamps.push(new Date(historyItem.createdAt || 0).getTime()));
+    });
+
+    project.chatMessages.forEach(message => timestamps.push(new Date(message.createdAt || 0).getTime()));
+
+    if (project.bugs) {
+        Object.values(project.bugs).forEach(bug => timestamps.push(new Date(bug.createdAt || 0).getTime()));
+    }
+
+    project.links.forEach(link => timestamps.push(new Date(link.createdAt || 0).getTime()));
+
+    return Math.max(...timestamps);
+};
 
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, onlineUsers, onSelectProject, onCreateProject, onManageMembers, onShareProject, addProjectFromPlan }) => {
@@ -50,8 +72,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  const totalPages = Math.ceil(projects.length / ITEMS_PER_PAGE);
-  const paginatedProjects = projects.slice(
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) => getProjectLastActivity(b) - getProjectLastActivity(a));
+  }, [projects]);
+
+  const totalPages = Math.ceil(sortedProjects.length / ITEMS_PER_PAGE);
+  const paginatedProjects = sortedProjects.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
@@ -87,7 +113,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
   return (
     <div>
         <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-            <h2 className="text-2xl font-bold text-white">Projects Dashboard</h2>
+            <h2 className="text-xl font-bold text-white">Projects Dashboard</h2>
             <div className="flex items-center gap-2">
                  {/* View Toggle */}
                 <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
@@ -110,7 +136,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                 {/* Export Button */}
                 <button
                   onClick={handleExport}
-                  className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 text-white font-semibold rounded-lg shadow-sm hover:bg-gray-700 transition-all text-sm"
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 text-white font-semibold rounded-lg shadow-sm hover:bg-gray-700 transition-all text-xs"
                 >
                     <DownloadIcon className="w-4 h-4"/>
                     <span>Export</span>
@@ -119,7 +145,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                 {/* Create Project Button */}
                 <button
                   onClick={onCreateProject}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all text-sm"
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-sm hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] transition-all text-xs"
                 >
                   <PlusIcon className="w-4 h-4" />
                   New Project
@@ -135,7 +161,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
             <>
                 {view === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {projects.map(project => (
+                        {sortedProjects.map(project => (
                             <ProjectCard 
                                 key={project.id} 
                                 project={project} 
@@ -175,7 +201,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, o
                           totalPages={totalPages}
                           onPageChange={setCurrentPage}
                           itemsPerPage={ITEMS_PER_PAGE}
-                          totalItems={projects.length}
+                          totalItems={sortedProjects.length}
                         />
                     </div>
                 )}

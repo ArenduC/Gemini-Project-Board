@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { api } from '../services/api';
 import { BotMessageSquareIcon, UsersIcon, LoaderCircleIcon, CheckIcon } from '../components/Icons';
@@ -123,26 +124,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                                 <CheckIcon className="w-5 h-5 text-white" />
                             </div>
                         </div>
-                        <h1 className="text-2xl font-bold tracking-tight text-white mt-2">
+                        <h1 className="text-xl font-bold tracking-tight text-white mt-2">
                             Check your email
                         </h1>
                     </div>
                     <div className="bg-[#131C1B] rounded-xl shadow-lg p-8 space-y-4">
-                        <p className="text-sm text-gray-300">
+                        <p className="text-xs text-gray-300">
                             {successMessage || `We've sent a confirmation link to ${email}. Please check your inbox (and spam folder) to complete your registration.`}
                         </p>
                         
-                        {error && <p className="text-sm text-red-500">{error}</p>}
+                        {error && <p className="text-xs text-red-500">{error}</p>}
                         
                         <button
                             onClick={handleResendConfirmation}
                             disabled={loading}
-                            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-black bg-gray-300 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-[#131C1B] disabled:bg-gray-500"
+                            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-xs font-medium text-black bg-gray-300 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-[#131C1B] disabled:bg-gray-500"
                         >
                             {loading ? <LoaderCircleIcon className="animate-spin h-5 w-5" /> : 'Resend confirmation link'}
                         </button>
 
-                        <button onClick={() => handleModeChange('signIn')} className="text-sm font-medium text-white hover:text-gray-300">
+                        <button onClick={() => handleModeChange('signIn')} className="text-xs font-medium text-white hover:text-gray-300">
                            Back to Sign In
                         </button>
                     </div>
@@ -156,13 +157,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
              <div className="w-full max-w-sm">
                 <div className="flex flex-col items-center mb-6">
                     <BotMessageSquareIcon className="w-12 h-12 text-gray-400" />
-                    <h1 className="text-2xl font-bold tracking-tight text-white mt-2">
+                    <h1 className="text-xl font-bold tracking-tight text-white mt-2">
                         Gemini Project Board
                     </h1>
-                    <p className="text-gray-400 mt-1 text-sm">{getTitle()}</p>
+                    <p className="text-gray-400 mt-1 text-xs">{getTitle()}</p>
                 </div>
                 {hasInvite && (
-                    <div className="mb-4 text-center text-sm text-green-300 bg-green-900/30 p-3 rounded-lg border border-green-700">
+                    <div className="mb-4 text-center text-xs text-green-300 bg-green-900/30 p-3 rounded-lg border border-green-700">
                         You've been invited to a project!
                         <br />
                         Please sign in or create an account to join.
@@ -172,7 +173,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {mode === 'signUp' && (
                              <div>
-                                <label htmlFor="name" className="block text-sm font-medium text-white mb-1">
+                                <label htmlFor="name" className="block text-xs font-medium text-white mb-1">
                                     Full Name
                                 </label>
                                 <input
@@ -183,13 +184,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                                     required
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
+                                    className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-xs"
                                 />
                             </div>
                         )}
                         {mode === 'signIn' || mode === 'signUp' ? (
                             <div>
-                                <label htmlFor="email" className="block text-sm font-medium text-white mb-1">
+                                <label htmlFor="email" className="block text-xs font-medium text-white mb-1">
                                     Email Address
                                 </label>
                                 <input
@@ -200,13 +201,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
+                                    className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-xs"
                                 />
                             </div>
                         ) : null}
                          {mode === 'forgotPassword' && (
                             <div>
-                                <label htmlFor="email-forgot" className="block text-sm font-medium text-white mb-1">
+                                <label htmlFor="email-forgot" className="block text-xs font-medium text-white mb-1">
                                     Email Address
                                 </label>
                                 <input
@@ -217,14 +218,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
+                                    className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-xs"
                                 />
                             </div>
                         )}
                         {mode !== 'forgotPassword' && (
                             <div>
                                 <div className="flex justify-between items-center">
-                                    <label htmlFor="password" className="block text-sm font-medium text-white mb-1">
+                                    <label htmlFor="password" className="block text-xs font-medium text-white mb-1">
                                         Password
                                     </label>
                                     {mode === 'signIn' && (
@@ -245,14 +246,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                             </div>
                         )}
 
-                        {error && <p className="text-sm text-red-500">{error}</p>}
-                        {successMessage && <p className="text-sm text-green-500">{successMessage}</p>}
+                        {error && <p className="text-xs text-red-500">{error}</p>}
+                        {successMessage && <p className="text-xs text-green-500">{successMessage}</p>}
 
                         <div>
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-black bg-gray-300 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-[#131C1B] disabled:bg-gray-500"
+                                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-xs font-medium text-black bg-gray-300 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-[#131C1B] disabled:bg-gray-500"
                             >
                                 {loading ? <LoaderCircleIcon className="animate-spin h-5 w-5" /> : 
                                  mode === 'signIn' ? 'Sign in' : 
@@ -260,7 +261,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                             </button>
                         </div>
                     </form>
-                     <p className="mt-6 text-center text-sm text-gray-400">
+                     <p className="mt-6 text-center text-xs text-gray-400">
                         {mode === 'signIn' && "Don't have an account?"}
                         {mode === 'signUp' && "Already have an account?"}
                         {mode === 'forgotPassword' && "Remembered your password?"}

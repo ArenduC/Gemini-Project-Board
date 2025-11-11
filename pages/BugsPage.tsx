@@ -54,16 +54,16 @@ export const BugsPage: React.FC<BugsPageProps> = ({
   return (
     <div>
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-        <h2 className="text-2xl font-bold text-white">Bug Tracker</h2>
+        <h2 className="text-xl font-bold text-white">Bug Tracker</h2>
         <div>
-          <label htmlFor="project-select" className="block text-sm font-medium text-gray-400 mb-1">
+          <label htmlFor="project-select" className="block text-xs font-medium text-gray-400 mb-1">
             Select a Project
           </label>
           <select
             id="project-select"
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="w-full sm:w-64 px-3 py-2 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-sm"
+            className="w-full sm:w-64 px-3 py-2 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-xs"
           >
             <option value="">-- View Bugs For --</option>
             {projectList.map(p => (
@@ -89,8 +89,8 @@ export const BugsPage: React.FC<BugsPageProps> = ({
       ) : (
         <div className="text-center py-20 px-6 bg-[#131C1B] rounded-xl border border-dashed border-gray-800">
           <LifeBuoyIcon className="mx-auto h-12 w-12 text-gray-500" />
-          <h3 className="mt-4 text-lg font-semibold text-white">{projectList.length > 0 ? 'Select a Project' : 'No Projects Found'}</h3>
-          <p className="mt-1 text-sm text-gray-400">
+          <h3 className="mt-4 text-base font-semibold text-white">{projectList.length > 0 ? 'Select a Project' : 'No Projects Found'}</h3>
+          <p className="mt-1 text-xs text-gray-400">
             {projectList.length > 0 ? 'Please choose a project from the dropdown above to view and manage its bugs.' : 'You need to create a project before you can track bugs.'}
           </p>
         </div>
