@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Sprint, Task } from '../types';
+// FIX: Import the `Column` type to use in component props.
+import { Sprint, Task, Column } from '../types';
 import { XIcon, LoaderCircleIcon, CheckSquareIcon } from './Icons';
 
 interface CompleteSprintModalProps {
@@ -7,19 +8,24 @@ interface CompleteSprintModalProps {
   onClose: () => void;
   sprint: Sprint;
   projectTasks: Task[];
+  // FIX: Add projectColumns to props to determine task status.
+  projectColumns: Record<string, Column>;
   projectSprints: Sprint[];
   onConfirm: (moveToSprintId: string | null) => Promise<void>;
 }
 
-export const CompleteSprintModal: React.FC<CompleteSprintModalProps> = ({ isOpen, onClose, sprint, projectTasks, projectSprints, onConfirm }) => {
+export const CompleteSprintModal: React.FC<CompleteSprintModalProps> = ({ isOpen, onClose, sprint, projectTasks, projectColumns, projectSprints, onConfirm }) => {
   const [isSaving, setIsSaving] = useState(false);
 
   const { completedTasks, incompleteTasks } = useMemo(() => {
     const tasksInSprint = projectTasks.filter(t => t.sprintId === sprint.id);
-    const completed = tasksInSprint.filter(t => t.status.toLowerCase() === 'done');
-    const incomplete = tasksInSprint.filter(t => t.status.toLowerCase() !== 'done');
+    // FIX: Determine task status by checking which column it's in, as the `Task` type does not have a `status` property.
+    const doneColumn = Object.values(projectColumns).find(c => c.title.toLowerCase() === 'done');
+    const doneTaskIds = new Set(doneColumn?.taskIds || []);
+    const completed = tasksInSprint.filter(t => doneTaskIds.has(t.id));
+    const incomplete = tasksInSprint.filter(t => !doneTaskIds.has(t.id));
     return { completedTasks: completed, incompleteTasks: incomplete };
-  }, [sprint, projectTasks]);
+  }, [sprint, projectTasks, projectColumns]);
 
   const activeSprints = useMemo(() => {
     return projectSprints

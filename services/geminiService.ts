@@ -1,13 +1,28 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { TaskPriority, Project, User, ProjectLink, AiGeneratedProjectPlan, AiGeneratedTaskFromFile } from "../types";
+import { TaskPriority, Project, User, ProjectLink, AiGeneratedProjectPlan, AiGeneratedTaskFromFile, BugResponse } from "../types";
+import { GEMINI_API_KEY } from '../config';
 
-// FIX: Switched to using process.env.API_KEY and updated the credential check
-// to align with @google/genai guidelines. This resolves the original type error.
-if (!process.env.API_KEY) {
-  throw new Error("Gemini API Key is not configured. Please set the API_KEY environment variable.");
-}
+const apiKey = GEMINI_API_KEY;
+const ai = (apiKey && apiKey !== 'YOUR_GEMINI_API_KEY_HERE') ? new GoogleGenAI({ apiKey }) : null;
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const keyErrorMessage = "Gemini API key is not configured. Please update the `GEMINI_API_KEY` in the `config.ts` file.";
+
+// Helper to handle API errors consistently
+const handleApiError = (error: unknown, action: string) => {
+    console.error(`Error calling Gemini API for ${action}:`, error);
+    if (error instanceof Error) {
+        if (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID')) {
+            throw new Error("The configured Gemini API key is invalid or has been rejected by the service.");
+        }
+        // Re-throw our specific configuration error if it was the cause
+        if (error.message === keyErrorMessage) {
+            throw error;
+        }
+    }
+    // Generic fallback
+    throw new Error(`Failed to ${action}. Please try again later.`);
+};
+
 
 interface SubtaskResponse {
     title: string;
@@ -184,11 +199,6 @@ const projectFromCsvResponseSchema = {
     required: ["name", "description", "columns"]
 };
 
-export interface BugResponse {
-    title: string;
-    description: string;
-}
-
 const bugsFromFileResponseSchema = {
     type: Type.ARRAY,
     items: {
@@ -235,13 +245,8 @@ export const tasksFromFileResponseSchema = {
 };
 
 
-/**
- * Generates a list of subtasks for a given parent task using the Gemini API.
- * @param title The title of the parent task.
- * @param description The description of the parent task.
- * @returns A promise that resolves to an array of subtask objects.
- */
 export const generateSubtasks = async (title: string, description: string): Promise<SubtaskResponse[]> => {
+  if (!ai) throw new Error(keyErrorMessage);
   try {
     const prompt = `
       Based on the following main task, break it down into smaller, actionable subtasks. 
@@ -262,38 +267,16 @@ export const generateSubtasks = async (title: string, description: string): Prom
     });
 
     const jsonText = response.text.trim();
-    if (!jsonText) {
-        console.warn("Gemini API returned an empty response for subtasks.");
-        return [];
-    }
-
-    const parsedResponse = JSON.parse(jsonText);
-    
-    // Basic validation to ensure the response is an array of objects with a title
-    if (Array.isArray(parsedResponse) && parsedResponse.every(item => typeof item === 'object' && item !== null && 'title' in item)) {
-        return parsedResponse as SubtaskResponse[];
-    } else {
-        console.error("Invalid JSON structure received from Gemini API:", parsedResponse);
-        throw new Error("AI response was not in the expected format.");
-    }
+    return jsonText ? JSON.parse(jsonText) as SubtaskResponse[] : [];
 
   } catch (error) {
-    console.error("Error calling Gemini API:", error);
-    // Provide a more user-friendly error message
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-        throw new Error("The Gemini API key is invalid or missing. Please check your `config.ts` file.");
-    }
-    throw new Error("Failed to generate subtasks from AI. Please try again later.");
+    handleApiError(error, 'generate subtasks');
+    return []; // Satisfy TypeScript, will not be reached
   }
 };
 
-
-/**
- * Generates a full task object from a single text prompt using the Gemini API.
- * @param prompt The user's high-level goal for the task.
- * @returns A promise that resolves to a task object with title, description, and priority.
- */
 export const generateTaskFromPrompt = async (prompt: string): Promise<TaskResponse> => {
+    if (!ai) throw new Error(keyErrorMessage);
     try {
         const fullPrompt = `
             You are an expert project manager. Based on the user's request, create a detailed task.
@@ -314,54 +297,24 @@ export const generateTaskFromPrompt = async (prompt: string): Promise<TaskRespon
         });
 
         const jsonText = response.text.trim();
-        if (!jsonText) {
-            throw new Error("AI returned an empty response.");
-        }
-
-        const parsedResponse = JSON.parse(jsonText);
-
-        // Validate the response structure
-        if (typeof parsedResponse.title === 'string' && typeof parsedResponse.description === 'string' && Object.values(TaskPriority).includes(parsedResponse.priority)) {
-            return parsedResponse as TaskResponse;
-        } else {
-            console.error("Invalid JSON structure for task received from Gemini API:", parsedResponse);
-            throw new Error("AI response was not in the expected format for a task.");
-        }
-
+        if (!jsonText) throw new Error("AI returned an empty response.");
+        return JSON.parse(jsonText) as TaskResponse;
     } catch (error) {
-        console.error("Error calling Gemini API for task generation:", error);
-        if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-            throw new Error("The Gemini API key is invalid or missing.");
-        }
-        throw new Error("Failed to generate task from AI. Please try again later.");
+        handleApiError(error, 'generate task from prompt');
+        throw error; // Re-throw to be handled by caller
     }
 };
 
-/**
- * Performs a global search across all projects, tasks, and users using the Gemini API.
- * @param query The user's search query (can be natural language).
- * @param projects A record of all projects.
- * @param users A record of all users.
- * @returns A promise that resolves to an object containing arrays of matching IDs.
- */
 export const performGlobalSearch = async (query: string, projects: Record<string, Project>, users: Record<string, User>): Promise<SearchResponse> => {
+    if (!ai) throw new Error(keyErrorMessage);
     try {
-        // Create a simplified context for the AI to reduce token usage and improve focus
         const searchContext = {
             projects: Object.values(projects).map(p => ({ id: p.id, name: p.name, description: p.description })),
             users: Object.values(users).map(u => ({ id: u.id, name: u.name })),
             tasks: Object.values(projects).flatMap(p =>
                 Object.values(p.board.tasks).map(t => {
                     const column = Object.values(p.board.columns).find(c => c.taskIds.includes(t.id));
-                    return {
-                        id: t.id,
-                        title: t.title,
-                        description: t.description,
-                        priority: t.priority,
-                        status: column?.title || 'N/A',
-                        projectId: p.id,
-                        assigneeId: t.assignee?.id,
-                    }
+                    return { id: t.id, title: t.title, projectId: p.id };
                 })
             )
         };
@@ -369,16 +322,10 @@ export const performGlobalSearch = async (query: string, projects: Record<string
         const prompt = `
             You are an intelligent search engine for a project management tool.
             The user's search query is: "${query}"
-
-            Here is a summary of all the data in the tool:
-            ${JSON.stringify(searchContext)}
-
-            Based on the user's query, return a JSON object containing arrays of the IDs of all matching projects, tasks, and users.
-            - Search across all fields: id, name, title, description, priority, status, etc.
-            - If the query is a specific ID, return that item.
-            - If the query is a natural language phrase like "high priority tasks for Bob", interpret it and find the relevant items.
-            - If no matches are found for a category, return an empty array for it.
-            - Ensure the response is only the JSON object.
+            Here is a summary of all the data: ${JSON.stringify(searchContext)}
+            Based on the query, return a JSON object with arrays of matching 'projects', 'tasks', and 'users' IDs.
+            Search all fields. If a query is natural language like "high priority tasks for Bob", interpret it.
+            If no matches are found for a category, return an empty array for it. Respond with only the JSON object.
         `;
 
         const response = await ai.models.generateContent({
@@ -391,59 +338,21 @@ export const performGlobalSearch = async (query: string, projects: Record<string
         });
 
         const jsonText = response.text.trim();
-        if (!jsonText) {
-            console.warn("Gemini API returned an empty response for search.");
-            return { projects: [], tasks: [], users: [] };
-        }
-
-        const parsedResponse = JSON.parse(jsonText);
-        
-        if (
-            Array.isArray(parsedResponse.projects) &&
-            Array.isArray(parsedResponse.tasks) &&
-            Array.isArray(parsedResponse.users)
-        ) {
-            return parsedResponse as SearchResponse;
-        } else {
-            console.error("Invalid JSON structure for search received from Gemini API:", parsedResponse);
-            throw new Error("AI response was not in the expected format for search.");
-        }
-
+        return jsonText ? JSON.parse(jsonText) as SearchResponse : { projects: [], tasks: [], users: [] };
     } catch (error) {
-        console.error("Error calling Gemini API for global search:", error);
-        if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-            throw new Error("The Gemini API key is invalid or missing.");
-        }
-        throw new Error("Failed to perform AI search. Please try again later.");
+        handleApiError(error, 'perform global search');
+        return { projects: [], tasks: [], users: [] }; // Satisfy TypeScript
     }
 };
 
-/**
- * Interprets a voice command using the Gemini API.
- * @param command The transcribed voice command from the user.
- * @param context The current state of the application (projects, users, etc.).
- * @returns A promise that resolves to a structured action object.
- */
 export const interpretVoiceCommand = async (command: string, context: any): Promise<VoiceCommandAction> => {
+    if (!ai) return { action: 'UNKNOWN', params: { reason: keyErrorMessage } };
     try {
         const prompt = `
-            You are a voice assistant for a project management application. Your task is to interpret the user's command
-            and translate it into a structured JSON object representing an action.
-
-            User's command: "${command}"
-
-            Here is the context of the application state. Use this to find the correct entities (tasks, columns, users, projects, links):
-            ${JSON.stringify(context)}
-
-            Based on the command, determine the user's intent and choose one of the following actions:
-            - CREATE_TASK: When the user wants to create a new task. Extract the title and optionally a description or priority.
-            - MOVE_TASK: When the user wants to move an existing task to a different column. Extract the task's title and the target column's name.
-            - ASSIGN_TASK: When the user wants to assign a task to a user. Extract the task's title and the assignee's name.
-            - NAVIGATE: When the user wants to go to a different page or project. The destination can be 'dashboard', 'tasks', 'resources', or a project name.
-            - OPEN_LINK: When the user wants to open a project-specific link. Extract the title of the link from the command.
-            - UNKNOWN: If the command is unclear or cannot be mapped to any of the above actions.
-
-            Return ONLY the JSON object for the action. Do not add any extra text or explanations.
+            You are a voice assistant for a project management app. Interpret the command: "${command}"
+            Here is the application context: ${JSON.stringify(context)}
+            Translate the command into a JSON object for one of these actions: CREATE_TASK, MOVE_TASK, ASSIGN_TASK, NAVIGATE, OPEN_LINK, UNKNOWN.
+            Return ONLY the JSON object.
         `;
 
         const response = await ai.models.generateContent({
@@ -456,42 +365,20 @@ export const interpretVoiceCommand = async (command: string, context: any): Prom
         });
         
         const jsonText = response.text.trim();
-        if (!jsonText) {
-            throw new Error("AI returned an empty response for voice command.");
-        }
-        
-        const parsedResponse = JSON.parse(jsonText);
-        
-        // Basic validation
-        if (parsedResponse.action && parsedResponse.params) {
-            return parsedResponse as VoiceCommandAction;
-        } else {
-            console.error("Invalid JSON structure for voice command received from Gemini:", parsedResponse);
-            return { action: 'UNKNOWN', params: { reason: "AI response was not in the expected format." } };
-        }
-
+        if (!jsonText) throw new Error("AI returned an empty response.");
+        return JSON.parse(jsonText) as VoiceCommandAction;
     } catch (error) {
-        console.error("Error calling Gemini API for voice command interpretation:", error);
-        if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-            throw new Error("The Gemini API key is invalid or missing.");
-        }
+        handleApiError(error, 'interpret voice command');
         return { action: 'UNKNOWN', params: { reason: "Failed to communicate with the AI assistant." } };
     }
 };
 
-/**
- * Generates a list of relevant project links using the Gemini API.
- * @param projectName The name of the project.
- * @param projectDescription The description of the project.
- * @returns A promise that resolves to an array of link objects.
- */
 export const generateProjectLinks = async (projectName: string, projectDescription: string): Promise<ProjectLinkResponse[]> => {
+    if (!ai) throw new Error(keyErrorMessage);
     try {
         const prompt = `
             Based on the project name "${projectName}" and description "${projectDescription}", 
-            suggest a list of relevant links for development and management. 
-            Common links include source code repositories (like GitHub), design files (like Figma), and documentation.
-            Provide a valid URL for each.
+            suggest relevant links for development and management (e.g., GitHub, Figma). Provide valid URLs.
         `;
 
         const response = await ai.models.generateContent({
@@ -504,40 +391,21 @@ export const generateProjectLinks = async (projectName: string, projectDescripti
         });
 
         const jsonText = response.text.trim();
-        if (!jsonText) {
-            console.warn("Gemini API returned an empty response for project links.");
-            return [];
-        }
-        const parsedResponse = JSON.parse(jsonText);
-        return parsedResponse as ProjectLinkResponse[];
+        return jsonText ? JSON.parse(jsonText) as ProjectLinkResponse[] : [];
     } catch (error) {
-        console.error("Error calling Gemini API for project link generation:", error);
-        throw new Error("Failed to generate project links from AI.");
+        handleApiError(error, 'generate project links');
+        return [];
     }
 };
 
-/**
- * Generates a structured project plan from CSV data.
- * @param csvContent The string content of the user's CSV file.
- * @returns A promise that resolves to a structured project plan object.
- */
 export const generateProjectFromCsv = async (csvContent: string): Promise<AiGeneratedProjectPlan> => {
+    if (!ai) throw new Error(keyErrorMessage);
     try {
         const prompt = `
-            You are an expert project manager. A user has provided a CSV file to bootstrap a new project.
-            Your task is to analyze the CSV content and structure it into a complete project plan.
-
-            CSV Content:
-            ---
-            ${csvContent}
-            ---
-
-            Instructions:
-            1.  Infer a suitable project name and a brief description from the data.
-            2.  Group tasks into logical columns. If a 'status' or 'column' field exists, use it. Otherwise, create standard columns like 'To Do', 'In Progress', and 'Done' and assign tasks appropriately. All tasks without a clear status should go into 'To Do'.
-            3.  For each task, extract a title, description, and priority. If priority isn't specified, default to 'Medium'.
-            4.  If there are items that look like subtasks of a main task, nest them accordingly.
-            5.  Ensure the output is ONLY the JSON object that matches the provided schema. Do not include any other text.
+            Analyze the following CSV content and structure it into a project plan JSON object.
+            Infer a project name, description, columns (like 'To Do', 'In Progress'), and tasks with titles, descriptions, priorities, and subtasks.
+            CSV Content: --- ${csvContent} ---
+            Ensure the output is ONLY the JSON object matching the schema.
         `;
 
         const response = await ai.models.generateContent({
@@ -550,41 +418,21 @@ export const generateProjectFromCsv = async (csvContent: string): Promise<AiGene
         });
 
         const jsonText = response.text.trim();
-        if (!jsonText) {
-            throw new Error("AI returned an empty response for the project plan.");
-        }
-        const parsedResponse = JSON.parse(jsonText);
-        // Add more robust validation if needed
-        return parsedResponse as AiGeneratedProjectPlan;
-
+        if (!jsonText) throw new Error("AI returned an empty response.");
+        return JSON.parse(jsonText) as AiGeneratedProjectPlan;
     } catch (error) {
-        console.error("Error calling Gemini API for project generation from CSV:", error);
-        if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-            throw new Error("The Gemini API key is invalid or missing.");
-        }
-        throw new Error("Failed to generate project from CSV. Please check the file format and try again.");
+        handleApiError(error, 'generate project from CSV');
+        throw error;
     }
 };
 
-/**
- * Parses bugs from a text or CSV file.
- * @param fileContent The string content of the user's file.
- * @returns A promise that resolves to an array of bug objects.
- */
 export const generateBugsFromFile = async (fileContent: string): Promise<BugResponse[]> => {
+    if (!ai) throw new Error(keyErrorMessage);
     try {
         const prompt = `
-            You are a bug tracking assistant. A user has provided a file (either CSV or plain text) containing a list of bugs.
-            Your task is to parse the content and structure it into a JSON array of bug objects. Each object must have a 'title' and a 'description'.
-            - For CSVs, look for columns like 'title', 'summary', 'bug', 'issue', 'description', 'details'.
-            - For text files, each line or paragraph may represent a different bug. Use the first line as the title and subsequent lines as the description.
-            - Be robust and handle messy data gracefully. If a row/line is unclear, skip it.
-            - Ensure the output is ONLY the JSON object that matches the provided schema. Do not include any other text.
-
-            File Content:
-            ---
-            ${fileContent}
-            ---
+            Parse the following file content (CSV or plain text) into a JSON array of bug objects. Each object must have a 'title' and a 'description'.
+            Handle messy data gracefully. Ensure the output is ONLY the JSON array.
+            File Content: --- ${fileContent} ---
         `;
 
         const response = await ai.models.generateContent({
@@ -597,43 +445,25 @@ export const generateBugsFromFile = async (fileContent: string): Promise<BugResp
         });
 
         const jsonText = response.text.trim();
-        if (!jsonText) {
-            console.warn("Gemini API returned an empty response for bug parsing.");
-            return [];
-        }
-        const parsedResponse = JSON.parse(jsonText);
-        return parsedResponse as BugResponse[];
-
+        return jsonText ? JSON.parse(jsonText) as BugResponse[] : [];
     } catch (error) {
-        console.error("Error calling Gemini API for bug parsing:", error);
-        if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-            throw new Error("The Gemini API key is invalid or missing.");
-        }
-        throw new Error("AI failed to parse bugs from the file. Please check the file format and try again.");
+        handleApiError(error, 'parse bugs from file');
+        return [];
     }
 };
 
-/**
- * Parses tasks from a text, CSV, PDF, or DOC file.
- * @param fileData An object containing the file content (string or base64) and its MIME type.
- * @param columnNames An array of possible column names for the 'status' field.
- * @returns A promise that resolves to an array of task objects.
- */
 export const generateTasksFromFile = async (fileData: { content: string; mimeType: string }, columnNames: string[]): Promise<AiGeneratedTaskFromFile[]> => {
+    if (!ai) throw new Error(keyErrorMessage);
     try {
         const isTextFile = fileData.mimeType === 'text/csv' || fileData.mimeType === 'text/plain';
 
         const promptText = `
-            You are a task management assistant. A user has provided a file (CSV, plain text, PDF, or Word document) containing a list of tasks.
-            Your task is to parse the file's content and structure it into a JSON array of task objects. Each object must have a 'title', 'description', 'priority', and 'status'.
-            - For CSVs, look for columns like 'title', 'task', 'description', 'priority', 'status'.
-            - For text files, each line or paragraph may represent a different task. Use the first line as the title and subsequent lines as the description.
-            - For PDF or Word documents, intelligently extract the key information that represents tasks.
-            - Infer priority from keywords if possible (e.g., 'urgent', 'important'), otherwise default to 'Medium'.
-            - The 'status' for each task MUST be one of the following available column names: ${JSON.stringify(columnNames)}. Assign tasks to the most logical column. If a task's status is unclear, assign it to the first column name in the list ('${columnNames[0]}').
-            - Be robust and handle messy data gracefully. If a row/line is unclear, skip it.
-            - Ensure the output is ONLY the JSON array. Do not include any other text.
-            ${isTextFile ? `\nHere is the file content:\n---\n${fileData.content}\n---` : ''}
+            Parse the provided file into a JSON array of task objects. Each object must have a 'title', 'description', 'priority', and 'status'.
+            The 'status' for each task MUST be one of the following: ${JSON.stringify(columnNames)}.
+            Assign tasks to the most logical column, or '${columnNames[0]}' if unclear.
+            Default priority to 'Medium' if not specified.
+            Ensure the output is ONLY the JSON array.
+            ${isTextFile ? `\nFile content:\n---\n${fileData.content}\n---` : ''}
         `;
 
         const contents = isTextFile 
@@ -653,18 +483,9 @@ export const generateTasksFromFile = async (fileData: { content: string; mimeTyp
         });
 
         const jsonText = response.text.trim();
-        if (!jsonText) {
-            console.warn("Gemini API returned an empty response for task parsing.");
-            return [];
-        }
-        const parsedResponse = JSON.parse(jsonText);
-        return parsedResponse as AiGeneratedTaskFromFile[];
-
+        return jsonText ? JSON.parse(jsonText) as AiGeneratedTaskFromFile[] : [];
     } catch (error) {
-        console.error("Error calling Gemini API for task parsing:", error);
-        if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-            throw new Error("The Gemini API key is invalid or missing.");
-        }
-        throw new Error("AI failed to parse tasks from the file. Please check the file format and try again.");
+        handleApiError(error, 'parse tasks from file');
+        return [];
     }
 };

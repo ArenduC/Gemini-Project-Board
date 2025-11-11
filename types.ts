@@ -121,6 +121,12 @@ export interface Bug {
   position: number;
 }
 
+// FIX: Add missing BugResponse type definition for AI-generated bugs.
+export interface BugResponse {
+  title: string;
+  description: string;
+}
+
 export interface Project {
   id: string;
   name: string;

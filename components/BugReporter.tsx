@@ -50,7 +50,6 @@ const EditableField: React.FC<{
 
   if (isEditing) {
     const commonProps = {
-        ref: inputRef,
         value: currentValue,
         onChange: (e: any) => setCurrentValue(e.target.value),
         onBlur: handleSave,
@@ -58,9 +57,10 @@ const EditableField: React.FC<{
         className: `w-full bg-[#1C2326] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 rounded-md ${inputClassName}`,
         placeholder,
     };
+    // FIX: Cast the multi-type ref to the specific element type required by each branch to resolve the TypeScript error.
     return isTextArea 
-        ? <textarea {...commonProps} rows={3} /> 
-        : <input type="text" {...commonProps} />;
+        ? <textarea ref={inputRef as React.RefObject<HTMLTextAreaElement>} {...commonProps} rows={3} /> 
+        : <input ref={inputRef as React.RefObject<HTMLInputElement>} type="text" {...commonProps} />;
   }
   return <div onClick={() => setIsEditing(true)} className={`cursor-pointer hover:bg-gray-800/50 rounded-md p-1 -m-1 transition-colors ${textClassName}`}>{value || <span className="text-gray-500">{placeholder || '...'}</span>}</div>;
 };
