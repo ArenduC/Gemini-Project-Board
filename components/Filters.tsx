@@ -300,6 +300,38 @@ export const Filters: React.FC<FiltersProps> = ({
     return JSON.stringify(sortedCurrent) !== JSON.stringify(sortedSegment);
   }, [activeSegment, currentFilters, hasActiveFilters]);
 
+  useEffect(() => {
+    // This effect handles detaching from the "All Tasks" view when a filter is applied.
+    // When filters are modified for a specific named view, we want to keep that view active
+    // to allow the user to update it.
+    if (activeSegmentId === 'all') {
+      const hasAnyFilter =
+        searchTerm ||
+        priorityFilter.length > 0 ||
+        assigneeFilter.length > 0 ||
+        (statusFilter && statusFilter.length > 0) ||
+        tagFilter.length > 0 ||
+        sprintFilter.length > 0 ||
+        startDate ||
+        endDate;
+
+      if (hasAnyFilter) {
+        onApplySegment(null);
+      }
+    }
+  }, [
+    activeSegmentId,
+    searchTerm,
+    priorityFilter,
+    assigneeFilter,
+    statusFilter,
+    tagFilter,
+    sprintFilter,
+    startDate,
+    endDate,
+    onApplySegment,
+  ]);
+  
   const handleDelete = (segmentId: string, segmentName: string) => {
     requestConfirmation({
       title: 'Delete View',
@@ -465,7 +497,7 @@ export const Filters: React.FC<FiltersProps> = ({
         
         {hasActiveFilters && (
             <>
-                {activeSegmentId && filtersHaveChanged ? (
+                {activeSegmentId && activeSegmentId !== 'all' && filtersHaveChanged ? (
                     <button onClick={() => onUpdateSegment(activeSegmentId, { filters: currentFilters })} className="flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-gray-300 border border-gray-700 rounded-lg shadow-sm hover:bg-gray-400 text-black">
                         <SaveIcon className="w-4 h-4" /> Update view
                     </button>

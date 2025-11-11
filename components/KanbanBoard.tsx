@@ -219,41 +219,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       }
   };
 
-  useEffect(() => {
-    const arraysEqual = (a: string[], b: string[]) => {
-      if (a.length !== b.length) return false;
-      const sortedA = [...a].sort();
-      const sortedB = [...b].sort();
-      return sortedA.every((val, index) => val === sortedB[index]);
-    }
-
-    if (activeSegmentId === 'all') {
-        if (searchTerm || priorityFilter.length > 0 || assigneeFilter.length > 0 || statusFilter.length > 0 || tagFilter.length > 0 || sprintFilter.length > 0 || startDate || endDate) {
-            setActiveSegmentId(null);
-        }
-        return;
-    }
-    
-    const activeSegment = (project.filterSegments || []).find(s => s.id === activeSegmentId);
-    if (!activeSegment) {
-        return;
-    };
-    
-    const filtersMatch = 
-        activeSegment.filters.searchTerm === searchTerm &&
-        arraysEqual(activeSegment.filters.priorityFilter, priorityFilter) &&
-        arraysEqual(activeSegment.filters.assigneeFilter, assigneeFilter) &&
-        arraysEqual(activeSegment.filters.statusFilter, statusFilter) &&
-        arraysEqual(activeSegment.filters.tagFilter, tagFilter) &&
-        arraysEqual(activeSegment.filters.sprintFilter, sprintFilter) &&
-        activeSegment.filters.startDate === startDate &&
-        activeSegment.filters.endDate === endDate;
-
-    if (!filtersMatch) {
-        setActiveSegmentId(null);
-    }
-  }, [searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, project.filterSegments, activeSegmentId]);
-  
   const handleClearFilters = () => {
     handleApplySegment('all');
   }
