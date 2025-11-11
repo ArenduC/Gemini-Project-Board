@@ -2,7 +2,7 @@ import React, { useState, DragEvent, useRef } from 'react';
 import { FileUpIcon, LoaderCircleIcon } from './Icons';
 
 interface TaskImportDropzoneProps {
-    onFileProcessed: (fileData: { content: string, mimeType: string }) => void;
+    onFileProcessed: (fileData: { content: string, mimeType: string, name: string }) => void;
     isLoading: boolean;
 }
 
@@ -50,7 +50,7 @@ export const TaskImportDropzone: React.FC<TaskImportDropzoneProps> = ({ onFilePr
 
     const processFile = (file: File) => {
         const supportedTypes = ['text/csv', 'text/plain', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-        if (!supportedTypes.includes(file.type)) {
+        if (!supportedTypes.includes(file.type) && !file.name.toLowerCase().endsWith('.csv')) {
             alert('Please upload a valid .csv, .txt, .pdf, .doc, or .docx file.');
             return;
         }
@@ -58,16 +58,19 @@ export const TaskImportDropzone: React.FC<TaskImportDropzoneProps> = ({ onFilePr
         const reader = new FileReader();
         reader.onload = (event) => {
             const result = event.target?.result as string;
-            if (file.type === 'text/csv' || file.type === 'text/plain') {
-                onFileProcessed({ content: result, mimeType: file.type });
+            // Ensure correct mimeType for CSVs based on extension
+            const mimeType = file.name.toLowerCase().endsWith('.csv') ? 'text/csv' : file.type;
+            
+            if (mimeType === 'text/csv' || mimeType === 'text/plain') {
+                onFileProcessed({ content: result, mimeType: mimeType, name: file.name });
             } else {
                 // For binary files read as data URL, extract base64 part
                 const base64Content = result.split(',')[1];
-                onFileProcessed({ content: base64Content, mimeType: file.type });
+                onFileProcessed({ content: base64Content, mimeType: mimeType, name: file.name });
             }
         };
 
-        if (file.type === 'text/csv' || file.type === 'text/plain') {
+        if (file.type === 'text/csv' || file.type === 'text/plain' || file.name.toLowerCase().endsWith('.csv')) {
             reader.readAsText(file);
         } else {
             reader.readAsDataURL(file);

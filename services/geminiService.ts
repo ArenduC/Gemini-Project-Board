@@ -426,11 +426,14 @@ export const generateProjectFromCsv = async (csvContent: string): Promise<AiGene
     }
 };
 
-export const generateBugsFromFile = async (fileContent: string): Promise<BugResponse[]> => {
+export const generateBugsFromFile = async (fileContent: string, headersToInclude: string[]): Promise<BugResponse[]> => {
     if (!ai) throw new Error(keyErrorMessage);
     try {
         const prompt = `
             Parse the following file content (CSV or plain text) into a JSON array of bug objects. Each object must have a 'title' and a 'description'.
+            For each bug's main description, also append a formatted list of data from the following columns: ${JSON.stringify(headersToInclude)}.
+            The format for each appended item should be "Header Name: Value". Only include the headers specified.
+            If the file is not a CSV or the headers are not found, do your best to extract a title and a detailed description.
             Handle messy data gracefully. Ensure the output is ONLY the JSON array.
             File Content: --- ${fileContent} ---
         `;
@@ -452,16 +455,21 @@ export const generateBugsFromFile = async (fileContent: string): Promise<BugResp
     }
 };
 
-export const generateTasksFromFile = async (fileData: { content: string; mimeType: string }, columnNames: string[]): Promise<AiGeneratedTaskFromFile[]> => {
+export const generateTasksFromFile = async (fileData: { content: string; mimeType: string }, columnNames: string[], headersToInclude: string[]): Promise<AiGeneratedTaskFromFile[]> => {
     if (!ai) throw new Error(keyErrorMessage);
     try {
         const isTextFile = fileData.mimeType === 'text/csv' || fileData.mimeType === 'text/plain';
+
+        const headerInstruction = headersToInclude.length > 0 
+            ? `For each task's main description, also append a formatted list of data from the following columns from the CSV: ${JSON.stringify(headersToInclude)}. The format for each appended item should be "Header Name: Value". Only include the headers specified.`
+            : 'If the file is not a CSV or no specific headers are requested, do your best to extract a title and a detailed description.';
 
         const promptText = `
             Parse the provided file into a JSON array of task objects. Each object must have a 'title', 'description', 'priority', and 'status'.
             The 'status' for each task MUST be one of the following: ${JSON.stringify(columnNames)}.
             Assign tasks to the most logical column, or '${columnNames[0]}' if unclear.
             Default priority to 'Medium' if not specified.
+            ${headerInstruction}
             Ensure the output is ONLY the JSON array.
             ${isTextFile ? `\nFile content:\n---\n${fileData.content}\n---` : ''}
         `;

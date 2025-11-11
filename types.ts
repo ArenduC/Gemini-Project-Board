@@ -121,7 +121,6 @@ export interface Bug {
   position: number;
 }
 
-// FIX: Add missing BugResponse type definition for AI-generated bugs.
 export interface BugResponse {
   title: string;
   description: string;
@@ -163,6 +162,9 @@ export interface FilterSegment {
     startDate: string;
     endDate: string;
     sprintFilter: string[];
+    relativeTimeValue?: string;
+    relativeTimeUnit?: 'seconds' | 'minutes' | 'hours' | 'days' | 'months' | 'years';
+    relativeTimeCondition?: 'within' | 'older_than';
   };
 }
 

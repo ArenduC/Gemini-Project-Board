@@ -1,10 +1,11 @@
 import React, { useState, FormEvent, DragEvent, useRef, useMemo, useEffect } from 'react';
-import { Project, User, Bug, TaskPriority } from '../types';
+import { Project, User, Bug, TaskPriority, BugResponse } from '../types';
 import { LifeBuoyIcon, PlusIcon, FileUpIcon, LoaderCircleIcon, SparklesIcon, XIcon, TrashIcon, SearchIcon, DownloadIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 import { ExportBugsModal } from './ExportBugsModal';
 import { Pagination } from './Pagination';
 import { useConfirmation } from '../App';
+import { generateBugsFromFile } from '../services/geminiService';
 
 // --- HELPER COMPONENTS ---
 
@@ -125,33 +126,78 @@ const CreateBugModal: React.FC<{
 
 const ImportBugsModal: React.FC<{
   onClose: () => void;
-  onImport: (fileContent: string) => Promise<void>;
+  onImport: (bugs: BugResponse[]) => Promise<void>;
 }> = ({ onClose, onImport }) => {
+  const [step, setStep] = useState<'upload' | 'selectHeaders'>('upload');
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fileDetails, setFileDetails] = useState<{ content: string; headers: string[] } | null>(null);
+  const [selectedHeaders, setSelectedHeaders] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const processFile = async (file: File) => {
-    if (file.type !== 'text/csv' && file.type !== 'text/plain') {
+  const processFile = (file: File) => {
+    const isCsv = file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv');
+    const isTxt = file.type === 'text/plain';
+
+    if (!isCsv && !isTxt) {
       setError('Please upload a valid .csv or .txt file.');
       return;
     }
+
     setIsLoading(true);
     setError('');
     const reader = new FileReader();
     reader.onload = async (event) => {
-        try {
-            const content = event.target?.result as string;
-            await onImport(content);
-            onClose();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to process file.');
-        } finally {
-            setIsLoading(false);
+      try {
+        const content = event.target?.result as string;
+        if (isCsv) {
+          const firstLine = content.split('\n')[0];
+          const headers = firstLine.split(',').map(h => h.trim().replace(/"/g, ''));
+          setFileDetails({ content, headers });
+          setSelectedHeaders(new Set()); // Unselect all by default
+          setStep('selectHeaders');
+        } else { // It's a .txt file
+          // For non-csv, skip header selection and call gemini directly
+          const bugs = await generateBugsFromFile(content, []);
+          await onImport(bugs);
+          onClose(); // Close immediately after processing
         }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to process file.');
+      } finally {
+        setIsLoading(false);
+      }
     };
     reader.readAsText(file);
+  };
+
+  const handleHeaderToggle = (header: string) => {
+    setSelectedHeaders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(header)) {
+        newSet.delete(header);
+      } else {
+        newSet.add(header);
+      }
+      return newSet;
+    });
+  };
+
+  const handleFinalImport = async () => {
+    if (!fileDetails) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      // Call gemini service from the modal itself
+      const bugs = await generateBugsFromFile(fileDetails.content, Array.from(selectedHeaders));
+      await onImport(bugs); // Pass parsed bugs up
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'AI failed to parse the file.');
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -160,13 +206,15 @@ const ImportBugsModal: React.FC<{
   };
 
   return (
-     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         <header className="p-4 border-b border-gray-800 flex justify-between items-center">
           <h2 className="text-lg font-bold text-white">Import Bugs with AI</h2>
           <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800"><XIcon className="w-6 h-6" /></button>
         </header>
-        <div className="p-6">
+        
+        {step === 'upload' && (
+          <div className="p-6">
             <input type="file" ref={fileInputRef} onChange={e => e.target.files?.[0] && processFile(e.target.files[0])} accept=".csv,.txt" className="hidden" />
             <div
                 onClick={() => fileInputRef.current?.click()}
@@ -174,20 +222,47 @@ const ImportBugsModal: React.FC<{
                 onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
                 onDragEnter={() => setIsDragging(true)}
                 onDragLeave={() => setIsDragging(false)}
-                className={`p-8 border-2 border-dashed rounded-xl text-center cursor-pointer transition-colors ${isDragging ? 'border-gray-500 bg-gray-800/50' : 'border-gray-700 hover:border-gray-600'}`}
+                className={`p-8 border-2 border-dashed rounded-xl text-center cursor-pointer transition-colors ${isLoading ? 'border-gray-600 bg-gray-800/30' : isDragging ? 'border-gray-500 bg-gray-800/50' : 'border-gray-700 hover:border-gray-600'}`}
             >
-                {isLoading ? (
-                    <div className="flex flex-col items-center"><LoaderCircleIcon className="w-10 h-10 animate-spin mb-3 text-white" /><p className="text-white">AI is parsing your file...</p></div>
-                ) : (
-                    <div className="flex flex-col items-center text-gray-400"><FileUpIcon className="w-10 h-10 mb-3" /><p className="font-semibold text-white">Drop a .csv or .txt file here</p><p>or click to upload</p></div>
-                )}
+              {isLoading ? (
+                <div className="flex flex-col items-center text-gray-400"><LoaderCircleIcon className="w-10 h-10 animate-spin mb-3 text-white" /><p>Processing file...</p></div>
+              ) : (
+                <div className="flex flex-col items-center text-gray-400"><FileUpIcon className="w-10 h-10 mb-3" /><p className="font-semibold text-white">Drop a .csv or .txt file here</p><p>or click to upload</p></div>
+              )}
             </div>
             {error && <p className="text-red-500 mt-4 text-center">{error}</p>}
-        </div>
+          </div>
+        )}
+        
+        {step === 'selectHeaders' && fileDetails && (
+          <>
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+              <h3 className="font-semibold text-white">Select columns to include</h3>
+              <p className="text-xs text-gray-400">Choose which columns from your CSV to include in each bug's description.</p>
+              <div className="space-y-2">
+                {fileDetails.headers.map((header, index) => (
+                  <label key={index} className="flex items-center gap-3 p-2 bg-gray-800/50 rounded-md cursor-pointer hover:bg-gray-800">
+                    <input type="checkbox" checked={selectedHeaders.has(header)} onChange={() => handleHeaderToggle(header)} className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500" />
+                    <span className="text-sm text-white">{header}</span>
+                  </label>
+                ))}
+              </div>
+               {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
+            </div>
+            <footer className="p-4 bg-[#1C2326]/50 rounded-b-xl flex justify-end gap-3">
+              <button onClick={() => setStep('upload')} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600">Back</button>
+              <button onClick={handleFinalImport} disabled={isLoading} className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg hover:bg-gray-400 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center gap-2">
+                {isLoading ? <LoaderCircleIcon className="w-5 h-5 animate-spin"/> : <SparklesIcon className="w-5 h-5"/>}
+                {isLoading ? 'Parsing...' : 'Import Bugs'}
+              </button>
+            </footer>
+          </>
+        )}
       </div>
-     </div>
+    </div>
   );
 };
+
 
 // --- MAIN COMPONENT ---
 
@@ -198,7 +273,7 @@ interface BugReporterProps {
   onAddBug: (bugData: { title: string, description: string, priority: TaskPriority }) => Promise<void>;
   onUpdateBug: (bugId: string, updates: Partial<Bug>) => Promise<void>;
   onDeleteBug: (bugId: string) => Promise<void>;
-  onAddBugsBatch: (fileContent: string) => Promise<void>;
+  onAddBugsBatch: (bugs: BugResponse[]) => Promise<void>;
   onDeleteBugsBatch: (bugIds: string[]) => Promise<void>;
   initialSearchTerm?: string;
 }
@@ -487,7 +562,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
                         value={bug.description}
                         onSave={(newDescription) => handleUpdate(bug.id, 'description', newDescription)}
                         isTextArea
-                        textClassName="text-xs text-gray-400 mt-1 truncate max-w-xs"
+                        textClassName="text-xs text-gray-400 mt-1 whitespace-pre-wrap"
                         inputClassName="px-2 py-1 text-xs mt-1"
                         placeholder="Enter a description"
                     />

@@ -12,7 +12,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import CallbackPage from './pages/CallbackPage';
 // FIX: Import `Column` type to be used in casting.
-import { User, Task, TaskPriority, NewTaskData, Project, ChatMessage, FeedbackType, Column, Subtask, AiGeneratedTaskFromFile, Sprint } from './types';
+import { User, Task, TaskPriority, NewTaskData, Project, ChatMessage, FeedbackType, Column, Subtask, AiGeneratedTaskFromFile, Sprint, BugResponse } from './types';
 import { api } from './services/api';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
 import { UserAvatar } from './components/UserAvatar';
@@ -883,7 +883,7 @@ const AppContent: React.FC = () => {
                   addBug={addBug}
                   updateBug={updateBug}
                   deleteBug={deleteBug}
-                  addBugsBatch={addBugsBatch}
+                  addBugsBatch={(bugs) => addBugsBatch(activeProject.id, bugs)}
                   deleteBugsBatch={deleteBugsBatch}
                   addTasksBatch={(tasks, sprintId) => addTasksBatch(activeProject.id, tasks, sprintId)}
                   addSprint={(sprintData) => addSprint(activeProject.id, sprintData)}

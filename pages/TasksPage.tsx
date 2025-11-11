@@ -26,6 +26,9 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   const [sprintFilter, setSprintFilter] = useState<string[]>([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [relativeTimeValue, setRelativeTimeValue] = useState('');
+  const [relativeTimeUnit, setRelativeTimeUnit] = useState<FilterSegment['filters']['relativeTimeUnit']>('hours');
+  const [relativeTimeCondition, setRelativeTimeCondition] = useState<FilterSegment['filters']['relativeTimeCondition']>('within');
   const [segments, setSegments] = useState<FilterSegment[]>([]);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>('all');
   
@@ -106,6 +109,9 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
       setSprintFilter([]);
       setStartDate('');
       setEndDate('');
+      setRelativeTimeValue('');
+      setRelativeTimeUnit('hours');
+      setRelativeTimeCondition('within');
     } else {
       const segment = segments.find(s => s.id === segmentId);
       if (segment) {
@@ -117,6 +123,9 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
         setSprintFilter(segment.filters.sprintFilter || []);
         setStartDate(segment.filters.startDate || '');
         setEndDate(segment.filters.endDate || '');
+        setRelativeTimeValue(segment.filters.relativeTimeValue || '');
+        setRelativeTimeUnit(segment.filters.relativeTimeUnit || 'hours');
+        setRelativeTimeCondition(segment.filters.relativeTimeCondition || 'within');
       }
     }
   };
@@ -226,9 +235,30 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
       const end = new Date(endDate).setHours(23, 59, 59, 999);
       tasks = tasks.filter(task => new Date(task.createdAt).getTime() <= end);
     }
+    
+    if (relativeTimeValue && parseInt(relativeTimeValue, 10) > 0) {
+        const now = new Date();
+        const cutoff = new Date();
+        const value = parseInt(relativeTimeValue, 10);
+
+        switch(relativeTimeUnit) {
+            case 'seconds': cutoff.setSeconds(now.getSeconds() - value); break;
+            case 'minutes': cutoff.setMinutes(now.getMinutes() - value); break;
+            case 'hours': cutoff.setHours(now.getHours() - value); break;
+            case 'days': cutoff.setDate(now.getDate() - value); break;
+            case 'months': cutoff.setMonth(now.getMonth() - value); break;
+            case 'years': cutoff.setFullYear(now.getFullYear() - value); break;
+        }
+        
+        if (relativeTimeCondition === 'within') {
+            tasks = tasks.filter(task => new Date(task.createdAt).getTime() >= cutoff.getTime());
+        } else { // older_than
+            tasks = tasks.filter(task => new Date(task.createdAt).getTime() < cutoff.getTime());
+        }
+    }
 
     return tasks;
-  }, [allTasks, viewMode, currentUser.id, searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate]);
+  }, [allTasks, viewMode, currentUser.id, searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
   
   // Reset to first page when filters change
   useEffect(() => {
@@ -298,6 +328,12 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
             setStartDate={setStartDate}
             endDate={endDate}
             setEndDate={setEndDate}
+            relativeTimeValue={relativeTimeValue}
+            setRelativeTimeValue={setRelativeTimeValue}
+            relativeTimeUnit={relativeTimeUnit}
+            setRelativeTimeUnit={setRelativeTimeUnit}
+            relativeTimeCondition={relativeTimeCondition}
+            setRelativeTimeCondition={setRelativeTimeCondition}
             assignees={uniqueAssignees}
             statuses={allStatuses}
             tags={allTags}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Project, User, Bug, TaskPriority } from '../types';
+import { Project, User, Bug, TaskPriority, BugResponse } from '../types';
 import { BugReporter } from '../components/BugReporter';
 import { LifeBuoyIcon } from '../components/Icons';
 
@@ -10,7 +10,7 @@ interface BugsPageProps {
   addBug: (projectId: string, bugData: { title: string, description: string, priority: TaskPriority }) => Promise<void>;
   updateBug: (bugId: string, updates: Partial<Bug>) => Promise<void>;
   deleteBug: (bugId: string) => Promise<void>;
-  addBugsBatch: (projectId: string, fileContent: string) => Promise<void>;
+  addBugsBatch: (projectId: string, bugs: BugResponse[]) => Promise<void>;
   deleteBugsBatch: (bugIds: string[]) => Promise<void>;
 }
 
@@ -46,9 +46,9 @@ export const BugsPage: React.FC<BugsPageProps> = ({
     return addBug(selectedProject.id, bugData);
   };
 
-  const handleAddBugsBatchForProject = (fileContent: string) => {
+  const handleAddBugsBatchForProject = (bugs: BugResponse[]) => {
     if (!selectedProject) throw new Error("A project must be selected to import bugs.");
-    return addBugsBatch(selectedProject.id, fileContent);
+    return addBugsBatch(selectedProject.id, bugs);
   };
 
   return (

@@ -24,6 +24,12 @@ interface FiltersProps {
   setStartDate: (value: string) => void;
   endDate: string;
   setEndDate: (value: string) => void;
+  relativeTimeValue: string;
+  setRelativeTimeValue: (value: string) => void;
+  relativeTimeUnit: FilterSegment['filters']['relativeTimeUnit'];
+  setRelativeTimeUnit: (value: FilterSegment['filters']['relativeTimeUnit']) => void;
+  relativeTimeCondition: FilterSegment['filters']['relativeTimeCondition'];
+  setRelativeTimeCondition: (value: FilterSegment['filters']['relativeTimeCondition']) => void;
   assignees: string[];
   statuses?: string[];
   tags: string[];
@@ -172,6 +178,9 @@ export const Filters: React.FC<FiltersProps> = ({
   sprints,
   startDate, setStartDate,
   endDate, setEndDate,
+  relativeTimeValue, setRelativeTimeValue,
+  relativeTimeUnit, setRelativeTimeUnit,
+  relativeTimeCondition, setRelativeTimeCondition,
   assignees, statuses, tags,
   segments, activeSegmentId,
   onAddSegment, onUpdateSegment, onDeleteSegment,
@@ -195,20 +204,18 @@ export const Filters: React.FC<FiltersProps> = ({
     { id: 'tag', name: 'Tag' },
     { id: 'sprint', name: 'Sprint' },
     { id: 'date', name: 'Date Range' },
+    { id: 'recency', name: 'Creation Date' },
   ], [statuses, setStatusFilter]);
 
   useEffect(() => {
     const segmentIdChanged = prevActiveSegmentId.current !== activeSegmentId;
     prevActiveSegmentId.current = activeSegmentId;
 
-    // Only clear visible filters when the user explicitly switches to the "All Tasks" view.
     if (segmentIdChanged && activeSegmentId === 'all') {
         setVisibleFilters(new Set());
         return;
     }
-
-    // If a segment is active (either on load or by switching), set its visible filters.
-    // This will also run if the segment data changes, keeping the view in sync.
+    
     if (activeSegmentId && activeSegmentId !== 'all') {
         const segment = segments.find(s => s.id === activeSegmentId);
         if (segment) {
@@ -220,12 +227,10 @@ export const Filters: React.FC<FiltersProps> = ({
             if (filters.tagFilter?.length > 0) newVisible.add('tag');
             if (filters.sprintFilter?.length > 0) newVisible.add('sprint');
             if (filters.startDate || filters.endDate) newVisible.add('date');
+            if (filters.relativeTimeValue) newVisible.add('recency');
             setVisibleFilters(newVisible);
         }
     }
-    // If the activeSegmentId has not changed and it's 'all', we do nothing.
-    // This is the key fix that prevents manually added filters from being wiped out
-    // by a background prop update.
   }, [activeSegmentId, segments]);
 
 
@@ -260,12 +265,16 @@ export const Filters: React.FC<FiltersProps> = ({
         setStartDate('');
         setEndDate('');
     }
+    if (type === 'recency') {
+        setRelativeTimeValue('');
+    }
   };
 
   const currentFilters = useMemo(() => ({
       searchTerm, priorityFilter, assigneeFilter, statusFilter: statusFilter || [],
-      tagFilter, sprintFilter, startDate, endDate
-  }), [searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate]);
+      tagFilter, sprintFilter, startDate, endDate,
+      relativeTimeValue, relativeTimeUnit, relativeTimeCondition
+  }), [searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
 
   const hasActiveFilters = Object.values(currentFilters).some(v => (Array.isArray(v) ? v.length > 0 : v !== ''));
 
@@ -288,22 +297,23 @@ export const Filters: React.FC<FiltersProps> = ({
 
     const sortedCurrent = sortArrayValues(currentFilters);
     const sortedSegment = sortArrayValues({
-        ...activeSegment.filters,
-        // Ensure all filter arrays exist to prevent errors
+        searchTerm: activeSegment.filters.searchTerm || '',
         priorityFilter: activeSegment.filters.priorityFilter || [],
         assigneeFilter: activeSegment.filters.assigneeFilter || [],
         statusFilter: activeSegment.filters.statusFilter || [],
         tagFilter: activeSegment.filters.tagFilter || [],
         sprintFilter: activeSegment.filters.sprintFilter || [],
+        startDate: activeSegment.filters.startDate || '',
+        endDate: activeSegment.filters.endDate || '',
+        relativeTimeValue: activeSegment.filters.relativeTimeValue || '',
+        relativeTimeUnit: activeSegment.filters.relativeTimeUnit || 'hours',
+        relativeTimeCondition: activeSegment.filters.relativeTimeCondition || 'within',
     });
 
     return JSON.stringify(sortedCurrent) !== JSON.stringify(sortedSegment);
   }, [activeSegment, currentFilters, hasActiveFilters]);
 
   useEffect(() => {
-    // This effect handles detaching from the "All Tasks" view when a filter is applied.
-    // When filters are modified for a specific named view, we want to keep that view active
-    // to allow the user to update it.
     if (activeSegmentId === 'all') {
       const hasAnyFilter =
         searchTerm ||
@@ -313,7 +323,8 @@ export const Filters: React.FC<FiltersProps> = ({
         tagFilter.length > 0 ||
         sprintFilter.length > 0 ||
         startDate ||
-        endDate;
+        endDate ||
+        relativeTimeValue;
 
       if (hasAnyFilter) {
         onApplySegment(null);
@@ -329,6 +340,7 @@ export const Filters: React.FC<FiltersProps> = ({
     sprintFilter,
     startDate,
     endDate,
+    relativeTimeValue,
     onApplySegment,
   ]);
   
@@ -473,6 +485,30 @@ export const Filters: React.FC<FiltersProps> = ({
                 <label className="text-xs font-semibold text-gray-400">To:</label>
                 <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent text-white focus:outline-none text-xs py-2"/>
                 <button onClick={() => removeFilter('date')} className="p-2 text-gray-500 hover:text-white self-stretch hover:bg-gray-700/50 rounded-r-md"><XIcon className="w-4 h-4"/></button>
+            </div>
+        )}
+        {visibleFilters.has('recency') && (
+            <div className="flex items-center gap-1 bg-[#131C1B] border border-gray-800 rounded-lg pl-3">
+                <select value={relativeTimeCondition} onChange={(e) => setRelativeTimeCondition(e.target.value as any)} className="bg-transparent text-white focus:outline-none text-xs py-2">
+                    <option value="within">Within last</option>
+                    <option value="older_than">Older than</option>
+                </select>
+                <input 
+                    type="number" 
+                    value={relativeTimeValue} 
+                    onChange={(e) => setRelativeTimeValue(e.target.value)} 
+                    className="bg-transparent text-white focus:outline-none text-xs py-2 w-16 text-center"
+                    placeholder="e.g. 2"
+                />
+                <select value={relativeTimeUnit} onChange={(e) => setRelativeTimeUnit(e.target.value as any)} className="bg-transparent text-white focus:outline-none text-xs py-2">
+                    <option value="seconds">seconds</option>
+                    <option value="minutes">minutes</option>
+                    <option value="hours">hours</option>
+                    <option value="days">days</option>
+                    <option value="months">months</option>
+                    <option value="years">years</option>
+                </select>
+                <button onClick={() => removeFilter('recency')} className="p-2 text-gray-500 hover:text-white self-stretch hover:bg-gray-700/50 rounded-r-md"><XIcon className="w-4 h-4"/></button>
             </div>
         )}
         

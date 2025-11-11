@@ -3,7 +3,7 @@ import { DropResult } from 'react-beautiful-dnd';
 // FIX: Import `BugResponse` from `types` instead of `geminiService`.
 import { AppState, Task, NewTaskData, User, ChatMessage, AiGeneratedProjectPlan, Bug, TaskPriority, Subtask, AiGeneratedTaskFromFile, Sprint, FilterSegment, BugResponse } from '../types';
 import { api } from '../services/api';
-import { generateTaskFromPrompt, generateBugsFromFile } from '../services/geminiService';
+import { generateTaskFromPrompt } from '../services/geminiService';
 import { Session } from '@supabase/supabase-js';
 import { playSentSound } from '../utils/sound';
 
@@ -421,7 +421,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     await fetchData();
   }, [fetchData, currentUser, state.projects]);
 
-  const addBugsBatch = useCallback(async (projectId: string, fileContent: string) => {
+  const addBugsBatch = useCallback(async (projectId: string, parsedBugs: BugResponse[]) => {
     if (!currentUser) return;
     const project = state.projects[projectId];
      if (!project) {
@@ -431,7 +431,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     const firstColumn = project.board.columns[project.board.columnOrder[0]];
     const initialStatus = firstColumn ? firstColumn.title : 'New';
 
-    const parsedBugs: BugResponse[] = await generateBugsFromFile(fileContent);
     if (parsedBugs.length > 0) {
         const bugsToCreate = parsedBugs.map(b => ({
             ...b,
