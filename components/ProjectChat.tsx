@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ChatMessage, User, Project, Bug } from '../types';
 import { XIcon, SendIcon } from './Icons';
@@ -13,6 +14,21 @@ interface ProjectChatProps {
     onSendMessage: (text: string) => Promise<void>;
     onNavigateToBug: (bugNumber: string) => void;
 }
+
+const formatDateSeparator = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+        return "Today";
+    } else if (date.toDateString() === yesterday.toDateString()) {
+        return "Yesterday";
+    } else {
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
+    }
+};
 
 const ChatBubble: React.FC<{ 
     message: ChatMessage;
@@ -32,6 +48,7 @@ const ChatBubble: React.FC<{
 
         const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         
+        // Sort by length (descending) to ensure longer names match first (e.g. "Alex" before "Al")
         const sortedUsers = [...users].sort((a, b) => b.name.length - a.name.length);
         const sortedBugs = [...bugs].sort((a, b) => b.bugNumber.length - a.bugNumber.length);
 
@@ -39,46 +56,56 @@ const ChatBubble: React.FC<{
         const bugNumbersRegex = sortedBugs.map(b => escapeRegex(b.bugNumber)).join('|');
 
         const partsForRegex = [];
-        if (userNamesRegex) partsForRegex.push(`(@(${userNamesRegex}))`);
-        if (bugNumbersRegex) partsForRegex.push(`(#(${bugNumbersRegex}))`);
+        if (userNamesRegex) partsForRegex.push(`(@(?:${userNamesRegex}))`);
+        if (bugNumbersRegex) partsForRegex.push(`(#(?:${bugNumbersRegex}))`);
 
         if (partsForRegex.length === 0) {
             return text;
         }
         
+        // Use a global regex to find all matches
         const regex = new RegExp(partsForRegex.join('|'), 'g');
-        // FIX: Use `React.ReactNode` to correctly type an array that can hold both strings and JSX elements, resolving the "Cannot find namespace 'JSX'" error.
         const elements: React.ReactNode[] = [];
         let lastIndex = 0;
+        let match;
 
-        text.replace(regex, (match, userFull, userName, bugFull, bugNumber, offset) => {
+        // Use exec loop for reliable offset handling regardless of capture group count
+        while ((match = regex.exec(text)) !== null) {
+            const matchedText = match[0];
+            const offset = match.index;
+
+            // Push text before the match
             if (offset > lastIndex) {
                 elements.push(text.substring(lastIndex, offset));
             }
 
-            if (userName) {
+            if (matchedText.startsWith('@')) {
+                const userName = matchedText.substring(1);
                 elements.push(
                     <strong key={offset} className="bg-blue-800/50 text-blue-300 font-semibold rounded px-1 py-0.5">
                         @{userName}
                     </strong>
                 );
-            } else if (bugNumber) {
+            } else if (matchedText.startsWith('#')) {
+                const bugNumber = matchedText.substring(1);
                 elements.push(
                     <strong
                         key={offset}
                         className="bg-purple-800/50 text-purple-300 font-semibold rounded px-1 py-0.5 cursor-pointer hover:underline"
-                        // FIX: Add a guard to ensure `bugNumber` is a string before calling `onNavigateToBug`.
-                        onClick={() => bugNumber && onNavigateToBug(bugNumber)}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onNavigateToBug(bugNumber);
+                        }}
                     >
                         #{bugNumber}
                     </strong>
                 );
             }
 
-            lastIndex = offset + match.length;
-            return match;
-        });
+            lastIndex = offset + matchedText.length;
+        }
 
+        // Push remaining text
         if (lastIndex < text.length) {
             elements.push(text.substring(lastIndex));
         }
@@ -87,7 +114,7 @@ const ChatBubble: React.FC<{
     };
 
     return (
-        <div className={`flex flex-col ${alignment}`}>
+        <div className={`flex flex-col ${alignment} mb-2`}>
             <div className="flex items-end gap-2 max-w-xs sm:max-w-md">
                 {!isCurrentUser && (
                     <UserAvatar user={message.author} className="w-7 h-7 flex-shrink-0 text-xs" isOnline={isOnline} />
@@ -96,7 +123,7 @@ const ChatBubble: React.FC<{
                     <p className="text-xs whitespace-pre-wrap">{renderTextWithTags(message.text)}</p>
                 </div>
             </div>
-             <div className={`flex gap-2 items-center text-xs text-gray-500 mt-1 ${isCurrentUser ? 'mr-1' : 'ml-9'}`}>
+             <div className={`flex gap-2 items-center text-[10px] text-gray-500 mt-1 ${isCurrentUser ? 'mr-1' : 'ml-9'}`}>
                 <span>{message.author.name.split(' ')[0]}</span>
                 <span>·</span>
                 <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -223,18 +250,32 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
                     <XIcon className="w-6 h-6" />
                 </button>
             </header>
-            <div className="flex-grow p-4 overflow-y-auto custom-scrollbar space-y-4">
-                {messages.map(msg => (
-                    <ChatBubble 
-                        key={msg.id} 
-                        message={msg} 
-                        isCurrentUser={msg.author.id === currentUser.id} 
-                        isOnline={onlineUsers.has(msg.author.id)}
-                        users={projectMembers}
-                        bugs={projectBugs}
-                        onNavigateToBug={onNavigateToBug}
-                    />
-                ))}
+            <div className="flex-grow p-4 overflow-y-auto custom-scrollbar">
+                {messages.map((msg, index) => {
+                    const currentDate = new Date(msg.createdAt).toDateString();
+                    const prevDate = index > 0 ? new Date(messages[index - 1].createdAt).toDateString() : null;
+                    const showDate = currentDate !== prevDate;
+
+                    return (
+                        <React.Fragment key={msg.id}>
+                            {showDate && (
+                                <div className="flex justify-center my-6">
+                                    <span className="bg-gray-800 text-gray-400 text-[10px] px-3 py-1 rounded-full font-medium">
+                                        {formatDateSeparator(msg.createdAt)}
+                                    </span>
+                                </div>
+                            )}
+                            <ChatBubble 
+                                message={msg} 
+                                isCurrentUser={msg.author.id === currentUser.id} 
+                                isOnline={onlineUsers.has(msg.author.id)}
+                                users={projectMembers}
+                                bugs={projectBugs}
+                                onNavigateToBug={onNavigateToBug}
+                            />
+                        </React.Fragment>
+                    );
+                })}
                 <div ref={messagesEndRef} />
             </div>
             <footer className="p-4 border-t border-gray-800 flex-shrink-0 relative">

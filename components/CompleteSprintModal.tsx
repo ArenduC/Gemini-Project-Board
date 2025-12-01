@@ -20,7 +20,8 @@ export const CompleteSprintModal: React.FC<CompleteSprintModalProps> = ({ isOpen
   const { completedTasks, incompleteTasks } = useMemo(() => {
     const tasksInSprint = projectTasks.filter(t => t.sprintId === sprint.id);
     // FIX: Determine task status by checking which column it's in, as the `Task` type does not have a `status` property.
-    const doneColumn = Object.values(projectColumns).find(c => c.title.toLowerCase() === 'done');
+    // Cast Object.values to Column[] to avoid 'unknown' type errors.
+    const doneColumn = (Object.values(projectColumns) as Column[]).find(c => c.title.toLowerCase() === 'done');
     const doneTaskIds = new Set(doneColumn?.taskIds || []);
     const completed = tasksInSprint.filter(t => doneTaskIds.has(t.id));
     const incomplete = tasksInSprint.filter(t => !doneTaskIds.has(t.id));
