@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useCallback, FormEvent, useMemo, useRef } from 'react';
 import { Task, Subtask, User, TaskPriority, Sprint } from '../types';
 import { generateSubtasks as generateSubtasksFromApi } from '../services/geminiService';
-import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon, TrashIcon, HistoryIcon } from './Icons';
+import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon, TrashIcon, HistoryIcon, CopyIcon, CheckIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 import { useConfirmation } from '../App';
 
@@ -20,6 +21,28 @@ interface TaskDetailsModalProps {
 }
 
 type AIGenerationState = 'idle' | 'loading' | 'success' | 'error';
+
+const CopyButton: React.FC<{ text: string; className?: string }> = ({ text, className }) => {
+    const [copied, setCopied] = useState(false);
+    
+    const handleCopy = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <button 
+            onClick={handleCopy} 
+            className={`p-1.5 rounded-md hover:bg-gray-700 transition-colors ${className}`}
+            title="Copy to clipboard"
+        >
+            {copied ? <CheckIcon className="w-3.5 h-3.5 text-green-500" /> : <CopyIcon className="w-3.5 h-3.5 text-gray-400" />}
+        </button>
+    );
+};
 
 const EditableField: React.FC<{value: string, onSave: (value: string) => void, isTextArea?: boolean, textClassName: string, inputClassName: string, placeholder?: string, type?: string }> = 
   ({ value, onSave, isTextArea = false, textClassName, inputClassName, placeholder, type = 'text' }) => {
@@ -277,7 +300,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
                 {combinedFeed.map(item => {
                   const author = item.type === 'comment' ? item.author : item.user;
                   return (
-                    <div key={`${item.type}-${item.id}`} className="flex items-start gap-3">
+                    <div key={`${item.type}-${item.id}`} className="flex items-start gap-3 group">
                          {item.type === 'comment' ? (
                             <UserAvatar user={author} className="w-9 h-9 flex-shrink-0" isOnline={onlineUsers.has(author.id)}/>
                          ) : (
@@ -285,14 +308,19 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
                                 <HistoryIcon className="w-5 h-5 text-gray-400" />
                             </div>
                          )}
-                         <div className="flex-grow pt-1.5">
+                         <div className="flex-grow pt-1.5 relative">
                             {item.type === 'comment' ? (
                                 <>
                                     <div className="flex items-center gap-2">
                                         <span className="font-semibold text-sm text-white">{author.name}</span>
                                         <span className="text-xs text-gray-500">{new Date(item.createdAt).toLocaleString()}</span>
                                     </div>
-                                    <p className="bg-[#1C2326] p-3 rounded-lg mt-1 whitespace-pre-wrap text-sm text-white">{renderWithMentions(item.text)}</p>
+                                    <div className="relative">
+                                        <p className="bg-[#1C2326] p-3 rounded-lg mt-1 whitespace-pre-wrap text-sm text-white">{renderWithMentions(item.text)}</p>
+                                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <CopyButton text={item.text} className="bg-gray-800 hover:bg-gray-700 p-1" />
+                                        </div>
+                                    </div>
                                 </>
                             ) : (
                                 <p className="text-sm text-gray-400">
@@ -503,13 +531,16 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <header className="p-4 border-b border-gray-800 flex justify-between items-center flex-shrink-0">
-            <EditableField 
-                value={editedTask.title}
-                onSave={(newTitle) => handleUpdateField('title', newTitle)}
-                textClassName="text-lg font-bold w-full cursor-pointer hover:bg-gray-800/50 rounded p-1 -m-1 text-white"
-                inputClassName="text-lg font-bold p-1 rounded border-2 border-gray-500 bg-[#1C2326] focus:outline-none text-white"
-                placeholder="Enter a task title..."
-            />
+            <div className="flex-grow mr-4 group flex items-center gap-2">
+                <EditableField 
+                    value={editedTask.title}
+                    onSave={(newTitle) => handleUpdateField('title', newTitle)}
+                    textClassName="text-lg font-bold w-full cursor-pointer hover:bg-gray-800/50 rounded p-1 -m-1 text-white"
+                    inputClassName="text-lg font-bold p-1 rounded border-2 border-gray-500 bg-[#1C2326] focus:outline-none text-white"
+                    placeholder="Enter a task title..."
+                />
+                <CopyButton text={editedTask.title} className="opacity-0 group-hover:opacity-100 flex-shrink-0" />
+            </div>
           <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors ml-4">
             <XIcon className="w-6 h-6" />
           </button>
@@ -530,14 +561,19 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                 <span>on {new Date(task.createdAt).toLocaleDateString()}</span>
             </div>
 
-            <EditableField 
-                value={editedTask.description}
-                onSave={(newDesc) => handleUpdateField('description', newDesc)}
-                isTextArea
-                textClassName="text-sm text-white w-full cursor-pointer hover:bg-gray-800/50 rounded p-2 -m-2 min-h-[50px]"
-                inputClassName="text-sm p-2 rounded border-2 border-gray-500 bg-[#1C2326] focus:outline-none text-white"
-                placeholder="Add a more detailed description..."
-            />
+            <div className="group relative">
+                <EditableField 
+                    value={editedTask.description}
+                    onSave={(newDesc) => handleUpdateField('description', newDesc)}
+                    isTextArea
+                    textClassName="text-sm text-white w-full cursor-pointer hover:bg-gray-800/50 rounded p-2 -m-2 min-h-[50px]"
+                    inputClassName="text-sm p-2 rounded border-2 border-gray-500 bg-[#1C2326] focus:outline-none text-white"
+                    placeholder="Add a more detailed description..."
+                />
+                <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <CopyButton text={editedTask.description} className="bg-[#1C2326]/80 p-1" />
+                </div>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>

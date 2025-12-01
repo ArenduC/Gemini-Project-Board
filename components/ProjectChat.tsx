@@ -42,34 +42,34 @@ const ChatBubble: React.FC<{
     const bubbleColor = isCurrentUser ? 'bg-gray-300 text-black' : 'bg-gray-800 text-white';
 
     const renderTextWithTags = (text: string) => {
-        if (users.length === 0 && bugs.length === 0) {
-            return text;
-        }
-
         const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         
-        // Sort by length (descending) to ensure longer names match first (e.g. "Alex" before "Al")
+        // Sort by length (descending) to ensure longer names match first
         const sortedUsers = [...users].sort((a, b) => b.name.length - a.name.length);
         const sortedBugs = [...bugs].sort((a, b) => b.bugNumber.length - a.bugNumber.length);
 
-        const userNamesRegex = sortedUsers.map(u => escapeRegex(u.name)).join('|');
-        const bugNumbersRegex = sortedBugs.map(b => escapeRegex(b.bugNumber)).join('|');
-
         const partsForRegex = [];
+        
+        // 1. URL Pattern
+        partsForRegex.push('(https?:\\/\\/[^\\s]+)'); 
+
+        // 2. User Mentions Pattern
+        const userNamesRegex = sortedUsers.map(u => escapeRegex(u.name)).join('|');
         if (userNamesRegex) partsForRegex.push(`(@(?:${userNamesRegex}))`);
+
+        // 3. Bug Numbers Pattern
+        const bugNumbersRegex = sortedBugs.map(b => escapeRegex(b.bugNumber)).join('|');
         if (bugNumbersRegex) partsForRegex.push(`(#(?:${bugNumbersRegex}))`);
 
         if (partsForRegex.length === 0) {
             return text;
         }
         
-        // Use a global regex to find all matches
         const regex = new RegExp(partsForRegex.join('|'), 'g');
         const elements: React.ReactNode[] = [];
         let lastIndex = 0;
         let match;
 
-        // Use exec loop for reliable offset handling regardless of capture group count
         while ((match = regex.exec(text)) !== null) {
             const matchedText = match[0];
             const offset = match.index;
@@ -79,10 +79,23 @@ const ChatBubble: React.FC<{
                 elements.push(text.substring(lastIndex, offset));
             }
 
-            if (matchedText.startsWith('@')) {
+            if (matchedText.startsWith('http')) {
+                elements.push(
+                    <a 
+                        key={offset} 
+                        href={matchedText} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className={`hover:underline ${isCurrentUser ? 'text-blue-600' : 'text-blue-400'}`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {matchedText}
+                    </a>
+                );
+            } else if (matchedText.startsWith('@')) {
                 const userName = matchedText.substring(1);
                 elements.push(
-                    <strong key={offset} className="bg-blue-800/50 text-blue-300 font-semibold rounded px-1 py-0.5">
+                    <strong key={offset} className={`font-semibold rounded px-1 py-0.5 ${isCurrentUser ? 'bg-blue-200 text-blue-800' : 'bg-blue-900/50 text-blue-300'}`}>
                         @{userName}
                     </strong>
                 );
@@ -91,7 +104,7 @@ const ChatBubble: React.FC<{
                 elements.push(
                     <strong
                         key={offset}
-                        className="bg-purple-800/50 text-purple-300 font-semibold rounded px-1 py-0.5 cursor-pointer hover:underline"
+                        className={`font-semibold rounded px-1 py-0.5 cursor-pointer hover:underline ${isCurrentUser ? 'bg-purple-200 text-purple-800' : 'bg-purple-900/50 text-purple-300'}`}
                         onClick={(e) => {
                             e.stopPropagation();
                             onNavigateToBug(bugNumber);
@@ -114,13 +127,13 @@ const ChatBubble: React.FC<{
     };
 
     return (
-        <div className={`flex flex-col ${alignment} mb-2`}>
+        <div className={`flex flex-col ${alignment} mb-2 group`}>
             <div className="flex items-end gap-2 max-w-xs sm:max-w-md">
                 {!isCurrentUser && (
                     <UserAvatar user={message.author} className="w-7 h-7 flex-shrink-0 text-xs" isOnline={isOnline} />
                 )}
-                <div className={`px-4 py-2 rounded-2xl ${bubbleColor}`}>
-                    <p className="text-xs whitespace-pre-wrap">{renderTextWithTags(message.text)}</p>
+                <div className={`px-4 py-2 rounded-2xl ${bubbleColor} shadow-sm`}>
+                    <p className="text-xs whitespace-pre-wrap leading-relaxed">{renderTextWithTags(message.text)}</p>
                 </div>
             </div>
              <div className={`flex gap-2 items-center text-[10px] text-gray-500 mt-1 ${isCurrentUser ? 'mr-1' : 'ml-9'}`}>
@@ -259,8 +272,8 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
                     return (
                         <React.Fragment key={msg.id}>
                             {showDate && (
-                                <div className="flex justify-center my-6">
-                                    <span className="bg-gray-800 text-gray-400 text-[10px] px-3 py-1 rounded-full font-medium">
+                                <div className="flex justify-center my-6 sticky top-0 z-10">
+                                    <span className="bg-[#1C2326]/80 backdrop-blur-md border border-gray-800 text-gray-400 text-[10px] px-3 py-1 rounded-full font-medium shadow-sm">
                                         {formatDateSeparator(msg.createdAt)}
                                     </span>
                                 </div>

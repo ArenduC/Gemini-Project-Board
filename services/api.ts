@@ -679,21 +679,14 @@ const updateInviteLink = async (linkId: string, updates: { is_active: boolean })
 };
 
 const acceptInvite = async (token: string): Promise<{ id: string; name: string; }> => {
-    // FIX: Removed the generic from rpc() to default data to `any`, which allows the typeof guard to work without type checker issues.
-    // FIX: By adding the `Json` generic, we provide a strong type for `data`, resolving the `unknown` type error with `JSON.parse`.
-    // FIX: Removed the `<Json>` generic to default `data` to `any`, resolving a complex type inference issue with `JSON.parse`.
     const { data, error } = await supabase.rpc('accept_project_invite', { invite_token: token });
     if (error) throw error;
     if (!data) {
         throw new Error('Invite acceptance returned no data.');
     }
     
-    // The `data` from the `rpc` call can be a stringified JSON.
-    // The `typeof` check correctly narrows `data` to `string` so `JSON.parse` can be called safely.
     if (typeof data === 'string') {
-        // FIX: The type guard `typeof data === 'string'` correctly narrows the type to `string`,
-        // so the explicit cast `as string` is unnecessary and was causing a type error.
-        return JSON.parse(data as string);
+        return JSON.parse(data);
     }
     return data as { id: string, name: string };
 };
