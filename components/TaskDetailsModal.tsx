@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect, useCallback, FormEvent, useMemo, useRef } from 'react';
 import { Task, Subtask, User, TaskPriority, Sprint } from '../types';
 import { generateSubtasks as generateSubtasksFromApi } from '../services/geminiService';
 import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon, TrashIcon, HistoryIcon, CopyIcon, CheckIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 import { useConfirmation } from '../App';
+import { JsonSyntaxHighlighter } from './JsonSyntaxHighlighter';
 
 interface TaskDetailsModalProps {
   task: Task;
@@ -42,6 +42,20 @@ const CopyButton: React.FC<{ text: string; className?: string }> = ({ text, clas
             {copied ? <CheckIcon className="w-3.5 h-3.5 text-green-500" /> : <CopyIcon className="w-3.5 h-3.5 text-gray-400" />}
         </button>
     );
+};
+
+const isJsonContent = (text: string): boolean => {
+    if (!text) return false;
+    const trimmed = text.trim();
+    if (!((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']')))) {
+        return false;
+    }
+    try {
+        JSON.parse(trimmed);
+        return true;
+    } catch {
+        return false;
+    }
 };
 
 const EditableField: React.FC<{value: string, onSave: (value: string) => void, isTextArea?: boolean, textClassName: string, inputClassName: string, placeholder?: string, type?: string }> = 
@@ -84,6 +98,17 @@ const EditableField: React.FC<{value: string, onSave: (value: string) => void, i
         ? <textarea {...commonProps} rows={4} /> 
         : <input type={type} {...commonProps} />;
   }
+  
+  // Custom rendering for read-only view if content is JSON
+  if (isJsonContent(value)) {
+      return (
+          <div onClick={() => setIsEditing(true)} className="cursor-pointer group relative">
+              <div className="absolute top-2 right-2 text-[10px] text-gray-500 opacity-0 group-hover:opacity-100 bg-[#0D1117] px-1 rounded border border-gray-800 z-10">Click to edit</div>
+              <JsonSyntaxHighlighter data={value} />
+          </div>
+      );
+  }
+
   return <div onClick={() => setIsEditing(true)} className={`min-h-[24px] ${textClassName}`}>{value || <span className="text-gray-500">{placeholder}</span>}</div>;
 }
 
@@ -151,19 +176,10 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
     
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (showMentions && filteredMembers.length > 0) {
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                setActiveIndex((prevIndex) => (prevIndex + 1) % filteredMembers.length);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setActiveIndex((prevIndex) => (prevIndex - 1 + filteredMembers.length) % filteredMembers.length);
-            } else if (e.key === 'Enter' || e.key === 'Tab') {
-                e.preventDefault();
-                handleMentionSelect(filteredMembers[activeIndex]);
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                setShowMentions(false);
-            }
+            if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex((prevIndex) => (prevIndex + 1) % filteredMembers.length); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex((prevIndex) => (prevIndex - 1 + filteredMembers.length) % filteredMembers.length); }
+            else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); handleMentionSelect(filteredMembers[activeIndex]); }
+            else if (e.key === 'Escape') { e.preventDefault(); setShowMentions(false); }
         }
     };
     
@@ -178,7 +194,6 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
     const combinedFeed = useMemo(() => {
       const comments = task.comments.map(c => ({ ...c, type: 'comment' as const }));
       const history = task.history.map(h => ({ ...h, type: 'history' as const }));
-
       const feed = [...comments, ...history];
       feed.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       return feed;
@@ -186,72 +201,26 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
 
     const renderWithMentions = (text: string) => {
         const escapeRegex = (str: string) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-        
         const userNames = users.map(u => escapeRegex(u.name)).join('|');
-        
         const regexParts = [];
-        // Capture group for users if users exist
-        if (userNames) {
-            // Group 1: full mention (@User), Group 2: user name (User)
-            regexParts.push(`(@(${userNames})\\b)`);
-        }
-        // Capture group for URLs
-        // Group 3 if users exist, Group 1 if not
+        if (userNames) regexParts.push(`(@(${userNames})\\b)`);
         regexParts.push(`(https?:\\/\\/\\S+)`);
-        
         const combinedRegex = new RegExp(regexParts.join('|'), 'g');
-        
         const elements: React.ReactNode[] = [];
         let lastIndex = 0;
         let match;
 
         while ((match = combinedRegex.exec(text)) !== null) {
-            // Determine which part matched by checking capture groups
             let userName, url;
-            if (userNames) {
-                userName = match[2];
-                url = match[3];
-            } else {
-                url = match[1];
-            }
-
+            if (userNames) { userName = match[2]; url = match[3]; } else { url = match[1]; }
             const fullMatch = match[0];
             const matchIndex = match.index;
-            
-            // Push the text before the match
-            if (matchIndex > lastIndex) {
-                elements.push(text.substring(lastIndex, matchIndex));
-            }
-            
-            if (userName) {
-                elements.push(
-                    <strong key={matchIndex} className="bg-gray-500/30 text-white font-semibold rounded px-1 py-0.5">
-                        @{userName}
-                    </strong>
-                );
-            } else if (url) {
-                elements.push(
-                    <a 
-                        key={matchIndex} 
-                        href={url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-400 hover:underline"
-                        onClick={(e) => e.stopPropagation()} // Prevent modal from closing if the link is clicked
-                    >
-                        {url}
-                    </a>
-                );
-            }
-
+            if (matchIndex > lastIndex) elements.push(text.substring(lastIndex, matchIndex));
+            if (userName) elements.push(<strong key={matchIndex} className="bg-gray-500/30 text-white font-semibold rounded px-1 py-0.5">@{userName}</strong>);
+            else if (url) elements.push(<a key={matchIndex} href={url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline" onClick={(e) => e.stopPropagation()}>{url}</a>);
             lastIndex = matchIndex + fullMatch.length;
         }
-        
-        // Push any remaining text after the last match
-        if (lastIndex < text.length) {
-            elements.push(text.substring(lastIndex));
-        }
-
+        if (lastIndex < text.length) elements.push(text.substring(lastIndex));
         return <>{elements.length > 0 ? elements : text}</>;
     };
 
@@ -299,6 +268,8 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
             <div className="space-y-4">
                 {combinedFeed.map(item => {
                   const author = item.type === 'comment' ? item.author : item.user;
+                  const isJson = item.type === 'comment' ? isJsonContent(item.text) : false;
+
                   return (
                     <div key={`${item.type}-${item.id}`} className="flex items-start gap-3 group">
                          {item.type === 'comment' ? (
@@ -308,7 +279,7 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
                                 <HistoryIcon className="w-5 h-5 text-gray-400" />
                             </div>
                          )}
-                         <div className="flex-grow pt-1.5 relative">
+                         <div className="flex-grow pt-1.5 relative w-full min-w-0">
                             {item.type === 'comment' ? (
                                 <>
                                     <div className="flex items-center gap-2">
@@ -316,10 +287,18 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
                                         <span className="text-xs text-gray-500">{new Date(item.createdAt).toLocaleString()}</span>
                                     </div>
                                     <div className="relative">
-                                        <p className="bg-[#1C2326] p-3 rounded-lg mt-1 whitespace-pre-wrap text-sm text-white">{renderWithMentions(item.text)}</p>
-                                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <CopyButton text={item.text} className="bg-gray-800 hover:bg-gray-700 p-1" />
-                                        </div>
+                                        {isJson ? (
+                                            <div className="mt-1">
+                                                <JsonSyntaxHighlighter data={item.text} />
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <p className="bg-[#1C2326] p-3 rounded-lg mt-1 whitespace-pre-wrap text-sm text-white">{renderWithMentions(item.text)}</p>
+                                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                                    <CopyButton text={item.text} className="bg-gray-800 hover:bg-gray-700 p-1" />
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </>
                             ) : (
@@ -541,9 +520,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                 />
                 <CopyButton text={editedTask.title} className="opacity-0 group-hover:opacity-100 flex-shrink-0" />
             </div>
-          <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors ml-4">
-            <XIcon className="w-6 h-6" />
-          </button>
+            <div className="flex items-center gap-2">
+                <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
+                    <XIcon className="w-6 h-6" />
+                </button>
+            </div>
         </header>
         
         <div className="p-6 overflow-y-auto custom-scrollbar space-y-8">
@@ -570,9 +551,11 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                     inputClassName="text-sm p-2 rounded border-2 border-gray-500 bg-[#1C2326] focus:outline-none text-white"
                     placeholder="Add a more detailed description..."
                 />
-                <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <CopyButton text={editedTask.description} className="bg-[#1C2326]/80 p-1" />
-                </div>
+                {!isJsonContent(editedTask.description) && (
+                    <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <CopyButton text={editedTask.description} className="bg-[#1C2326]/80 p-1" />
+                    </div>
+                )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -768,7 +751,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                 <button
                 onClick={handleGenerateSubtasks}
                 disabled={aiState === 'loading'}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#131C1B] disabled:bg-gray-500 disabled:cursor-not-allowed transition-all text-sm"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] disabled:bg-gray-500 disabled:cursor-not-allowed transition-all text-sm"
                 >
                 {aiState === 'loading' ? (
                     <>
@@ -789,7 +772,14 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
           <hr className="border-gray-800" />
           
           <div className="p-6">
-            <ActivitySection task={editedTask} onAddComment={onAddComment} currentUser={currentUser} projectMembers={projectMembers} onlineUsers={onlineUsers} users={users} />
+            <ActivitySection 
+                task={editedTask} 
+                onAddComment={onAddComment} 
+                currentUser={currentUser} 
+                projectMembers={projectMembers} 
+                onlineUsers={onlineUsers} 
+                users={users} 
+            />
           </div>
         </div>
       </div>

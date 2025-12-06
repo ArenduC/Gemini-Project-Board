@@ -228,7 +228,7 @@ const moveTask = async (taskId: string, newColumnId: string, newPosition: number
         new_column_id: newColumnId,
         new_position: newPosition
     });
-    if (error) console.error("Error moving task:", error.message || error);
+    if (error) console.error("Error moving task:", (error as any).message || error);
 };
 
 const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) => {
@@ -269,7 +269,7 @@ const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) 
             const { data: columnData } = await supabase.from('columns').select('project_id').eq('id', oldTaskData.column_id).single();
             const projectId = columnData?.project_id;
             if (projectId) {
-                const { data: allSprints } = await supabase.from('sprints').select('id, name').eq('project_id', projectId);
+                const { data: allSprints } = await supabase.from('sprints').select('id, name').eq('project_id', projectId as string);
                 const oldSprintName = allSprints?.find(s => s.id === oldTaskData.sprint_id)?.name;
                 const newSprintName = allSprints?.find(s => s.id === updatedTask.sprintId)?.name;
                 
@@ -385,7 +385,7 @@ const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) 
         // Upsert tags to ensure they exist and get their IDs.
         const { data: upsertedTagsData, error: upsertTagsError } = await supabase.from('tags').upsert(
             tagNames.map(name => ({ name })),
-            { onConflict: 'name' }
+            { onConflict: 'name' } as any
         ).select('id, name');
 
         if (upsertTagsError) throw upsertTagsError;
@@ -758,7 +758,7 @@ const updateSprint = async (sprintId: string, updates: Partial<Sprint>): Promise
             const { error: unsetError } = await supabase
                 .from('sprints')
                 .update({ is_default: false })
-                .eq('project_id', sprint.project_id)
+                .eq('project_id', sprint.project_id as string)
                 .neq('id', sprintId);
             if (unsetError) throw unsetError;
         }

@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ChatMessage, User, Project, Bug } from '../types';
-import { XIcon, SendIcon } from './Icons';
+import { XIcon, SendIcon, CopyIcon, CheckIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
+import { JsonSyntaxHighlighter } from './JsonSyntaxHighlighter';
 
 interface ProjectChatProps {
     project: Project;
@@ -30,6 +30,20 @@ const formatDateSeparator = (dateString: string) => {
     }
 };
 
+const isJsonContent = (text: string): boolean => {
+    if (!text) return false;
+    const trimmed = text.trim();
+    if (!((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']')))) {
+        return false;
+    }
+    try {
+        JSON.parse(trimmed);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
 const ChatBubble: React.FC<{ 
     message: ChatMessage;
     isCurrentUser: boolean;
@@ -39,31 +53,33 @@ const ChatBubble: React.FC<{
     onNavigateToBug: (bugNumber: string) => void;
 }> = ({ message, isCurrentUser, isOnline, users, bugs, onNavigateToBug }) => {
     const alignment = isCurrentUser ? 'items-end' : 'items-start';
-    const bubbleColor = isCurrentUser ? 'bg-gray-300 text-black' : 'bg-gray-800 text-white';
+    const isJson = isJsonContent(message.text);
+    // Remove bubble background/padding for JSON to allow code block to take full width/style
+    const bubbleStyle = isJson ? 'w-full max-w-2xl' : `px-4 py-2 rounded-2xl shadow-sm ${isCurrentUser ? 'bg-gray-300 text-black' : 'bg-gray-800 text-white'}`;
+    
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(message.text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     const renderTextWithTags = (text: string) => {
         const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         
-        // Sort by length (descending) to ensure longer names match first
         const sortedUsers = [...users].sort((a, b) => b.name.length - a.name.length);
         const sortedBugs = [...bugs].sort((a, b) => b.bugNumber.length - a.bugNumber.length);
 
         const partsForRegex = [];
-        
-        // 1. URL Pattern
         partsForRegex.push('(https?:\\/\\/[^\\s]+)'); 
-
-        // 2. User Mentions Pattern
         const userNamesRegex = sortedUsers.map(u => escapeRegex(u.name)).join('|');
         if (userNamesRegex) partsForRegex.push(`(@(?:${userNamesRegex}))`);
-
-        // 3. Bug Numbers Pattern
         const bugNumbersRegex = sortedBugs.map(b => escapeRegex(b.bugNumber)).join('|');
         if (bugNumbersRegex) partsForRegex.push(`(#(?:${bugNumbersRegex}))`);
 
-        if (partsForRegex.length === 0) {
-            return text;
-        }
+        if (partsForRegex.length === 0) return text;
         
         const regex = new RegExp(partsForRegex.join('|'), 'g');
         const elements: React.ReactNode[] = [];
@@ -74,66 +90,47 @@ const ChatBubble: React.FC<{
             const matchedText = match[0];
             const offset = match.index;
 
-            // Push text before the match
-            if (offset > lastIndex) {
-                elements.push(text.substring(lastIndex, offset));
-            }
+            if (offset > lastIndex) elements.push(text.substring(lastIndex, offset));
 
             if (matchedText.startsWith('http')) {
                 elements.push(
-                    <a 
-                        key={offset} 
-                        href={matchedText} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className={`hover:underline ${isCurrentUser ? 'text-blue-600' : 'text-blue-400'}`}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {matchedText}
-                    </a>
+                    <a key={offset} href={matchedText} target="_blank" rel="noopener noreferrer" className={`hover:underline ${isCurrentUser ? 'text-blue-600' : 'text-blue-400'}`} onClick={(e) => e.stopPropagation()}>{matchedText}</a>
                 );
             } else if (matchedText.startsWith('@')) {
                 const userName = matchedText.substring(1);
-                elements.push(
-                    <strong key={offset} className={`font-semibold rounded px-1 py-0.5 ${isCurrentUser ? 'bg-blue-200 text-blue-800' : 'bg-blue-900/50 text-blue-300'}`}>
-                        @{userName}
-                    </strong>
-                );
+                elements.push(<strong key={offset} className={`font-semibold rounded px-1 py-0.5 ${isCurrentUser ? 'bg-blue-200 text-blue-800' : 'bg-blue-900/50 text-blue-300'}`}>@{userName}</strong>);
             } else if (matchedText.startsWith('#')) {
                 const bugNumber = matchedText.substring(1);
-                elements.push(
-                    <strong
-                        key={offset}
-                        className={`font-semibold rounded px-1 py-0.5 cursor-pointer hover:underline ${isCurrentUser ? 'bg-purple-200 text-purple-800' : 'bg-purple-900/50 text-purple-300'}`}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onNavigateToBug(bugNumber);
-                        }}
-                    >
-                        #{bugNumber}
-                    </strong>
-                );
+                elements.push(<strong key={offset} className={`font-semibold rounded px-1 py-0.5 cursor-pointer hover:underline ${isCurrentUser ? 'bg-purple-200 text-purple-800' : 'bg-purple-900/50 text-purple-300'}`} onClick={(e) => { e.stopPropagation(); onNavigateToBug(bugNumber); }}>#{bugNumber}</strong>);
             }
-
             lastIndex = offset + matchedText.length;
         }
-
-        // Push remaining text
-        if (lastIndex < text.length) {
-            elements.push(text.substring(lastIndex));
-        }
-
+        if (lastIndex < text.length) elements.push(text.substring(lastIndex));
         return <>{elements}</>;
     };
 
     return (
-        <div className={`flex flex-col ${alignment} mb-2 group`}>
-            <div className="flex items-end gap-2 max-w-xs sm:max-w-md">
+        <div className={`flex flex-col ${alignment} mb-2 group relative w-full`}>
+            <div className={`flex items-end gap-2 max-w-[85%] sm:max-w-[75%] relative ${isJson ? 'w-full' : ''}`}>
                 {!isCurrentUser && (
                     <UserAvatar user={message.author} className="w-7 h-7 flex-shrink-0 text-xs" isOnline={isOnline} />
                 )}
-                <div className={`px-4 py-2 rounded-2xl ${bubbleColor} shadow-sm`}>
-                    <p className="text-xs whitespace-pre-wrap leading-relaxed">{renderTextWithTags(message.text)}</p>
+                
+                {/* Standard Copy Action for non-JSON text bubbles (JSON highlighter has its own) */}
+                {!isJson && (
+                    <div className={`absolute top-0 ${isCurrentUser ? 'left-0 -translate-x-full pr-2' : 'right-0 translate-x-full pl-2'} h-full flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10`}>
+                        <button onClick={handleCopy} className="p-1.5 rounded-full bg-[#1C2326] border border-gray-700 text-gray-400 hover:text-white" title="Copy Text">
+                            {copied ? <CheckIcon className="w-3 h-3 text-green-500" /> : <CopyIcon className="w-3 h-3" />}
+                        </button>
+                    </div>
+                )}
+
+                <div className={`${bubbleStyle} overflow-hidden`}>
+                    {isJson ? (
+                        <JsonSyntaxHighlighter data={message.text} />
+                    ) : (
+                        <p className="text-xs whitespace-pre-wrap leading-relaxed">{renderTextWithTags(message.text)}</p>
+                    )}
                 </div>
             </div>
              <div className={`flex gap-2 items-center text-[10px] text-gray-500 mt-1 ${isCurrentUser ? 'mr-1' : 'ml-9'}`}>
@@ -158,22 +155,14 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
     const projectBugs = useMemo(() => Object.values(project.bugs || {}), [project.bugs]);
 
     const filteredSuggestions = useMemo(() => {
-        if (!suggestionState.show || !suggestionState.query) {
-            return [];
-        }
+        if (!suggestionState.show || !suggestionState.query) return [];
         const queryLower = suggestionState.query.toLowerCase();
-        if (suggestionState.type === 'user') {
-            return projectMembers.filter(m => m.name.toLowerCase().includes(queryLower));
-        }
-        if (suggestionState.type === 'bug') {
-            return projectBugs.filter(b => b.bugNumber.toLowerCase().includes(queryLower) || b.title.toLowerCase().includes(queryLower));
-        }
+        if (suggestionState.type === 'user') return projectMembers.filter(m => m.name.toLowerCase().includes(queryLower));
+        if (suggestionState.type === 'bug') return projectBugs.filter(b => b.bugNumber.toLowerCase().includes(queryLower) || b.title.toLowerCase().includes(queryLower));
         return [];
     }, [suggestionState, projectMembers, projectBugs]);
 
-    useEffect(() => {
-      setActiveIndex(0);
-    }, [filteredSuggestions]);
+    useEffect(() => { setActiveIndex(0); }, [filteredSuggestions]);
     
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -186,19 +175,12 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
     const handleNewMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const text = e.target.value;
         setNewMessage(text);
-        
         const cursorPos = e.target.selectionStart;
         const textToCursor = text.substring(0, cursorPos);
         const lastWordMatch = textToCursor.match(/[@#](\w*)$/);
 
         if (lastWordMatch) {
-            const trigger = lastWordMatch[0][0];
-            const query = lastWordMatch[1];
-            setSuggestionState({
-                show: true,
-                type: trigger === '@' ? 'user' : 'bug',
-                query: query,
-            });
+            setSuggestionState({ show: true, type: lastWordMatch[0][0] === '@' ? 'user' : 'bug', query: lastWordMatch[1] });
         } else {
             setSuggestionState({ show: false, type: null, query: '' });
         }
@@ -209,7 +191,6 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
         const cursorPos = textareaRef.current?.selectionStart || 0;
         const textToCursor = text.substring(0, cursorPos);
         const lastTriggerIndex = textToCursor.lastIndexOf(suggestionState.type === 'user' ? '@' : '#');
-
         if (lastTriggerIndex === -1) return;
 
         const prefix = text.substring(0, lastTriggerIndex);
@@ -219,7 +200,6 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
 
         setNewMessage(newText);
         setSuggestionState({ show: false, type: null, query: '' });
-        
         setTimeout(() => {
             textareaRef.current?.focus();
             const newCursorPos = lastTriggerIndex + value.length + 2;
@@ -229,19 +209,10 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (suggestionState.show && filteredSuggestions.length > 0) {
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                setActiveIndex((prev) => (prev + 1) % filteredSuggestions.length);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                setActiveIndex((prev) => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length);
-            } else if (e.key === 'Enter' || e.key === 'Tab') {
-                e.preventDefault();
-                handleSuggestionSelect(filteredSuggestions[activeIndex]);
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                setSuggestionState({ show: false, type: null, query: '' });
-            }
+            if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex((prev) => (prev + 1) % filteredSuggestions.length); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex((prev) => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length); }
+            else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); handleSuggestionSelect(filteredSuggestions[activeIndex]); }
+            else if (e.key === 'Escape') { e.preventDefault(); setSuggestionState({ show: false, type: null, query: '' }); }
         } else if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSubmit();
@@ -256,8 +227,8 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
     };
 
     return (
-        <div className="fixed top-0 right-0 h-full w-full max-w-md bg-[#131C1B] shadow-2xl z-30 flex flex-col transform transition-transform duration-300 ease-in-out">
-             <header className="p-4 border-b border-gray-800 flex justify-between items-center flex-shrink-0">
+        <div className="fixed top-0 right-0 h-full w-full max-w-md bg-[#131C1B] shadow-2xl z-30 flex flex-col transform transition-transform duration-300 ease-in-out border-l border-gray-800">
+             <header className="p-4 border-b border-gray-800 flex justify-between items-center flex-shrink-0 bg-[#131C1B]/95 backdrop-blur">
                 <h3 className="text-base font-bold text-white">Project Chat</h3>
                 <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
                     <XIcon className="w-6 h-6" />
@@ -291,7 +262,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
                 })}
                 <div ref={messagesEndRef} />
             </div>
-            <footer className="p-4 border-t border-gray-800 flex-shrink-0 relative">
+            <footer className="p-4 border-t border-gray-800 flex-shrink-0 relative bg-[#131C1B]">
                 {suggestionState.show && filteredSuggestions.length > 0 && (
                     <div className="absolute bottom-full mb-2 w-[calc(100%-2rem)] bg-[#1C2326] border border-gray-700 rounded-md shadow-lg max-h-48 overflow-y-auto custom-scrollbar z-10">
                         <ul>
