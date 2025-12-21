@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { DragDropContext, DropResult } from 'react-beautiful-dnd';
 import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority, AiGeneratedTaskFromFile, Sprint, BugResponse } from '../types';
@@ -539,7 +540,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         />
       </div>
 
-      <div className="relative z-20 mb-6 flex flex-wrap items-start justify-between gap-4">
+      {/* FIX: Reduced z-index to z-10 to stay below main header z-30 */}
+      <div className="relative z-10 mb-6 flex flex-wrap items-start justify-between gap-4">
         {!['bugs', 'sprints'].includes(projectView) && (
             <Filters
                 projectId={project.id}

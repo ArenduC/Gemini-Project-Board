@@ -1,6 +1,6 @@
 {
-  "name": "Gemini Project Board",
-  "description": "A JIRA-like project management board with AI-powered features for task generation and management. This application provides a visually appealing and intuitive Kanban board where users can manage their workflow, with columns for different stages of task completion. The standout feature is its integration with the Gemini API to automatically generate subtasks, helping users break down complex tasks into manageable steps.",
+  "name": "Graphynovus | Gemini Project Board",
+  "description": "A high-end project management board with AI-powered features for task generation and management, featuring modern parallax transitions and neural workflow optimization.",
   "requestFramePermissions": [
     "microphone"
   ]

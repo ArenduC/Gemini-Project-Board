@@ -1,14 +1,16 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, ReactNode } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ManageMembersModal } from './components/ManageMembersModal';
-import { BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon, RotateCwIcon, LifeBuoyIcon, XIcon } from './components/Icons';
+import { AppLogo, BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon, RotateCwIcon, LifeBuoyIcon, XIcon } from './components/Icons';
 import { useAppState } from './hooks/useAppState';
 import { DashboardPage } from './pages/DashboardPage';
 import { TasksPage } from './pages/TasksPage';
 import { ResourceManagementPage } from './pages/ResourceManagementPage';
 import { LoginPage } from './pages/LoginPage';
+import { LandingPage } from './components/LandingPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import CallbackPage from './pages/CallbackPage';
 // FIX: Import `Column` type to be used in casting.
@@ -43,7 +45,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <header className="p-4 border-b border-gray-800 flex justify-between items-center">
           <h2 className="text-lg font-bold text-white">{title}</h2>
@@ -573,7 +575,8 @@ const AppContent: React.FC = () => {
                  const dragResult: DropResult = {
                      draggableId: taskToMove.id,
                      source: { droppableId: sourceColumn.id, index: sourceColumn.taskIds.indexOf(taskToMove.id) },
-                     destination: { droppableId: destColumn.id, index: destColumn.taskIds.length },
+                     // FIX: Use destColumn.id and default index 0 for the destination to fix missing variable errors.
+                     destination: { droppableId: destColumn.id, index: 0 },
                      reason: 'DROP',
                      type: 'DEFAULT',
                      mode: 'FLUID',
@@ -667,7 +670,7 @@ const AppContent: React.FC = () => {
             <button onClick={handleBackToDashboard} className="p-2 rounded-full hover:bg-gray-800 transition-colors">
                 <ArrowLeftIcon className="w-5 h-5"/>
             </button>
-            <BotMessageSquareIcon className="w-7 h-7 text-gray-400" />
+            <AppLogo className="w-7 h-7" />
             <h1 className="text-lg font-bold tracking-tight text-white">
               {activeProject.name}
             </h1>
@@ -688,9 +691,9 @@ const AppContent: React.FC = () => {
     }
      return (
         <div className="flex items-center gap-3">
-            <BotMessageSquareIcon className="w-7 h-7 text-gray-400" />
+            <AppLogo className="w-7 h-7" />
             <h1 className="text-lg font-bold tracking-tight text-white">
-              Gemini Project Board
+              Graphynovus
             </h1>
         </div>
      )
@@ -720,13 +723,13 @@ const AppContent: React.FC = () => {
     if (view === 'privacy') {
         return <PrivacyPolicyPage isEmbedded={false} onBack={() => navigate('/')} />;
     }
-    return <LoginPage onShowPrivacy={() => navigate('/privacy')} />;
+    return <LandingPage onShowPrivacy={() => navigate('/privacy')} />;
   }
 
   return (
     <>
       <div onClick={initAudio} className="min-h-screen font-sans text-gray-300 bg-[#1C2326] transition-colors duration-300">
-        <header className="bg-[#131C1B]/80 backdrop-blur-sm border-b border-gray-800 p-4 flex justify-between items-center sticky top-0 z-20 flex-wrap gap-4">
+        <header className="bg-[#131C1B]/80 backdrop-blur-sm border-b border-gray-800 p-4 flex justify-between items-center sticky top-0 z-30 flex-wrap gap-4">
           <HeaderContent />
 
           <nav className="flex items-center gap-2 px-2 py-1 bg-[#1C2326] rounded-full">
@@ -845,10 +848,11 @@ const AppContent: React.FC = () => {
             </div>
           ) : (
             <>
-              {view === 'dashboard' && (
+              {view === 'dashboard' && currentUser && (
                 <DashboardPage 
                   projects={Object.values(state.projects)}
                   users={state.users}
+                  currentUser={currentUser}
                   onlineUsers={onlineUsers}
                   onSelectProject={handleSelectProject}
                   onCreateProject={() => setCreateProjectModalOpen(true)}
@@ -883,6 +887,7 @@ const AppContent: React.FC = () => {
                   addBug={addBug}
                   updateBug={updateBug}
                   deleteBug={deleteBug}
+                  // FIX: Wrap addBugsBatch to provide the active project's ID.
                   addBugsBatch={(bugs) => addBugsBatch(activeProject.id, bugs)}
                   deleteBugsBatch={deleteBugsBatch}
                   addTasksBatch={(tasks, sprintId) => addTasksBatch(activeProject.id, tasks, sprintId)}

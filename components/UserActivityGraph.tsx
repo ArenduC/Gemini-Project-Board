@@ -1,19 +1,26 @@
 import React, { useMemo } from 'react';
-import { Project, User, Task, BoardData } from '../types';
+import { Project, User, Task, BoardData, Bug } from '../types';
 import { UserAvatar } from './UserAvatar';
+import { CheckSquareIcon, LifeBuoyIcon } from './Icons';
 
-const statusColors: Record<string, { dot: string, text: string }> = {
-    'To Do': { dot: 'bg-gray-500', text: 'text-gray-400' },
-    'In Progress': { dot: 'bg-blue-500', text: 'text-blue-400' },
-    'Done': { dot: 'bg-green-500', text: 'text-green-400' },
-    'default': { dot: 'bg-gray-500', text: 'text-gray-400' },
+const statusColors: Record<string, { dot: string, text: string, bg: string }> = {
+    'To Do': { dot: 'bg-gray-500', text: 'text-gray-400', bg: 'bg-gray-500/10' },
+    'In Progress': { dot: 'bg-blue-500', text: 'text-blue-400', bg: 'bg-blue-500/10' },
+    'Done': { dot: 'bg-emerald-500', text: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    'default': { dot: 'bg-gray-500', text: 'text-gray-400', bg: 'bg-gray-500/10' },
 };
 
-const getTaskStatus = (task: Task, board: BoardData): { name: string; colorInfo: { dot: string, text: string } } => {
+const getTaskStatus = (task: Task, board: BoardData): { name: string; colorInfo: typeof statusColors['default']; isDone: boolean } => {
     const column = Object.values(board.columns).find(c => c.taskIds.includes(task.id));
     const statusName = column?.title || 'Uncategorized';
     const colorInfo = statusColors[statusName] || statusColors.default;
-    return { name: statusName, colorInfo };
+    return { name: statusName, colorInfo, isDone: statusName.toLowerCase() === 'done' };
+};
+
+const getBugStatus = (bug: Bug): { name: string; colorInfo: typeof statusColors['default']; isDone: boolean } => {
+    const isDone = bug.status.toLowerCase().includes('done') || bug.status.toLowerCase().includes('resolved');
+    const colorInfo = isDone ? statusColors['Done'] : (bug.status.toLowerCase().includes('progress') ? statusColors['In Progress'] : statusColors['To Do']);
+    return { name: bug.status, colorInfo, isDone };
 };
 
 interface UserActivityGraphProps {
@@ -28,87 +35,113 @@ interface UserWorkload {
     projectWorkload: {
         project: Project;
         tasks: Task[];
+        bugs: Bug[];
+        solvedCount: number;
     }[];
 }
 
 export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, users, onlineUsers, onTaskClick }) => {
     const userWorkloads = useMemo((): UserWorkload[] => {
-        // FIX: Cast Object.values to the correct type to avoid type inference issues.
         return (Object.values(users) as User[]).map(user => {
-            // FIX: Cast Object.values to the correct type to avoid type inference issues.
             const projectWorkload = (Object.values(projects) as Project[])
                 .map(project => {
-                    // FIX: Cast Object.values to the correct type to avoid type inference issues.
                     const tasks = (Object.values(project.board.tasks) as Task[]).filter(task => task.assignee?.id === user.id);
-                    return { project, tasks };
+                    const bugs = (Object.values(project.bugs || {}) as Bug[]).filter(bug => bug.assignee?.id === user.id);
+                    
+                    const solvedTasks = tasks.filter(t => getTaskStatus(t, project.board).isDone).length;
+                    const solvedBugs = bugs.filter(b => getBugStatus(b).isDone).length;
+
+                    return { project, tasks, bugs, solvedCount: solvedTasks + solvedBugs };
                 })
-                .filter(workload => workload.tasks.length > 0); // Only include projects where user has tasks
+                .filter(workload => workload.tasks.length > 0 || workload.bugs.length > 0);
 
             return { user, projectWorkload };
-        });
+        }).filter(w => w.projectWorkload.length > 0);
     }, [projects, users]);
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-12">
             {userWorkloads.map(({ user, projectWorkload }) => (
-                <div key={user.id} className="p-4 bg-[#131C1B] rounded-xl border border-gray-800">
-                    {/* User Node */}
-                    <div className="flex items-center gap-4 mb-4">
-                        <UserAvatar user={user} className="w-12 h-12 text-xl" isOnline={onlineUsers.has(user.id)} />
+                <div key={user.id} className="relative">
+                    {/* User Anchor */}
+                    <div className="flex items-center gap-4 mb-6 sticky top-0 bg-[#131C1B]/95 backdrop-blur-md py-2 z-10 border-b border-white/5">
+                        <UserAvatar user={user} className="w-14 h-14 text-xl ring-4 ring-white/5" isOnline={onlineUsers.has(user.id)} />
                         <div>
-                            <h3 className="text-base font-bold text-white">{user.name}</h3>
-                            <p className="text-xs text-gray-400">{user.role}</p>
+                            <h3 className="text-lg font-bold text-white tracking-tight">{user.name}</h3>
+                            <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{user.role}</span>
+                                <span className="w-1 h-1 rounded-full bg-gray-700" />
+                                <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">
+                                    {projectWorkload.reduce((acc, p) => acc + p.solvedCount, 0)} Solved Nodes
+                                </span>
+                            </div>
                         </div>
                     </div>
                     
-                    {/* Projects & Tasks Tree */}
-                    {projectWorkload.length > 0 ? (
-                        <ul className="relative pl-6">
-                             {/* The main vertical connector line */}
-                            <span className="absolute left-[2px] top-4 bottom-4 w-0.5 bg-gray-800" aria-hidden="true"></span>
-                            {projectWorkload.map(({ project, tasks }) => (
-                                <li key={project.id} className="relative py-2">
-                                     {/* The horizontal connector line */}
-                                    <span className="absolute left-[-22px] top-4 -translate-y-1/2 w-6 h-0.5 bg-gray-800" aria-hidden="true"></span>
-                                    {/* Connector dot */}
-                                    <span className="absolute left-[2px] top-4 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-gray-800" aria-hidden="true"></span>
-                                    
-                                    {/* Project Node */}
-                                    <div className="mb-2">
-                                        <h4 className="font-semibold text-white">{project.name}</h4>
-                                    </div>
-                                    
-                                    {/* Tasks List */}
-                                    <ul className="relative pt-2 pl-9">
-                                        <span className="absolute left-[11px] top-0 bottom-4 w-0.5 bg-gray-800/50" aria-hidden="true"></span>
-                                        {tasks.map(task => {
-                                            const { name: statusName, colorInfo } = getTaskStatus(task, project.board);
-                                            return (
-                                                <li key={task.id} className="relative py-1.5">
-                                                     <span className="absolute left-[-25px] top-1/2 -translate-y-1/2 w-6 h-0.5 bg-gray-800/50" aria-hidden="true"></span>
-                                                     <span className="absolute left-[-2px] top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-gray-800/50" aria-hidden="true"></span>
-                                                    <div 
-                                                        className="flex items-center gap-4 bg-[#1C2326]/60 p-2 rounded-md border border-gray-800/50 cursor-pointer hover:bg-[#1C2326] transition-colors"
-                                                        onClick={() => onTaskClick(task)}
-                                                    >
-                                                        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-gray-800 flex-shrink-0">
-                                                            <div className={`w-2.5 h-2.5 rounded-full ${colorInfo.dot}`}></div>
-                                                        </div>
-                                                        <p className="flex-grow text-xs text-white">{task.title}</p>
-                                                        <p className={`text-xs font-medium ${colorInfo.text}`}>{statusName}</p>
-                                                    </div>
-                                                </li>
-                                            )
-                                        })}
-                                    </ul>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <div className="pl-6 text-xs text-gray-500">No tasks assigned to this user.</div>
-                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-4 border-l-2 border-white/5">
+                        {projectWorkload.map(({ project, tasks, bugs }) => (
+                            <div key={project.id} className="space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                        {project.name}
+                                    </h4>
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase">{tasks.length + bugs.length} Total</span>
+                                </div>
+                                
+                                <div className="space-y-2">
+                                    {tasks.map(task => {
+                                        const { name, colorInfo, isDone } = getTaskStatus(task, project.board);
+                                        return (
+                                            <div 
+                                                key={task.id}
+                                                onClick={() => onTaskClick(task)}
+                                                className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group/task
+                                                    ${isDone ? 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30' : 'bg-white/5 border-white/5 hover:border-white/10'}
+                                                `}
+                                            >
+                                                <CheckSquareIcon className={`w-4 h-4 ${isDone ? 'text-emerald-500' : 'text-gray-600 group-hover/task:text-gray-400'}`} />
+                                                <p className={`flex-grow text-xs font-medium truncate ${isDone ? 'text-emerald-400/70 line-through' : 'text-white'}`}>
+                                                    {task.title}
+                                                </p>
+                                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${colorInfo.bg} ${colorInfo.text}`}>
+                                                    {name}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                    {bugs.map(bug => {
+                                        const { name, colorInfo, isDone } = getBugStatus(bug);
+                                        return (
+                                            <div 
+                                                key={bug.id}
+                                                className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group/bug
+                                                    ${isDone ? 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30' : 'bg-red-500/5 border-red-500/10 hover:border-red-500/20'}
+                                                `}
+                                            >
+                                                <LifeBuoyIcon className={`w-4 h-4 ${isDone ? 'text-emerald-500' : 'text-red-500/50 group-hover/bug:text-red-500'}`} />
+                                                <p className={`flex-grow text-xs font-medium truncate ${isDone ? 'text-emerald-400/70 line-through' : 'text-white'}`}>
+                                                    <span className="font-mono text-[10px] text-gray-600 mr-2">{bug.bugNumber}</span>
+                                                    {bug.title}
+                                                </p>
+                                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${colorInfo.bg} ${colorInfo.text}`}>
+                                                    {name}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             ))}
+            {userWorkloads.length === 0 && (
+                <div className="py-20 text-center text-gray-500">
+                    <p className="font-bold">No effort matches the current strategic filter.</p>
+                    <p className="text-xs mt-1">Adjust filters or search criteria to analyze resource nodes.</p>
+                </div>
+            )}
         </div>
     );
 };

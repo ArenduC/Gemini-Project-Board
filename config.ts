@@ -1,5 +1,5 @@
-// IMPORTANT: Replace with your actual Google Gemini API key.
-export const GEMINI_API_KEY: string = "AIzaSyBivRDxCpQRGOqjPk43ksuPHCByW6MA1Bo";
+
+// FIX: Removed hardcoded GEMINI_API_KEY as per guidelines. API key is obtained from process.env.API_KEY in services/geminiService.ts.
 
 // FIX: Added explicit string types to prevent TypeScript from inferring literal types, which causes comparison errors.
 export const SUPABASE_URL: string = "https://gusrrfpuzjpgowblvjkl.supabase.co";

@@ -6,6 +6,7 @@ import { exportAugmentedTasksToCsv } from '../utils/export';
 import { TaskListRow } from '../components/TaskListRow';
 import { Filters } from '../components/Filters';
 import { Pagination } from '../components/Pagination';
+import { TaskInsights } from '../components/TaskInsights';
 
 interface TasksPageProps {
   projects: Record<string, Project>;
@@ -277,7 +278,10 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   };
 
   return (
-    <div>
+    <div className="max-w-[1600px] mx-auto pb-20">
+      {/* Dynamic Task Insights */}
+      <TaskInsights tasks={filteredTasks} />
+
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <h2 className="text-xl font-bold text-white">Tasks</h2>
         <div className="flex items-center gap-2">
@@ -347,14 +351,14 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
           />
       </div>
 
-      <div className="bg-[#131C1B] rounded-lg shadow-md border border-gray-800 overflow-hidden">
+      <div className="bg-[#131C1B]/80 backdrop-blur-xl rounded-[2rem] border border-white/5 overflow-hidden shadow-2xl">
         {/* List Header */}
-        <div className="grid grid-cols-12 gap-4 items-center px-4 py-2 border-b border-gray-800 bg-[#1C2326]/50">
-          <div className="col-span-4 font-semibold text-xs uppercase tracking-wider text-gray-400">Task</div>
-          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Project</div>
-          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Priority</div>
-          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400">Status</div>
-          <div className="col-span-2 font-semibold text-xs uppercase tracking-wider text-gray-400 text-right">Assignee</div>
+        <div className="grid grid-cols-12 gap-4 items-center px-6 py-4 border-b border-white/5 bg-white/5">
+          <div className="col-span-4 font-bold text-[10px] uppercase tracking-widest text-gray-500">Node / Title</div>
+          <div className="col-span-2 font-bold text-[10px] uppercase tracking-widest text-gray-500">Project Nexus</div>
+          <div className="col-span-2 font-bold text-[10px] uppercase tracking-widest text-gray-500">Priority</div>
+          <div className="col-span-2 font-bold text-[10px] uppercase tracking-widest text-gray-500">Status</div>
+          <div className="col-span-2 font-bold text-[10px] uppercase tracking-widest text-gray-500 text-right">Resource</div>
         </div>
         {paginatedTasks.length > 0 ? (
             paginatedTasks.map(task => (
@@ -366,8 +370,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
                 />
             ))
         ) : (
-            <div className="p-8 text-center text-gray-400">
-                No tasks found for this view.
+            <div className="p-20 text-center text-gray-500 font-mono text-sm italic">
+                NO NEURAL TASKS FOUND IN CURRENT SCOPE
             </div>
         )}
       </div>

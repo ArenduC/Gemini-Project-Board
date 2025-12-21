@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ChatMessage, User, Project, Bug } from '../types';
 import { XIcon, SendIcon, CopyIcon, CheckIcon } from './Icons';
@@ -145,6 +146,7 @@ const ChatBubble: React.FC<{
 
 export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messages, currentUser, onlineUsers, onClose, onSendMessage, onNavigateToBug }) => {
     const [newMessage, setNewMessage] = useState('');
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     
@@ -164,12 +166,26 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
 
     useEffect(() => { setActiveIndex(0); }, [filteredSuggestions]);
     
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Improved scroll logic
+    const scrollToBottom = (smooth = true) => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ 
+                behavior: smooth ? "smooth" : "auto",
+                block: "end"
+            });
+        }
     };
 
+    // Scroll on mount (instant)
     useEffect(() => {
-        scrollToBottom();
+        // Use a small delay to ensure initial height is calculated after render
+        const timer = setTimeout(() => scrollToBottom(false), 50);
+        return () => clearTimeout(timer);
+    }, []);
+
+    // Scroll when messages change
+    useEffect(() => {
+        scrollToBottom(true);
     }, [messages]);
 
     const handleNewMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -227,14 +243,14 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
     };
 
     return (
-        <div className="fixed top-0 right-0 h-full w-full max-w-md bg-[#131C1B] shadow-2xl z-30 flex flex-col transform transition-transform duration-300 ease-in-out border-l border-gray-800">
+        <div className="fixed top-0 right-0 h-full w-full max-w-md bg-[#131C1B] shadow-2xl z-40 flex flex-col transform transition-transform duration-300 ease-in-out border-l border-gray-800">
              <header className="p-4 border-b border-gray-800 flex justify-between items-center flex-shrink-0 bg-[#131C1B]/95 backdrop-blur">
                 <h3 className="text-base font-bold text-white">Project Chat</h3>
                 <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
                     <XIcon className="w-6 h-6" />
                 </button>
             </header>
-            <div className="flex-grow p-4 overflow-y-auto custom-scrollbar">
+            <div ref={scrollContainerRef} className="flex-grow p-4 overflow-y-auto custom-scrollbar">
                 {messages.map((msg, index) => {
                     const currentDate = new Date(msg.createdAt).toDateString();
                     const prevDate = index > 0 ? new Date(messages[index - 1].createdAt).toDateString() : null;
@@ -260,7 +276,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
                         </React.Fragment>
                     );
                 })}
-                <div ref={messagesEndRef} />
+                <div ref={messagesEndRef} className="h-px w-full" />
             </div>
             <footer className="p-4 border-t border-gray-800 flex-shrink-0 relative bg-[#131C1B]">
                 {suggestionState.show && filteredSuggestions.length > 0 && (

@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { api } from '../services/api';
 import { BotMessageSquareIcon, UsersIcon, LoaderCircleIcon, CheckIcon } from '../components/Icons';
@@ -107,176 +105,160 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
         setPassword('');
     };
 
-    const getTitle = () => {
-        if (mode === 'signIn') return 'Sign in to your account';
-        if (mode === 'signUp') return 'Create a new account';
-        return 'Reset your password';
-    };
-
     if (mode === 'awaitingConfirmation') {
         return (
-            <div className="min-h-screen font-sans bg-[#1C2326] flex flex-col items-center justify-center p-4">
-                <div className="w-full max-w-sm text-center">
-                    <div className="flex flex-col items-center mb-6">
-                        <div className="relative mb-6">
-                            <BotMessageSquareIcon className="w-16 h-16 text-gray-400" />
-                             <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-1 border-2 border-[#1C2326]">
-                                <CheckIcon className="w-5 h-5 text-white" />
-                            </div>
+            <div className="text-center">
+                <div className="flex flex-col items-center mb-6">
+                    <div className="relative mb-6">
+                        <BotMessageSquareIcon className="w-16 h-16 text-gray-400" />
+                        <div className="absolute -bottom-2 -right-2 bg-green-500 rounded-full p-1 border-2 border-[#131C1B]">
+                            <CheckIcon className="w-5 h-5 text-white" />
                         </div>
-                        <h1 className="text-xl font-bold tracking-tight text-white mt-2">
-                            Check your email
-                        </h1>
                     </div>
-                    <div className="bg-[#131C1B] rounded-xl shadow-lg p-8 space-y-4">
-                        <p className="text-xs text-gray-300">
-                            {successMessage || `We've sent a confirmation link to ${email}. Please check your inbox (and spam folder) to complete your registration.`}
-                        </p>
-                        
-                        {error && <p className="text-xs text-red-500">{error}</p>}
-                        
-                        <button
-                            onClick={handleResendConfirmation}
-                            disabled={loading}
-                            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-xs font-medium text-black bg-gray-300 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-[#131C1B] disabled:bg-gray-500"
-                        >
-                            {loading ? <LoaderCircleIcon className="animate-spin h-5 w-5" /> : 'Resend confirmation link'}
-                        </button>
+                    <h1 className="text-xl font-bold tracking-tight text-white mt-2">
+                        Check your email
+                    </h1>
+                </div>
+                <div className="space-y-4">
+                    <p className="text-xs text-gray-300">
+                        {successMessage || `We've sent a confirmation link to ${email}. Please check your inbox (and spam folder) to complete your registration.`}
+                    </p>
+                    
+                    {error && <p className="text-xs text-red-500">{error}</p>}
+                    
+                    <button
+                        onClick={handleResendConfirmation}
+                        disabled={loading}
+                        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-xs font-medium text-black bg-gray-300 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#131C1B] disabled:bg-gray-500"
+                    >
+                        {loading ? <LoaderCircleIcon className="animate-spin h-5 w-5" /> : 'Resend confirmation link'}
+                    </button>
 
-                        <button onClick={() => handleModeChange('signIn')} className="text-xs font-medium text-white hover:text-gray-300">
-                           Back to Sign In
-                        </button>
-                    </div>
+                    <button onClick={() => handleModeChange('signIn')} className="text-xs font-medium text-white hover:text-gray-300">
+                       Back to Sign In
+                    </button>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen font-sans bg-[#1C2326] flex flex-col items-center justify-center p-4">
-             <div className="w-full max-w-sm">
-                <div className="flex flex-col items-center mb-6">
-                    <BotMessageSquareIcon className="w-12 h-12 text-gray-400" />
-                    <h1 className="text-xl font-bold tracking-tight text-white mt-2">
-                        Gemini Project Board
-                    </h1>
-                    <p className="text-gray-400 mt-1 text-xs">{getTitle()}</p>
+        <div className="w-full">
+            {hasInvite && (
+                <div className="mb-6 text-center text-xs text-green-300 bg-green-900/30 p-3 rounded-lg border border-green-700">
+                    You've been invited to a project!
+                    <br />
+                    Please sign in or create an account to join.
                 </div>
-                {hasInvite && (
-                    <div className="mb-4 text-center text-xs text-green-300 bg-green-900/30 p-3 rounded-lg border border-green-700">
-                        You've been invited to a project!
-                        <br />
-                        Please sign in or create an account to join.
+            )}
+            <form onSubmit={handleSubmit} className="space-y-5">
+                {mode === 'signUp' && (
+                     <div>
+                        <label htmlFor="name" className="block text-xs font-medium text-white mb-1.5 uppercase tracking-wider opacity-70">
+                            Full Name
+                        </label>
+                        <input
+                            id="name"
+                            name="name"
+                            type="text"
+                            autoComplete="name"
+                            required
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent bg-[#1C2326] text-white text-xs transition-all"
+                        />
                     </div>
                 )}
-                <div className="bg-[#131C1B] rounded-xl shadow-lg p-8">
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        {mode === 'signUp' && (
-                             <div>
-                                <label htmlFor="name" className="block text-xs font-medium text-white mb-1">
-                                    Full Name
-                                </label>
-                                <input
-                                    id="name"
-                                    name="name"
-                                    type="text"
-                                    autoComplete="name"
-                                    required
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-xs"
-                                />
-                            </div>
-                        )}
-                        {mode === 'signIn' || mode === 'signUp' ? (
-                            <div>
-                                <label htmlFor="email" className="block text-xs font-medium text-white mb-1">
-                                    Email Address
-                                </label>
-                                <input
-                                    id="email"
-                                    name="email"
-                                    type="email"
-                                    autoComplete="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-xs"
-                                />
-                            </div>
-                        ) : null}
-                         {mode === 'forgotPassword' && (
-                            <div>
-                                <label htmlFor="email-forgot" className="block text-xs font-medium text-white mb-1">
-                                    Email Address
-                                </label>
-                                <input
-                                    id="email-forgot"
-                                    name="email"
-                                    type="email"
-                                    autoComplete="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-xs"
-                                />
-                            </div>
-                        )}
-                        {mode !== 'forgotPassword' && (
-                            <div>
-                                <div className="flex justify-between items-center">
-                                    <label htmlFor="password" className="block text-xs font-medium text-white mb-1">
-                                        Password
-                                    </label>
-                                    {mode === 'signIn' && (
-                                        <button type="button" onClick={() => handleModeChange('forgotPassword')} className="text-xs text-gray-400 hover:text-white">
-                                            Forgot password?
-                                        </button>
-                                    )}
-                                </div>
-                                <PasswordInput
-                                    id="password"
-                                    name="password"
-                                    autoComplete="current-password"
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                />
-                                {mode === 'signUp' && <PasswordStrength password={password} />}
-                            </div>
-                        )}
-
-                        {error && <p className="text-xs text-red-500">{error}</p>}
-                        {successMessage && <p className="text-xs text-green-500">{successMessage}</p>}
-
-                        <div>
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-xs font-medium text-black bg-gray-300 hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-[#131C1B] disabled:bg-gray-500"
-                            >
-                                {loading ? <LoaderCircleIcon className="animate-spin h-5 w-5" /> : 
-                                 mode === 'signIn' ? 'Sign in' : 
-                                 mode === 'signUp' ? 'Sign up' : 'Send Reset Link'}
-                            </button>
+                {mode === 'signIn' || mode === 'signUp' ? (
+                    <div>
+                        <label htmlFor="email" className="block text-xs font-medium text-white mb-1.5 uppercase tracking-wider opacity-70">
+                            Email Address
+                        </label>
+                        <input
+                            id="email"
+                            name="email"
+                            type="email"
+                            autoComplete="email"
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent bg-[#1C2326] text-white text-xs transition-all"
+                        />
+                    </div>
+                ) : null}
+                 {mode === 'forgotPassword' && (
+                    <div>
+                        <label htmlFor="email-forgot" className="block text-xs font-medium text-white mb-1.5 uppercase tracking-wider opacity-70">
+                            Email Address
+                        </label>
+                        <input
+                            id="email-forgot"
+                            name="email"
+                            type="email"
+                            autoComplete="email"
+                            required
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full px-4 py-2.5 border border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent bg-[#1C2326] text-white text-xs transition-all"
+                        />
+                    </div>
+                )}
+                {mode !== 'forgotPassword' && (
+                    <div>
+                        <div className="flex justify-between items-center mb-1.5">
+                            <label htmlFor="password" className="block text-xs font-medium text-white uppercase tracking-wider opacity-70">
+                                Password
+                            </label>
+                            {mode === 'signIn' && (
+                                <button type="button" onClick={() => handleModeChange('forgotPassword')} className="text-[10px] text-gray-400 hover:text-white transition-colors">
+                                    Forgot password?
+                                </button>
+                            )}
                         </div>
-                    </form>
-                     <p className="mt-6 text-center text-xs text-gray-400">
-                        {mode === 'signIn' && "Don't have an account?"}
-                        {mode === 'signUp' && "Already have an account?"}
-                        {mode === 'forgotPassword' && "Remembered your password?"}
-                        {' '}
-                        <button onClick={() => handleModeChange(mode === 'signIn' || mode === 'forgotPassword' ? 'signUp' : 'signIn')} className="font-medium text-white hover:text-gray-300">
-                           {mode === 'signIn' || mode === 'forgotPassword' ? 'Sign Up' : 'Sign In'}
-                        </button>
-                    </p>
-                </div>
-                <div className="mt-6 text-center text-xs text-gray-500">
-                    <button onClick={onShowPrivacy} className="hover:text-white hover:underline">
-                        Privacy Policy
+                        <PasswordInput
+                            id="password"
+                            name="password"
+                            autoComplete="current-password"
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                        />
+                        {mode === 'signUp' && <PasswordStrength password={password} />}
+                    </div>
+                )}
+
+                {error && (
+                    <div className="p-3 bg-red-900/20 border border-red-800/50 rounded-lg">
+                        <p className="text-xs text-red-400 text-center">{error}</p>
+                    </div>
+                )}
+                {successMessage && (
+                    <div className="p-3 bg-green-900/20 border border-green-800/50 rounded-lg">
+                        <p className="text-xs text-green-400 text-center">{successMessage}</p>
+                    </div>
+                )}
+
+                <div>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-xs font-bold text-black bg-white hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 focus:ring-offset-[#131C1B] disabled:bg-gray-700 disabled:text-gray-500 transition-all transform active:scale-[0.98]"
+                    >
+                        {loading ? <LoaderCircleIcon className="animate-spin h-5 w-5" /> : 
+                         mode === 'signIn' ? 'Sign in' : 
+                         mode === 'signUp' ? 'Sign up' : 'Send Reset Link'}
                     </button>
                 </div>
-            </div>
+            </form>
+            <p className="mt-8 text-center text-xs text-gray-500">
+                {mode === 'signIn' && "Don't have an account?"}
+                {mode === 'signUp' && "Already have an account?"}
+                {mode === 'forgotPassword' && "Remembered your password?"}
+                {' '}
+                <button onClick={() => handleModeChange(mode === 'signIn' || mode === 'forgotPassword' ? 'signUp' : 'signIn')} className="font-bold text-white hover:text-gray-300 transition-colors">
+                   {mode === 'signIn' || mode === 'forgotPassword' ? 'Sign Up' : 'Sign In'}
+                </button>
+            </p>
         </div>
     );
 };

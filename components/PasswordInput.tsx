@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { EyeIcon, EyeOffIcon } from './Icons';
 
@@ -15,12 +13,12 @@ export const PasswordInput: React.FC<PasswordInputProps> = (props) => {
             <input
                 {...props}
                 type={isVisible ? 'text' : 'password'}
-                className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-xs pr-10"
+                className="w-full px-4 py-2.5 border border-gray-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent bg-[#1C2326] text-white text-xs pr-10 transition-all shadow-sm"
             />
             <button
                 type="button"
                 onClick={toggleVisibility}
-                className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-white"
+                className="absolute inset-y-0 right-0 flex items-center px-4 text-gray-400 hover:text-white transition-colors"
                 aria-label={isVisible ? "Hide password" : "Show password"}
             >
                 {isVisible ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}

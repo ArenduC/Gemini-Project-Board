@@ -9,10 +9,10 @@ interface TaskListRowProps {
 }
 
 const priorityStyles: Record<TaskPriority, string> = {
-  [TaskPriority.URGENT]: 'bg-gray-200 text-black font-bold',
-  [TaskPriority.HIGH]: 'bg-gray-400 text-black',
-  [TaskPriority.MEDIUM]: 'bg-gray-600 text-white',
-  [TaskPriority.LOW]: 'bg-gray-800 text-gray-400',
+  [TaskPriority.URGENT]: 'bg-red-500/10 text-red-400 border-red-500/20 font-bold',
+  [TaskPriority.HIGH]: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  [TaskPriority.MEDIUM]: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  [TaskPriority.LOW]: 'bg-gray-500/10 text-gray-400 border-white/5',
 };
 
 
@@ -22,24 +22,24 @@ export const TaskListRow: React.FC<TaskListRowProps> = ({ task, onClick, users }
   return (
     <div
       onClick={() => onClick(task)}
-      className="grid grid-cols-12 gap-4 items-center bg-[#131C1B] px-4 py-3 border-b border-gray-800 cursor-pointer hover:bg-gray-800 transition-colors duration-200 text-xs"
+      className="grid grid-cols-12 gap-4 items-center bg-transparent px-6 py-4 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-all duration-300 group"
     >
-      <div className="col-span-4 font-semibold text-white">{title}</div>
-      <div className="col-span-2 text-gray-400">{projectName}</div>
+      <div className="col-span-4 font-bold text-white text-sm group-hover:text-emerald-400 transition-colors truncate">{title}</div>
+      <div className="col-span-2 text-xs text-gray-500 font-mono truncate">{projectName}</div>
       <div className="col-span-2">
-        <div className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full ${priorityStyles[priority]}`}>
+        <div className={`inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border ${priorityStyles[priority]}`}>
             {priority}
         </div>
       </div>
       <div className="col-span-2">
-        <span className="text-[11px] font-medium bg-gray-800 text-gray-400 px-2 py-1 rounded-full">
+        <span className="text-[10px] font-bold uppercase tracking-widest bg-white/5 text-gray-400 px-2 py-1 rounded-lg border border-white/5">
             {columnName}
         </span>
       </div>
       <div className="col-span-2 flex justify-end">
         <UserAvatar
           user={assignee}
-          className="w-8 h-8 rounded-full ring-2 ring-[#131C1B]"
+          className="w-9 h-9 rounded-full ring-2 ring-white/10 shadow-lg group-hover:scale-110 transition-transform"
           title={assignee ? `Assigned to ${assignee.name}` : "Unassigned"}
         />
       </div>

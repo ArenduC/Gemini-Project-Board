@@ -1,11 +1,9 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { TaskPriority, Project, User, ProjectLink, AiGeneratedProjectPlan, AiGeneratedTaskFromFile, BugResponse } from "../types";
-import { GEMINI_API_KEY } from '../config';
 
-const apiKey = GEMINI_API_KEY;
-const ai = (apiKey && apiKey !== 'YOUR_GEMINI_API_KEY_HERE') ? new GoogleGenAI({ apiKey }) : null;
-
-const keyErrorMessage = "Gemini API key is not configured. Please update the `GEMINI_API_KEY` in the `config.ts` file.";
+// FIX: Initialize GoogleGenAI exclusively using process.env.API_KEY as per guidelines.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper to handle API errors consistently
 const handleApiError = (error: unknown, action: string) => {
@@ -13,10 +11,6 @@ const handleApiError = (error: unknown, action: string) => {
     if (error instanceof Error) {
         if (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID')) {
             throw new Error("The configured Gemini API key is invalid or has been rejected by the service.");
-        }
-        // Re-throw our specific configuration error if it was the cause
-        if (error.message === keyErrorMessage) {
-            throw error;
         }
     }
     // Generic fallback
@@ -246,7 +240,6 @@ export const tasksFromFileResponseSchema = {
 
 
 export const generateSubtasks = async (title: string, description: string): Promise<SubtaskResponse[]> => {
-  if (!ai) throw new Error(keyErrorMessage);
   try {
     const prompt = `
       Based on the following main task, break it down into smaller, actionable subtasks. 
@@ -257,8 +250,9 @@ export const generateSubtasks = async (title: string, description: string): Prom
       Main Task Description: "${description}"
     `;
 
+    // FIX: Use gemini-3-flash-preview model.
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -276,7 +270,6 @@ export const generateSubtasks = async (title: string, description: string): Prom
 };
 
 export const generateTaskFromPrompt = async (prompt: string): Promise<TaskResponse> => {
-    if (!ai) throw new Error(keyErrorMessage);
     try {
         const fullPrompt = `
             You are an expert project manager. Based on the user's request, create a detailed task.
@@ -287,8 +280,9 @@ export const generateTaskFromPrompt = async (prompt: string): Promise<TaskRespon
             User Request: "${prompt}"
         `;
 
+        // FIX: Use gemini-3-flash-preview model.
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: fullPrompt,
             config: {
                 responseMimeType: "application/json",
@@ -306,7 +300,6 @@ export const generateTaskFromPrompt = async (prompt: string): Promise<TaskRespon
 };
 
 export const performGlobalSearch = async (query: string, projects: Record<string, Project>, users: Record<string, User>): Promise<SearchResponse> => {
-    if (!ai) throw new Error(keyErrorMessage);
     try {
         const searchContext = {
             projects: Object.values(projects).map(p => ({ id: p.id, name: p.name, description: p.description })),
@@ -328,8 +321,9 @@ export const performGlobalSearch = async (query: string, projects: Record<string
             If no matches are found for a category, return an empty array for it. Respond with only the JSON object.
         `;
 
+        // FIX: Use gemini-3-pro-preview for complex search tasks.
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -346,7 +340,6 @@ export const performGlobalSearch = async (query: string, projects: Record<string
 };
 
 export const interpretVoiceCommand = async (command: string, context: any): Promise<VoiceCommandAction> => {
-    if (!ai) return { action: 'UNKNOWN', params: { reason: keyErrorMessage } };
     try {
         const prompt = `
             You are a voice assistant for a project management app. Interpret the command: "${command}"
@@ -355,8 +348,9 @@ export const interpretVoiceCommand = async (command: string, context: any): Prom
             Return ONLY the JSON object.
         `;
 
+        // FIX: Use gemini-3-pro-preview for complex instruction following.
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -374,15 +368,15 @@ export const interpretVoiceCommand = async (command: string, context: any): Prom
 };
 
 export const generateProjectLinks = async (projectName: string, projectDescription: string): Promise<ProjectLinkResponse[]> => {
-    if (!ai) throw new Error(keyErrorMessage);
     try {
         const prompt = `
             Based on the project name "${projectName}" and description "${projectDescription}", 
             suggest relevant links for development and management (e.g., GitHub, Figma). Provide valid URLs.
         `;
 
+        // FIX: Use gemini-3-flash-preview.
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -399,7 +393,6 @@ export const generateProjectLinks = async (projectName: string, projectDescripti
 };
 
 export const generateProjectFromCsv = async (csvContent: string): Promise<AiGeneratedProjectPlan> => {
-    if (!ai) throw new Error(keyErrorMessage);
     try {
         const prompt = `
             Analyze the following CSV content and structure it into a project plan JSON object.
@@ -408,8 +401,9 @@ export const generateProjectFromCsv = async (csvContent: string): Promise<AiGene
             Ensure the output is ONLY the JSON object matching the schema.
         `;
 
+        // FIX: Use gemini-3-pro-preview for complex data extraction.
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -427,7 +421,6 @@ export const generateProjectFromCsv = async (csvContent: string): Promise<AiGene
 };
 
 export const generateBugsFromFile = async (fileContent: string, headersToInclude: string[]): Promise<BugResponse[]> => {
-    if (!ai) throw new Error(keyErrorMessage);
     try {
         const prompt = `
             Parse the following file content (CSV or plain text) into a JSON array of bug objects. Each object must have a 'title' and a 'description'.
@@ -438,8 +431,9 @@ export const generateBugsFromFile = async (fileContent: string, headersToInclude
             File Content: --- ${fileContent} ---
         `;
 
+        // FIX: Use gemini-3-pro-preview.
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -456,7 +450,6 @@ export const generateBugsFromFile = async (fileContent: string, headersToInclude
 };
 
 export const generateTasksFromFile = async (fileData: { content: string; mimeType: string }, columnNames: string[], headersToInclude: string[]): Promise<AiGeneratedTaskFromFile[]> => {
-    if (!ai) throw new Error(keyErrorMessage);
     try {
         const isTextFile = fileData.mimeType === 'text/csv' || fileData.mimeType === 'text/plain';
 
@@ -481,8 +474,9 @@ export const generateTasksFromFile = async (fileData: { content: string; mimeTyp
                 { inlineData: { mimeType: fileData.mimeType, data: fileData.content } }
             ]};
 
+        // FIX: Use gemini-3-pro-preview.
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: contents,
             config: {
                 responseMimeType: "application/json",

@@ -233,12 +233,14 @@ const moveTask = async (taskId: string, newColumnId: string, newPosition: number
 
 const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) => {
     // Fetch old task data for comparison to create history logs
-    const { data: oldTaskData, error: fetchError } = await supabase
+    const { data: oldTaskDataResult, error: fetchError } = await supabase
         .from('tasks')
         .select('*, assignee:users!tasks_assignee_id_fkey(*), subtasks(*, assignee:users!subtasks_assignee_id_fkey(*))')
         .eq('id', updatedTask.id)
         .single();
 
+    // FIX: Cast Supabase result to any to avoid "unknown" type errors when accessing properties.
+    const oldTaskData = oldTaskDataResult as any;
     const historyItems: { task_id: string; user_id: string; change_description: string; }[] = [];
 
     if (fetchError) {
@@ -266,10 +268,13 @@ const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) 
         }
         // History for sprint change
         if (oldTaskData.sprint_id !== updatedTask.sprintId) {
-            const { data: columnData } = await supabase.from('columns').select('project_id').eq('id', oldTaskData.column_id).single();
-            const projectId = columnData?.project_id;
+            const { data: columnData } = await supabase.from('columns').select('project_id').eq('id', oldTaskData.column_id as string).single();
+            // FIX: Ensure projectId is treated as a string to avoid type errors. Cast columnData to any to safely access project_id.
+            const projectId = (columnData as any)?.project_id as string;
             if (projectId) {
-                const { data: allSprints } = await supabase.from('sprints').select('id, name').eq('project_id', projectId as string);
+                const { data: allSprintsResult } = await supabase.from('sprints').select('id, name').eq('project_id', projectId);
+                // FIX: Cast result to any[] to avoid "unknown" type errors.
+                const allSprints = allSprintsResult as any[] | null;
                 const oldSprintName = allSprints?.find(s => s.id === oldTaskData.sprint_id)?.name;
                 const newSprintName = allSprints?.find(s => s.id === updatedTask.sprintId)?.name;
                 
@@ -334,7 +339,7 @@ const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) 
             .eq('task_id', updatedTask.id);
 
         if (!tagFetchError && oldTagData) {
-            const oldTags: string[] = oldTagData.map((item: any) => item.tags.name);
+            const oldTags: string[] = (oldTagData as any[]).map((item: any) => item.tags.name);
             const newTags = updatedTask.tags || [];
 
             const tagsAdded = newTags.filter(t => !oldTags.includes(t));
@@ -396,7 +401,7 @@ const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) 
         // Create new associations
         const newAssociations = tagNames.map(name => ({
             task_id: updatedTask.id,
-            tag_id: tagIdMap.get(name)
+            tag_id: tagIdMap.get(name) as string
         })).filter(assoc => assoc.tag_id);
 
         if (newAssociations.length > 0) {
@@ -418,7 +423,7 @@ const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) 
             throw fetchSubtasksError;
         }
 
-        const currentSubtaskIds = new Set(currentSubtasks.map(s => s.id));
+        const currentSubtaskIds = new Set((currentSubtasks as any[]).map(s => s.id));
         const updatedSubtaskIds = new Set(updatedTask.subtasks.map(s => s.id));
         const subtasksToDelete = Array.from(currentSubtaskIds).filter(id => !updatedSubtaskIds.has(id));
 
@@ -426,7 +431,7 @@ const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) 
             const { error: deleteSubtasksError } = await supabase
                 .from('subtasks')
                 .delete()
-                .in('id', subtasksToDelete);
+                .in('id', subtasksToDelete as string[]);
             
             if (deleteSubtasksError) {
                 console.error("Error deleting subtasks:", deleteSubtasksError);
@@ -758,7 +763,7 @@ const updateSprint = async (sprintId: string, updates: Partial<Sprint>): Promise
             const { error: unsetError } = await supabase
                 .from('sprints')
                 .update({ is_default: false })
-                .eq('project_id', sprint.project_id as string)
+                .eq('project_id', (sprint as any).project_id as string)
                 .neq('id', sprintId);
             if (unsetError) throw unsetError;
         }
