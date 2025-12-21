@@ -188,7 +188,7 @@ export const LandingPage: React.FC<{ onShowPrivacy: () => void }> = ({ onShowPri
 
             {/* Login Section Wrapper - Full screen destination */}
             <section ref={loginSectionRef} className="relative z-10 min-h-screen flex items-center justify-center py-24 px-6 bg-[#0D1117]/40 backdrop-blur-sm">
-                <div className="w-full max-w-lg bg-[#131C1B]/80 p-10 rounded-[2.5rem] border border-gray-800 backdrop-blur-3xl shadow-2xl transition-all duration-500 hover:border-gray-700 ring-1 ring-white/5">
+                <div className="w-full max-w-lg bg-[#131C1B]/80 p-10 rounded-[2rem] border border-gray-800 backdrop-blur-3xl shadow-2xl transition-all duration-500 hover:border-gray-700 ring-1 ring-white/5">
                     <div className="text-center mb-10">
                         <AppLogo className="w-20 h-20 mx-auto mb-6 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]" />
                         <h2 className="text-3xl font-bold text-white mb-3 tracking-tight">

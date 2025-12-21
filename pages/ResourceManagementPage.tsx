@@ -15,7 +15,7 @@ interface ResourceManagementPageProps {
 }
 
 const SummaryMetric: React.FC<{ icon: React.ReactNode; label: string; value: string | number; color: string }> = ({ icon, label, value, color }) => (
-    <div className="p-6 rounded-3xl bg-[#131C1B] border border-white/5 shadow-xl transition-all hover:border-white/10 group">
+    <div className="p-6 rounded-[2rem] bg-[#131C1B] border border-white/5 shadow-xl transition-all hover:border-white/10 group">
         <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center mb-4 text-white group-hover:scale-110 transition-transform`}>
             {icon}
         </div>
@@ -282,13 +282,13 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                     />
                 )}
                 {view === 'graph' && (
-                    <div className="p-6 bg-[#131C1B] rounded-[3rem] border border-white/5 shadow-2xl">
+                    <div className="p-6 bg-[#131C1B] rounded-[2rem] border border-white/5 shadow-2xl">
                         <UserActivityGraph projects={projects} users={users} onlineUsers={onlineUsers} onTaskClick={onTaskClick} />
                     </div>
                 )}
                 {view === 'table' && (
                     <div className="space-y-6">
-                        <div className="bg-[#131C1B] rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl">
+                        <div className="bg-[#131C1B] rounded-[2rem] border border-white/5 overflow-hidden shadow-2xl">
                             <table className="w-full text-left">
                                 <thead className="bg-white/5">
                                     <tr className="text-[10px] uppercase tracking-[0.2em] font-bold text-gray-500">
@@ -359,7 +359,7 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
 
             {/* Sidebar Logic */}
             <div className="col-span-12 lg:col-span-4 space-y-6">
-                <div className="p-8 rounded-[3rem] bg-[#131C1B] border border-white/5 shadow-2xl">
+                <div className="p-8 rounded-[2rem] bg-[#131C1B] border border-white/5 shadow-2xl">
                     <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 mb-8 flex items-center gap-2">
                         Effort Distribution
                         <ZapIcon className="w-3 h-3 text-yellow-500 animate-pulse" />
@@ -392,7 +392,7 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                     </div>
                 </div>
 
-                <div className="p-8 rounded-[3rem] bg-gradient-to-br from-[#131C1B] to-[#0D1117] border border-white/10 shadow-2xl relative overflow-hidden group">
+                <div className="p-8 rounded-[2rem] bg-gradient-to-br from-[#131C1B] to-[#0D1117] border border-white/10 shadow-2xl relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
                         <SparklesIcon className="w-32 h-32 text-white" />
                     </div>

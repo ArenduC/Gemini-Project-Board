@@ -7,7 +7,7 @@ interface TaskInsightsProps {
 }
 
 const InsightCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; colorClass: string; footer?: string }> = ({ title, value, icon, colorClass, footer }) => (
-    <div className="bg-[#131C1B]/40 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-6 flex flex-col justify-between shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-500 min-h-[160px]">
+    <div className="bg-[#131C1B]/40 backdrop-blur-xl border border-white/5 rounded-[2rem] p-6 flex flex-col justify-between shadow-2xl relative overflow-hidden group hover:border-white/10 transition-all duration-500 min-h-[160px]">
         {/* Animated Scanning Effect */}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out pointer-events-none" />
         
@@ -53,7 +53,7 @@ const NeuralTimeline: React.FC<{ tasks: AugmentedTask[] }> = ({ tasks }) => {
     }, [tasks]);
 
     return (
-        <div className="bg-[#131C1B]/40 border border-white/5 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden h-full">
+        <div className="bg-[#131C1B]/40 border border-white/5 rounded-[2rem] p-8 shadow-2xl relative overflow-hidden h-full">
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h5 className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em]">Neural Flux Timeline</h5>
@@ -125,7 +125,7 @@ const NeuralEquilibrium: React.FC<{ data: Record<string, number>, total: number 
     }, [data, total]);
 
     return (
-        <div className="bg-[#131C1B]/40 border border-white/5 rounded-[2.5rem] p-8 shadow-2xl flex flex-col items-center h-full relative group">
+        <div className="bg-[#131C1B]/40 border border-white/5 rounded-[2rem] p-8 shadow-2xl flex flex-col items-center h-full relative group">
             <h5 className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mb-10 w-full text-center">Status Equilibrium</h5>
             
             <div className="relative w-40 h-40 mb-10">

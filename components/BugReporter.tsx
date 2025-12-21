@@ -463,7 +463,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
   };
 
   return (
-    <div className="bg-[#1C2326]/50 p-4 sm:p-6 rounded-lg">
+    <div className="bg-[#1C2326]/50 p-4 sm:p-6 rounded-[2rem]">
       <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
         <div className="flex items-center gap-4">
           <h3 className="text-xl font-bold text-white flex items-center gap-2"><LifeBuoyIcon className="w-6 h-6"/> Bug Tracker</h3>
@@ -529,11 +529,11 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
         )}
       </div>
 
-      <div className="bg-[#131C1B] rounded-lg shadow-md border border-gray-800 overflow-x-auto">
+      <div className="bg-[#131C1B] rounded-[2rem] shadow-md border border-gray-800 overflow-x-auto">
         <table className="w-full text-left min-w-[1000px]">
             <thead className="bg-[#1C2326]/50">
               <tr className="text-xs">
-                  <th className="px-4 py-2 w-12">
+                  <th className="px-6 py-2 w-12 text-center">
                     <input type="checkbox" checked={isAllOnPageSelected} ref={input => { if (input) { const numSelectedOnPage = paginatedBugs.filter(b => selectedBugIds.has(b.id)).length; input.indeterminate = numSelectedOnPage > 0 && !isAllOnPageSelected; }}} onChange={handleSelectAll} className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500" aria-label="Select all bugs on page" />
                   </th>
                   <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider w-24">Bug ID</th>
@@ -542,13 +542,13 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
                   <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Priority</th>
                   <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Date</th>
                   <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Assignee</th>
-                  <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider text-right">Actions</th>
+                  <th className="px-6 py-3 font-semibold text-white uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
               {bugsExist && paginatedBugs.length > 0 ? paginatedBugs.map(bug => (
                 <tr key={bug.id} className={`text-sm text-white ${selectedBugIds.has(bug.id) ? 'bg-gray-800/50' : 'hover:bg-gray-800/30'}`}>
-                  <td className="px-4 py-3"><input type="checkbox" checked={selectedBugIds.has(bug.id)} onChange={() => handleSelectOne(bug.id)} className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500" /></td>
+                  <td className="px-6 py-3 text-center"><input type="checkbox" checked={selectedBugIds.has(bug.id)} onChange={() => handleSelectOne(bug.id)} className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500" /></td>
                   <td className="px-4 py-3 font-mono text-sm text-gray-400">{bug.bugNumber}</td>
                   <td className="px-4 py-3 align-top">
                      <EditableField
@@ -571,7 +571,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
                   <td className="px-4 py-3"><select value={bug.priority} onChange={e => handleUpdate(bug.id, 'priority', e.target.value)} className={`bg-transparent border text-xs font-semibold rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${priorityStyles[bug.priority]}`}>{Object.values(TaskPriority).map(p => <option key={p} value={p} className="bg-[#1C2326] text-white font-normal">{p}</option>)}</select></td>
                   <td className="px-4 py-3 text-gray-400">{new Date(bug.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3"><select value={bug.assignee?.id || ''} onChange={e => handleUpdate(bug.id, 'assignee', e.target.value)} className="w-full bg-[#1C2326] text-white text-sm border border-gray-800 focus:ring-2 focus:ring-gray-500 rounded-md px-2 py-1"><option value="">Unassigned</option>{projectMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
-                  <td className="px-4 py-3 text-right"><button onClick={() => handleDeleteOne(bug)} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-900/50 rounded-full"><TrashIcon className="w-4 h-4" /></button></td>
+                  <td className="px-6 py-3 text-right"><button onClick={() => handleDeleteOne(bug)} className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-900/50 rounded-full"><TrashIcon className="w-4 h-4" /></button></td>
                 </tr>
               )) : (
                 <tr>

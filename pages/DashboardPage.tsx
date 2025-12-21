@@ -22,7 +22,7 @@ interface DashboardPageProps {
 }
 
 const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, trend?: string }> = ({ icon, label, value, trend }) => (
-    <div className="p-5 rounded-2xl bg-[#131C1B]/80 border border-white/5 shadow-xl backdrop-blur-md hover:border-white/20 transition-all group">
+    <div className="p-5 rounded-[2rem] bg-[#131C1B]/80 border border-white/5 shadow-xl backdrop-blur-md hover:border-white/20 transition-all group">
         <div className="flex justify-between items-start mb-4">
             <div className="p-2.5 rounded-xl bg-white/5 text-gray-400 group-hover:text-white transition-colors">{icon}</div>
             {trend && <span className="text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">{trend}</span>}
@@ -56,7 +56,7 @@ const MiniCalendar: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     }, [tasks, currentMonth, currentYear]);
 
     return (
-        <div className="p-5 rounded-2xl bg-[#131C1B]/80 border border-white/5 shadow-xl backdrop-blur-md">
+        <div className="p-5 rounded-[2rem] bg-[#131C1B]/80 border border-white/5 shadow-xl backdrop-blur-md">
             <div className="flex justify-between items-center mb-4">
                 <h4 className="text-xs font-bold uppercase tracking-widest text-gray-500">Upcoming Flow</h4>
                 <span className="text-xs font-semibold text-white">{today.toLocaleString('default', { month: 'long' })}</span>
@@ -92,7 +92,7 @@ const DeadlineTracker: React.FC<{ tasks: Task[], onTaskClick: (task: Task) => vo
     }, [tasks]);
 
     return (
-        <div className="p-5 rounded-2xl bg-[#131C1B]/80 border border-white/5 shadow-xl backdrop-blur-md">
+        <div className="p-5 rounded-[2rem] bg-[#131C1B]/80 border border-white/5 shadow-xl backdrop-blur-md">
             <h4 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-4">Neural Deadlines</h4>
             <div className="space-y-4">
                 {sortedDeadlines.length > 0 ? sortedDeadlines.map(t => (
@@ -180,7 +180,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
                 <div className="flex items-center gap-3">
                     <button
                         onClick={onCreateProject}
-                        className="px-6 py-3 bg-white text-black font-bold rounded-2xl hover:scale-105 transition-all flex items-center gap-2 shadow-2xl shadow-white/5 active:scale-95"
+                        className="px-6 py-3 bg-white text-black font-bold rounded-xl hover:scale-105 transition-all flex items-center gap-2 shadow-2xl shadow-white/5 active:scale-95"
                     >
                         <PlusIcon className="w-5 h-5" />
                         New Node
@@ -221,7 +221,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
                     <ProjectDropzone onFileProcessed={handleFileProcessed} isLoading={isAiProcessing} />
 
                     {projects.length === 0 ? (
-                        <div className="py-24 text-center bg-[#131C1B]/40 rounded-[2.5rem] border border-dashed border-white/5 backdrop-blur-sm">
+                        <div className="py-24 text-center bg-[#131C1B]/40 rounded-[2rem] border border-dashed border-white/5 backdrop-blur-sm">
                             <LayoutDashboardIcon className="mx-auto h-16 w-16 text-gray-700 mb-4" />
                             <h3 className="text-xl font-bold text-white">Mesh Empty</h3>
                             <p className="text-gray-500 text-sm mt-1 max-w-xs mx-auto">Initialize your workspace by creating a project or importing a neural plan.</p>
@@ -242,7 +242,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
                             ))}
                         </div>
                     ) : (
-                        <div className="bg-[#131C1B]/80 rounded-[2.5rem] border border-white/5 overflow-hidden shadow-2xl backdrop-blur-xl">
+                        <div className="bg-[#131C1B]/80 rounded-[2rem] border border-white/5 overflow-hidden shadow-2xl backdrop-blur-xl">
                              <div className="grid grid-cols-12 gap-4 items-center px-6 py-4 border-b border-white/5 bg-white/5 text-[10px] uppercase tracking-widest font-bold text-gray-500">
                                 <div className="col-span-4">Project Mesh</div>
                                 <div className="col-span-2">Sync Progress</div>

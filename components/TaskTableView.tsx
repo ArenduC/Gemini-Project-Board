@@ -58,14 +58,14 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({ project, tasks, us
   };
 
   return (
-    <div className="bg-[#131C1B] rounded-lg shadow-md border border-gray-800 overflow-hidden">
+    <div className="bg-[#131C1B] rounded-[2rem] shadow-md border border-gray-800 overflow-hidden">
       <table className="w-full text-left">
         <thead className="bg-[#1C2326]/50">
           <tr className="text-xs">
-            <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Task</th>
-            <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Status</th>
-            <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Priority</th>
-            <th className="px-4 py-3 font-semibold text-white uppercase tracking-wider">Assignee</th>
+            <th className="px-6 py-4 font-semibold text-white uppercase tracking-wider">Task</th>
+            <th className="px-4 py-4 font-semibold text-white uppercase tracking-wider">Status</th>
+            <th className="px-4 py-4 font-semibold text-white uppercase tracking-wider">Priority</th>
+            <th className="px-6 py-4 font-semibold text-white uppercase tracking-wider">Assignee</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-800">
@@ -73,7 +73,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({ project, tasks, us
             const currentColumnId = getTaskColumnId(task.id);
             return (
               <tr key={task.id} className="text-sm text-white hover:bg-gray-800/50">
-                <td className="px-4 py-3">
+                <td className="px-6 py-3">
                   <button onClick={() => onTaskClick(task)} className="font-medium hover:underline text-left">
                     {task.title}
                   </button>
@@ -100,7 +100,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({ project, tasks, us
                     ))}
                   </select>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-6 py-3">
                   <div className="flex items-center gap-2">
                     <UserAvatar user={task.assignee} className="w-7 h-7" />
                     <select
