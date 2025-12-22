@@ -15,9 +15,10 @@ interface ColumnProps {
   onTaskClick: (task: Task, e: React.MouseEvent) => void;
   deleteTask: (taskId: string, columnId: string) => Promise<void>;
   deleteColumn: (columnId: string) => Promise<void>;
+  dragHandleProps?: any;
 }
 
-export const Column: React.FC<ColumnProps> = ({ column, tasks, sprints, users, onlineUsers, onTaskClick, deleteTask, deleteColumn, selectedTaskIds }) => {
+export const Column: React.FC<ColumnProps> = ({ column, tasks, sprints, users, onlineUsers, onTaskClick, deleteTask, deleteColumn, selectedTaskIds, dragHandleProps }) => {
   const requestConfirmation = useConfirmation();
 
   const handleDelete = () => {
@@ -34,8 +35,11 @@ export const Column: React.FC<ColumnProps> = ({ column, tasks, sprints, users, o
   };
 
   return (
-    <div className="bg-[#1C2326] rounded-xl flex flex-col max-h-[calc(100vh-12rem)]">
-      <div className="p-4 border-b border-gray-800 sticky top-0 bg-[#1C2326] backdrop-blur-sm rounded-t-xl z-10">
+    <div className="bg-[#1C2326] rounded-lg flex flex-col max-h-[calc(100vh-12rem)]">
+      <div 
+        {...dragHandleProps}
+        className="p-4 border-b border-gray-800 sticky top-0 bg-[#1C2326] backdrop-blur-sm rounded-t-lg z-10 cursor-grab active:cursor-grabbing"
+      >
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold flex items-center gap-2 text-white">
             <span>{column.title}</span>
@@ -52,7 +56,7 @@ export const Column: React.FC<ColumnProps> = ({ column, tasks, sprints, users, o
           </button>
         </div>
       </div>
-      <Droppable droppableId={column.id}>
+      <Droppable droppableId={column.id} type="task">
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}

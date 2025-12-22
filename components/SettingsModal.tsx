@@ -99,7 +99,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-[#131C1B] rounded-lg shadow-2xl w-full max-w-3xl max-h-[80vh] flex" onClick={(e) => e.stopPropagation()}>
         {/* Sidebar */}
         <aside className="w-1/4 p-4 border-r border-gray-800 flex flex-col">
           <h2 className="text-base font-bold mb-6 text-white">Settings</h2>

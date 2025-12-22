@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DropResult } from 'react-beautiful-dnd';
-// FIX: Import `BugResponse` from `types` instead of `geminiService`.
 import { AppState, Task, NewTaskData, User, ChatMessage, AiGeneratedProjectPlan, Bug, TaskPriority, Subtask, AiGeneratedTaskFromFile, Sprint, FilterSegment, BugResponse } from '../types';
 import { api } from '../services/api';
 import { generateTaskFromPrompt } from '../services/geminiService';
@@ -44,7 +43,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     }
   }, [userId]);
   
-  // This effect orchestrates the entire data loading and caching lifecycle.
   useEffect(() => {
     if (!userId) {
       setState(initialState);
@@ -52,26 +50,22 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
       return;
     }
     
-    // Step 1: Attempt to hydrate from cache for an instant UI.
     const cacheKey = `gemini-board-cache-${userId}`;
     const cachedStateJSON = localStorage.getItem(cacheKey);
     if (cachedStateJSON) {
       try {
         setState(JSON.parse(cachedStateJSON));
-        setLoading(false); // Cache hit, hide data loading screen immediately.
+        setLoading(false); 
       } catch (e) {
         console.warn("Failed to parse cached state, clearing it.", e);
         localStorage.removeItem(cacheKey);
       }
     }
 
-    // Step 2: Always fetch fresh data from the server.
     fetchData();
 
   }, [userId, fetchData]);
 
-
-  // Real-time subscription for project chat
   useEffect(() => {
     if (!activeProjectId || !session || !userId) return;
     const cacheKey = `gemini-board-cache-${userId}`;
@@ -100,7 +94,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         let newMessages;
 
         if (isSender) {
-          // Find and replace the optimistic message
           const optimisticIndex = project.chatMessages.findIndex(m => m.id.startsWith('temp-') && m.text === finalMessage.text);
           if (optimisticIndex > -1) {
             newMessages = [...project.chatMessages];
@@ -124,7 +117,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
                 }
             }
         };
-        // Update cache with new message
         localStorage.setItem(cacheKey, JSON.stringify(updatedState));
         return updatedState;
       });
@@ -139,40 +131,88 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
 
 
   const onDragEnd = useCallback(async (projectId: string, result: DropResult) => {
-    const { destination, source, draggableId: taskId } = result;
+    const { destination, source, draggableId, type } = result;
     if (!destination || !currentUser) return;
 
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
     
-    // Optimistic local state update for immediate UI feedback
     const project = state.projects[projectId];
+    if (!project) return;
+
+    // --- HANDLE COLUMN DRAGGING ---
+    if (type === 'column') {
+        const newColumnOrder = Array.from(project.board.columnOrder);
+        newColumnOrder.splice(source.index, 1);
+        newColumnOrder.splice(destination.index, 0, draggableId);
+
+        // Immutable update for Column Order
+        setState(prevState => ({
+          ...prevState,
+          projects: {
+            ...prevState.projects,
+            [projectId]: {
+              ...prevState.projects[projectId],
+              board: {
+                ...prevState.projects[projectId].board,
+                columnOrder: newColumnOrder
+              }
+            }
+          }
+        }));
+
+        try {
+            await api.data.updateColumnOrder(projectId, newColumnOrder);
+        } catch (error) {
+            console.error("Error updating column order:", error);
+            await fetchData(); // Revert on failure
+        }
+        return;
+    }
+
+    // --- HANDLE TASK DRAGGING ---
     const startCol = project.board.columns[source.droppableId];
     const endCol = project.board.columns[destination.droppableId];
     
+    if (!startCol || !endCol) return;
+
     const newStartTaskIds = Array.from(startCol.taskIds);
     newStartTaskIds.splice(source.index, 1);
     
-    let newEndTaskIds;
-    if (startCol.id === endCol.id) {
-        newEndTaskIds = newStartTaskIds;
+    const newEndTaskIds = startCol.id === endCol.id ? newStartTaskIds : Array.from(endCol.taskIds);
+    if (startCol.id !== endCol.id) {
+        newEndTaskIds.splice(destination.index, 0, draggableId);
     } else {
-        newEndTaskIds = Array.from(endCol.taskIds);
+        newStartTaskIds.splice(destination.index, 0, draggableId);
     }
-    newEndTaskIds.splice(destination.index, 0, taskId);
 
-    const newState = { ...state };
-    newState.projects[projectId].board.columns[startCol.id] = { ...startCol, taskIds: newStartTaskIds };
-    newState.projects[projectId].board.columns[endCol.id] = { ...endCol, taskIds: newEndTaskIds };
-    setState(newState);
+    // Immutable update for Tasks within Columns
+    setState(prevState => {
+      const updatedColumns = {
+        ...prevState.projects[projectId].board.columns,
+        [startCol.id]: { ...startCol, taskIds: newStartTaskIds },
+        [endCol.id]: { ...endCol, taskIds: newEndTaskIds }
+      };
 
+      return {
+        ...prevState,
+        projects: {
+          ...prevState.projects,
+          [projectId]: {
+            ...prevState.projects[projectId],
+            board: {
+              ...prevState.projects[projectId].board,
+              columns: updatedColumns
+            }
+          }
+        }
+      };
+    });
 
-    // Update database and re-fetch for consistency
     try {
-        await api.data.moveTask(taskId, destination.droppableId, destination.index + 1, currentUser.id);
+        await api.data.moveTask(draggableId, destination.droppableId, destination.index + 1, currentUser.id);
     } catch (error) {
         console.error("Error moving task:", error);
-    } finally {
-        await fetchData();
+        await fetchData(); // Revert on failure
     }
 
   }, [state, currentUser, fetchData]);
@@ -197,7 +237,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   const addTask = useCallback(async (projectId: string, taskData: NewTaskData, creatorId: string) => {
     const newTask = await api.data.addTask(taskData, creatorId);
     if (newTask && currentUser) {
-      // Move the new task to the top of its column.
       await api.data.moveTask(newTask.id, taskData.columnId, 1, currentUser.id);
     }
     await fetchData();
@@ -208,7 +247,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     const project = state.projects[projectId];
     if (!project) return;
     
-    // Create a map of column names to column IDs for quick lookup
     const columnMap = new Map<string, string>();
     for (const colId of project.board.columnOrder) {
         const col = project.board.columns[colId];
@@ -240,7 +278,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
             
             for (const columnId of Object.keys(tasksByColumn)) {
                 const tasksForColumn = tasksByColumn[columnId];
-                // Reverse iterate to maintain order when inserting at position 1
                 for (let i = tasksForColumn.length - 1; i >= 0; i--) {
                     const task = tasksForColumn[i];
                     await api.data.moveTask(task.id, columnId, 1, currentUser.id);
@@ -265,7 +302,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         title: generatedData.title,
         description: generatedData.description,
         priority: generatedData.priority,
-        columnId: project.board.columnOrder[0], // Add to the first column
+        columnId: project.board.columnOrder[0], 
         dueDate: generatedData.dueDate,
     };
 
@@ -300,10 +337,8 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   const addProjectFromPlan = useCallback(async (plan: AiGeneratedProjectPlan) => {
     if (!currentUser) throw new Error("User must be logged in.");
 
-    // 1. Create Project Shell
     const newProject = await api.data.createProjectShell(plan.name, plan.description, currentUser.id);
 
-    // 2. Create Columns and Tasks
     for (const col of plan.columns) {
         const newColumn = await api.data.addColumn(newProject.id, col.title);
         if (newColumn) {
@@ -322,7 +357,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         }
     }
     
-    // 3. Refresh state
     await fetchData();
   }, [fetchData, currentUser]);
 
@@ -352,7 +386,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         createdAt: new Date().toISOString(),
     };
 
-    // Optimistic update
     setState(prevState => {
         const project = prevState.projects[projectId];
         if (!project) return prevState;
@@ -370,9 +403,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
 
     try {
         await api.data.sendChatMessage(projectId, text, author.id);
-        // We don't need to re-fetch here because the realtime subscription will update the state
     } catch (error) {
-        // Revert on error
         console.error("Failed to send message, reverting:", error);
         setState(prevState => {
             const project = prevState.projects[projectId];
@@ -401,7 +432,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
       await fetchData();
   }, [fetchData]);
 
-  // Bug Management
   const addBug = useCallback(async (projectId: string, bugData: { title: string, description: string, priority: TaskPriority }) => {
     if (!currentUser) return;
     const project = state.projects[projectId];
@@ -451,7 +481,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         description,
         priority,
         status,
-        assigneeId: assignee?.id ?? (assignee === undefined ? undefined : null), // Handle unassigning
+        assigneeId: assignee?.id ?? (assignee === undefined ? undefined : null), 
     });
     await fetchData();
   }, [fetchData]);
@@ -466,7 +496,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     await fetchData();
   }, [fetchData]);
 
-  // FIX: The type for new sprint data should not include properties that are auto-generated by the database, like `status`.
   const addSprint = useCallback(async (projectId: string, sprintData: Omit<Sprint, 'id' | 'projectId' | 'createdAt' | 'status' | 'isDefault'> & { isDefault?: boolean }): Promise<Sprint> => {
     const newSprint = await api.data.addSprint({ ...sprintData, projectId });
     await fetchData();
@@ -493,7 +522,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     await fetchData();
   }, [fetchData]);
 
-  // Filter Segment Management
   const addFilterSegment = useCallback(async (projectId: string, name: string, filters: FilterSegment['filters'], creatorId: string) => {
     await api.data.addFilterSegment(projectId, name, filters, creatorId);
     await fetchData();

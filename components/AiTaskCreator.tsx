@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { SparklesIcon, LoaderCircleIcon } from './Icons';
+import { SparklesIcon, LoaderCircleIcon, SendIcon } from './Icons';
 
 interface AiTaskCreatorProps {
   onGenerateTask: (prompt: string) => Promise<void>;
@@ -26,31 +26,35 @@ export const AiTaskCreator: React.FC<AiTaskCreatorProps> = ({ onGenerateTask }) 
   };
 
   return (
-    <div className="relative">
-      <SparklesIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-      <input
-        type="text"
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
-        placeholder="Describe a task to generate with AI..."
-        className="w-full pl-10 pr-28 py-2 border border-gray-800 rounded-lg bg-[#1C2326] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-xs h-10"
-        disabled={isLoading}
-      />
-      <button
-        onClick={handleGenerate}
-        disabled={isLoading || !prompt.trim()}
-        className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center gap-2 px-3 py-1 bg-gray-700 text-white font-semibold rounded-md hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed transition-all text-xs h-8"
-      >
-        {isLoading ? (
-          <>
-            <LoaderCircleIcon className="w-4 h-4 animate-spin" />
-          </>
-        ) : (
-          'Generate'
-        )}
-      </button>
-      {error && <p className="text-xs text-red-500 mt-1 absolute">{error}</p>}
+    <div className="space-y-2">
+      <div className="relative">
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleGenerate();
+            }
+          }}
+          placeholder="e.g., Build a neural gateway for user onboarding..."
+          className="w-full pl-4 pr-12 py-4 border border-white/10 rounded-2xl bg-[#1C2326] text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-sm h-32 resize-none shadow-inner custom-scrollbar"
+          disabled={isLoading}
+        />
+        <button
+          onClick={handleGenerate}
+          disabled={isLoading || !prompt.trim()}
+          className="absolute right-3 bottom-3 flex items-center justify-center w-10 h-10 bg-emerald-500 text-black font-bold rounded-xl hover:bg-emerald-400 disabled:bg-gray-800 disabled:text-gray-600 transition-all shadow-lg"
+          title="Synthesize Task"
+        >
+          {isLoading ? (
+            <LoaderCircleIcon className="w-5 h-5 animate-spin" />
+          ) : (
+            <SendIcon className="w-5 h-5" />
+          )}
+        </button>
+      </div>
+      {error && <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest ml-1">{error}</p>}
     </div>
   );
 };

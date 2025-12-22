@@ -48,7 +48,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, index, sprintName, isO
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           onClick={onClick}
-          className={`relative group bg-[#131C1B] rounded-lg shadow-md border border-transparent mb-4 p-4 cursor-pointer hover:bg-gray-800 transition-all duration-200 transform hover:-translate-y-1 ${
+          className={`relative group bg-[#131C1B] rounded-md shadow-md border border-transparent mb-4 p-4 cursor-pointer hover:bg-gray-800 transition-all duration-200 transform hover:-translate-y-1 ${
             snapshot.isDragging ? 'shadow-2xl scale-105 ring-2 ring-gray-500' : ''
           } ${isSelected ? 'ring-2 ring-blue-500 border-blue-500/50' : ''}`}
         >

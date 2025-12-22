@@ -508,7 +508,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-[#131C1B] rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <header className="p-4 border-b border-gray-800 flex justify-between items-center flex-shrink-0">
             <div className="flex-grow mr-4 group flex items-center gap-2">
                 <EditableField 

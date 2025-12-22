@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AppLogo, BotMessageSquareIcon, SparklesIcon, UsersIcon, LayoutDashboardIcon, ArrowLeftIcon, RocketIcon, ZapIcon, ShieldCheckIcon, ChevronRightIcon } from './Icons';
+import { AppLogo, BotMessageSquareIcon, SparklesIcon, UsersIcon, LayoutDashboardIcon, ArrowLeftIcon, RocketIcon, ZapIcon, ShieldCheckIcon, ChevronRightIcon, CheckSquareIcon, TrendingUpIcon } from './Icons';
 import { LoginPage } from '../pages/LoginPage';
 
 const ParallaxBackground: React.FC = () => {
@@ -40,32 +40,38 @@ const ParallaxBackground: React.FC = () => {
 
 export const LandingPage: React.FC<{ onShowPrivacy: () => void }> = ({ onShowPrivacy }) => {
     const loginSectionRef = useRef<HTMLDivElement>(null);
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            setMousePos({
+                x: (e.clientX / window.innerWidth - 0.5) * 20,
+                y: (e.clientY / window.innerHeight - 0.5) * 20
+            });
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
 
     const scrollToLogin = () => {
         loginSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    const imgBack = "https://zcxsscvheqidzvkhlnwz.supabase.co/storage/v1/object/public/Default%20image/image%202.png";
-    const imgMid = "https://zcxsscvheqidzvkhlnwz.supabase.co/storage/v1/object/public/Default%20image/image%203.png";
     const imgFront = "https://zcxsscvheqidzvkhlnwz.supabase.co/storage/v1/object/public/Default%20image/image%2010.png";
 
     return (
         <div className="min-h-screen bg-[#1C2326] selection:bg-gray-500 selection:text-white overflow-x-hidden">
             <style>{`
-                @keyframes float {
-                    0%, 100% { transform: translateY(0px) rotateX(25deg) rotateY(-10deg) rotateZ(1deg); }
-                    50% { transform: translateY(-20px) rotateX(25deg) rotateY(-10deg) rotateZ(1deg); }
+                @keyframes float-slow {
+                    0%, 100% { transform: translateY(0px) translateX(0px); }
+                    50% { transform: translateY(-20px) translateX(10px); }
                 }
-                @keyframes float-reverse {
-                    0%, 100% { transform: translateY(0px) rotateX(25deg) rotateY(10deg) rotateZ(-1deg); }
-                    50% { transform: translateY(-15px) rotateX(25deg) rotateY(10deg) rotateZ(-1deg); }
+                @keyframes pulse-glow {
+                    0%, 100% { opacity: 0.3; transform: scale(1); }
+                    50% { opacity: 0.6; transform: scale(1.05); }
                 }
                 .perspective-container {
                     perspective: 2000px;
-                }
-                .dashboard-card {
-                    transform-style: preserve-3d;
-                    transition: transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
                 }
             `}</style>
 
@@ -97,7 +103,7 @@ export const LandingPage: React.FC<{ onShowPrivacy: () => void }> = ({ onShowPri
                 <p className="text-lg text-gray-400 max-w-xl mb-12 leading-relaxed">
                     Graphynovus orchestrates your most complex projects with advanced neural reasoning and real-time mesh connectivity.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-4 items-center mb-32">
+                <div className="flex flex-col sm:flex-row gap-4 items-center mb-40">
                     <button 
                         onClick={scrollToLogin}
                         className="px-8 py-4 bg-white text-black font-bold rounded-xl hover:scale-105 transition-all flex items-center gap-2 shadow-2xl shadow-white/10 group"
@@ -107,60 +113,105 @@ export const LandingPage: React.FC<{ onShowPrivacy: () => void }> = ({ onShowPri
                     </button>
                 </div>
 
-                {/* 3D Tilted Stack Dashboard Preview */}
-                <div className="relative w-full max-w-6xl mt-12 perspective-container group">
-                    <div className="relative h-[400px] md:h-[600px] w-full">
-                        
-                        {/* Shadow Base */}
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 translate-y-1/2 w-[80%] h-32 bg-black/40 blur-[100px] rounded-full pointer-events-none" />
+                {/* Minimalist 3D Terminal Preview */}
+                <div className="relative w-full max-w-5xl mt-12 perspective-container">
+                    
+                    {/* Background Glow Pulse */}
+                    <div 
+                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-emerald-500/5 rounded-full blur-[160px] pointer-events-none" 
+                        style={{ animation: 'pulse-glow 8s infinite ease-in-out' }}
+                    />
 
-                        {/* Back Layer (Image 2) */}
-                        <div 
-                            className="absolute left-[5%] top-0 w-[60%] md:w-[50%] dashboard-card z-10 opacity-40 group-hover:opacity-60 transition-all duration-700"
-                            style={{ animation: 'float-reverse 8s infinite ease-in-out' }}
-                        >
-                            <div className="absolute -inset-4 bg-blue-500/20 blur-3xl rounded-full" />
-                            <div className="p-1 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md shadow-2xl overflow-hidden">
-                                <img src={imgBack} alt="UI Layer 1" className="w-full h-auto rounded-xl" />
+                    <div 
+                        className="relative z-20 transition-transform duration-300 ease-out"
+                        style={{ 
+                            transform: `rotateX(${10 - mousePos.y * 0.5}deg) rotateY(${mousePos.x * 0.5}deg)`
+                        }}
+                    >
+                        {/* Main Glass Frame */}
+                        <div className="p-1 rounded-xl bg-gradient-to-br from-white/10 to-transparent border border-white/20 backdrop-blur-3xl shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] overflow-hidden">
+                             {/* Bezel / Window Controls */}
+                             <div className="flex items-center justify-between px-6 py-4 bg-white/5 border-b border-white/5">
+                                <div className="flex gap-1.5">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/30" />
+                                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/30" />
+                                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/30" />
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="w-24 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                        <div className="w-2/3 h-full bg-emerald-500/50" />
+                                    </div>
+                                    <div className="text-[9px] font-mono text-emerald-500/50 uppercase tracking-widest">System Active</div>
+                                </div>
                             </div>
+                            
+                            <img 
+                                src={imgFront} 
+                                alt="Graphynovus Terminal" 
+                                className="w-full h-auto grayscale-[0.2] contrast-[1.1] brightness-[0.9]"
+                            />
                         </div>
 
-                        {/* Middle Layer (Image 3) */}
+                        {/* Floating Satellite 1 - Performance Card */}
                         <div 
-                            className="absolute right-[5%] top-[10%] w-[60%] md:w-[50%] dashboard-card z-20 opacity-60 group-hover:opacity-80 transition-all duration-700"
-                            style={{ animation: 'float 7s infinite ease-in-out', animationDelay: '-1s' }}
-                        >
-                            <div className="absolute -inset-4 bg-purple-500/20 blur-3xl rounded-full" />
-                            <div className="p-1 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md shadow-2xl overflow-hidden">
-                                <img src={imgMid} alt="UI Layer 2" className="w-full h-auto rounded-xl" />
-                            </div>
-                        </div>
-
-                        {/* Front Main Layer (Image 10) */}
-                        <div 
-                            className="absolute left-1/2 top-[20%] -translate-x-1/2 w-[85%] md:w-[70%] dashboard-card z-30 transition-all duration-700 group-hover:scale-105"
+                            className="absolute -top-12 -left-12 p-5 rounded-xl bg-[#131C1B]/80 border border-emerald-500/20 backdrop-blur-2xl shadow-2xl hidden md:block"
                             style={{ 
-                                animation: 'float 6s infinite ease-in-out', 
-                                animationDelay: '-2s',
-                                transform: 'rotateX(20deg) rotateY(0deg) rotateZ(0deg)'
+                                animation: 'float-slow 6s infinite ease-in-out',
+                                transform: `translateZ(100px)`
                             }}
                         >
-                            <div className="absolute -inset-10 bg-emerald-500/10 blur-[100px] rounded-full opacity-50" />
-                            <div className="p-1.5 rounded-3xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 backdrop-blur-xl shadow-[0_50px_100px_-20px_rgba(0,0,0,0.5)] overflow-hidden">
-                                {/* Window Chrome */}
-                                <div className="flex gap-1.5 px-4 py-3 bg-white/5 border-b border-white/5">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/40" />
-                                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/40" />
-                                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/40" />
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                                    <TrendingUpIcon className="w-4 h-4" />
                                 </div>
-                                <img src={imgFront} alt="Graphynovus Interface" className="w-full h-auto rounded-b-2xl" />
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Efficiency</p>
+                                    <p className="text-sm font-bold text-white">Neural Load 98%</p>
+                                </div>
                             </div>
                         </div>
 
+                        {/* Floating Satellite 2 - User Status */}
+                        <div 
+                            className="absolute -bottom-10 -right-10 p-5 rounded-xl bg-[#131C1B]/80 border border-blue-500/20 backdrop-blur-2xl shadow-2xl hidden md:block"
+                            style={{ 
+                                animation: 'float-slow 5s infinite ease-in-out',
+                                animationDelay: '-2s',
+                                transform: `translateZ(80px)`
+                            }}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="relative">
+                                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs border border-blue-500/30">
+                                        G
+                                    </div>
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#131C1B]" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Project Sync</p>
+                                    <p className="text-sm font-bold text-white">Gemini Online</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Floating Satellite 3 - Quick Action */}
+                        <div 
+                            className="absolute top-1/4 -right-16 p-4 rounded-xl bg-[#131C1B]/80 border border-white/10 backdrop-blur-2xl shadow-2xl hidden lg:block"
+                            style={{ 
+                                animation: 'float-slow 7s infinite ease-in-out',
+                                animationDelay: '-1s',
+                                transform: `translateZ(120px)`
+                            }}
+                        >
+                            <div className="flex items-center gap-3 text-white/50">
+                                <ZapIcon className="w-4 h-4" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Critical Path Detected</span>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Gradient Fade-out at bottom of hero */}
-                    <div className="absolute -bottom-32 left-0 w-full h-64 bg-gradient-to-t from-[#1C2326] via-transparent to-transparent z-40 pointer-events-none" />
+                    {/* Ground Reflection / Gradient Fade-out */}
+                    <div className="absolute -bottom-40 left-0 w-full h-80 bg-gradient-to-t from-[#1C2326] via-transparent to-transparent z-30 pointer-events-none" />
                 </div>
             </header>
 
@@ -188,7 +239,7 @@ export const LandingPage: React.FC<{ onShowPrivacy: () => void }> = ({ onShowPri
 
             {/* Login Section Wrapper - Full screen destination */}
             <section ref={loginSectionRef} className="relative z-10 min-h-screen flex items-center justify-center py-24 px-6 bg-[#0D1117]/40 backdrop-blur-sm">
-                <div className="w-full max-w-lg bg-[#131C1B]/80 p-10 rounded-[2rem] border border-gray-800 backdrop-blur-3xl shadow-2xl transition-all duration-500 hover:border-gray-700 ring-1 ring-white/5">
+                <div className="w-full max-w-lg bg-[#131C1B]/80 p-10 rounded-xl border border-gray-800 backdrop-blur-3xl shadow-2xl transition-all duration-500 hover:border-gray-700 ring-1 ring-white/5">
                     <div className="text-center mb-10">
                         <AppLogo className="w-20 h-20 mx-auto mb-6 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]" />
                         <h2 className="text-3xl font-bold text-white mb-3 tracking-tight">

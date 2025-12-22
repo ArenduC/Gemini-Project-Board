@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, ReactNode } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
@@ -46,7 +45,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, 
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-[#131C1B] rounded-lg shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <header className="p-4 border-b border-gray-800 flex justify-between items-center">
           <h2 className="text-lg font-bold text-white">{title}</h2>
           <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
@@ -56,7 +55,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, 
         <div className="p-6">
           <div className="text-sm text-gray-300">{message}</div>
         </div>
-        <footer className="p-4 bg-[#1C2326]/50 rounded-b-xl flex justify-end gap-3">
+        <footer className="p-4 bg-[#1C2326]/50 rounded-b-lg flex justify-end gap-3">
           <button
             type="button"
             onClick={onClose}

@@ -13,12 +13,12 @@ interface ProjectLinksManagerProps {
 const getLinkIcon = (url: string): ReactNode => {
     try {
         const domain = new URL(url).hostname;
-        if (domain.includes('github.com')) return <GitHubIcon className="w-5 h-5 text-gray-400" />;
-        if (domain.includes('figma.com')) return <FigmaIcon className="w-5 h-5 text-gray-400" />;
+        if (domain.includes('github.com')) return <GitHubIcon className="w-4 h-4 text-emerald-400" />;
+        if (domain.includes('figma.com')) return <FigmaIcon className="w-4 h-4 text-emerald-400" />;
     } catch (e) {
         // Invalid URL, fallback to generic icon
     }
-    return <LinkIcon className="w-5 h-5 text-gray-400" />;
+    return <LinkIcon className="w-4 h-4 text-emerald-400" />;
 };
 
 export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ project, onAddLink, onDeleteLink }) => {
@@ -40,8 +40,6 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
             setUrl('');
         } catch (error) {
             console.error("Failed to add link:", error);
-            // Can't use alert, will log to console
-            console.error("Could not add link. Please try again.");
         } finally {
             setIsAdding(false);
         }
@@ -56,7 +54,6 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
             }
         } catch (error) {
             console.error("Failed to generate links with AI:", error);
-            console.error("Could not generate links. Please try again.");
         } finally {
             setIsGenerating(false);
         }
@@ -82,34 +79,54 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
     };
 
     return (
-        <div className="bg-[#131C1B]/50 border border-gray-800 rounded-xl">
-            <button onClick={() => setIsOpen(!isOpen)} className="w-full p-4 flex justify-between items-center">
-                <h3 className="font-semibold text-sm text-white">Project Links</h3>
-                <span className="text-gray-400 transform transition-transform duration-200">{isOpen ? 'Hide' : 'Show'}</span>
+        <div className="bg-[#131C1B]/40 backdrop-blur-xl border border-white/5 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300">
+            <button 
+                onClick={() => setIsOpen(!isOpen)} 
+                className="w-full px-6 py-4 flex justify-between items-center hover:bg-white/[0.02] transition-colors group"
+            >
+                <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                        <LinkIcon className="w-4 h-4" />
+                    </div>
+                    <h3 className="font-black text-[10px] uppercase tracking-[0.2em] text-white/70 group-hover:text-white transition-colors">Neural Resource Mesh</h3>
+                </div>
+                <div className="flex items-center gap-3">
+                    <span className="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{project.links.length} Connected</span>
+                    <div className={`transform transition-transform duration-300 text-gray-500 ${isOpen ? 'rotate-180' : ''}`}>
+                        <PlusIcon className="w-4 h-4" />
+                    </div>
+                </div>
             </button>
+
             {isOpen && (
-                <div className="p-4 border-t border-gray-800 space-y-4">
+                <div className="p-6 border-t border-white/5 space-y-6 animate-in slide-in-from-top-2 duration-300">
                     {project.links.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                             {project.links.map(link => (
-                                <div key={link.id} className="group flex items-center gap-3 p-2 rounded-md hover:bg-gray-800/50">
-                                    {getLinkIcon(link.url)}
-                                    <div className="flex-grow">
-                                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="font-medium text-xs text-white hover:underline">{link.title}</a>
-                                        <p className="text-xs text-gray-500 truncate">{link.url}</p>
+                                <div key={link.id} className="group relative bg-white/5 border border-white/5 rounded-xl p-3 flex items-center gap-4 hover:border-emerald-500/30 transition-all">
+                                    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-black/20 flex items-center justify-center border border-white/5">
+                                        {getLinkIcon(link.url)}
                                     </div>
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex-grow min-w-0 pr-16">
+                                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="block font-bold text-xs text-white hover:text-emerald-400 truncate transition-colors mb-0.5">
+                                            {link.title}
+                                        </a>
+                                        <p className="text-[10px] text-gray-500 font-mono truncate opacity-60">
+                                            {link.url}
+                                        </p>
+                                    </div>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => handleCopyLink(link.url, link.id)}
-                                            className="p-1.5 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white"
-                                            aria-label="Copy link"
+                                            className="p-2 rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition-all"
+                                            title="Copy Link"
                                         >
-                                            {copiedLinkId === link.id ? <CheckIcon className="w-4 h-4 text-green-500" /> : <CopyIcon className="w-4 h-4" />}
+                                            {copiedLinkId === link.id ? <CheckIcon className="w-4 h-4 text-emerald-400" /> : <CopyIcon className="w-4 h-4" />}
                                         </button>
                                         <button
                                             onClick={() => handleDelete(link.id, link.title)}
-                                            className="p-1.5 rounded-full text-gray-400 hover:bg-red-900/50 hover:text-red-400"
-                                            aria-label="Delete link"
+                                            className="p-2 rounded-lg text-gray-400 hover:bg-red-500/10 hover:text-red-400 transition-all"
+                                            title="Delete Link"
                                         >
                                             <TrashIcon className="w-4 h-4" />
                                         </button>
@@ -118,50 +135,48 @@ export const ProjectLinksManager: React.FC<ProjectLinksManagerProps> = ({ projec
                             ))}
                         </div>
                     ) : (
-                        <p className="text-xs text-gray-500 text-center py-2">No links added yet.</p>
+                        <div className="py-12 text-center bg-black/10 rounded-xl border border-dashed border-white/5">
+                            <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">No active mesh links</p>
+                        </div>
                     )}
 
-                    <div className="pt-4 border-t border-gray-800/50 space-y-3">
-                        <form onSubmit={handleAddSubmit} className="flex flex-col sm:flex-row gap-2 items-end">
-                            <div className="flex-grow w-full">
-                                <label className="text-xs text-gray-400">Title</label>
+                    <div className="pt-6 border-t border-white/5 space-y-4">
+                        <form onSubmit={handleAddSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Asset Label</label>
                                 <input
                                     type="text" value={title} onChange={e => setTitle(e.target.value)}
-                                    placeholder="e.g. GitHub Repo"
-                                    className="w-full mt-1 px-3 py-1.5 border border-gray-700 rounded-md bg-[#1C2326] text-white text-xs focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                    placeholder="e.g. Protocol Documentation"
+                                    className="w-full px-4 py-2.5 border border-white/5 rounded-xl bg-black/20 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all"
                                     required
                                 />
                             </div>
-                            <div className="flex-grow w-full">
-                                 <label className="text-xs text-gray-400">URL</label>
+                            <div className="space-y-1.5">
+                                 <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Remote Endpoint</label>
                                 <input
                                     type="url" value={url} onChange={e => setUrl(e.target.value)}
                                     placeholder="https://..."
-                                    className="w-full mt-1 px-3 py-1.5 border border-gray-700 rounded-md bg-[#1C2326] text-white text-xs focus:outline-none focus:ring-2 focus:ring-gray-500"
+                                    className="w-full px-4 py-2.5 border border-white/5 rounded-xl bg-black/20 text-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/30 transition-all"
                                     required
                                 />
                             </div>
-                            <button type="submit" disabled={isAdding} className="flex-shrink-0 w-full sm:w-auto px-3 py-1.5 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 disabled:opacity-50 flex items-center justify-center gap-2 text-xs">
-                                {isAdding ? <LoaderCircleIcon className="w-5 h-5 animate-spin"/> : <PlusIcon className="w-4 h-4"/>}
-                                Add Link
+                            <button type="submit" disabled={isAdding} className="h-10 px-6 bg-white text-black font-black uppercase tracking-widest rounded-xl hover:bg-gray-200 disabled:opacity-50 transition-all flex items-center justify-center gap-2 text-[10px] shadow-xl shadow-white/5">
+                                {isAdding ? <LoaderCircleIcon className="w-4 h-4 animate-spin"/> : <PlusIcon className="w-4 h-4"/>}
+                                <span className="mt-0.5">Attach Node</span>
                             </button>
                         </form>
+                         
                          <button
                             onClick={handleAiGenerate}
                             disabled={isGenerating}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-600/50 border border-gray-700 text-white font-semibold rounded-lg shadow-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 transition-all text-xs"
+                            className="w-full group h-10 flex items-center justify-center gap-3 px-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-black uppercase tracking-[0.2em] rounded-xl hover:bg-emerald-500/20 disabled:opacity-50 transition-all text-[10px] shadow-lg shadow-emerald-500/5"
                         >
                             {isGenerating ? (
-                                <>
-                                    <LoaderCircleIcon className="w-5 h-5 animate-spin" />
-                                    Generating...
-                                </>
+                                <LoaderCircleIcon className="w-4 h-4 animate-spin" />
                             ) : (
-                                <>
-                                    <SparklesIcon className="w-5 h-5" />
-                                    Generate with AI
-                                </>
+                                <SparklesIcon className="w-4 h-4 group-hover:animate-pulse" />
                             )}
+                            <span className="mt-0.5">{isGenerating ? 'Synthesizing...' : 'Predict Resource Links'}</span>
                         </button>
                     </div>
                 </div>

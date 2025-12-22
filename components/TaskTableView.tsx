@@ -58,7 +58,7 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({ project, tasks, us
   };
 
   return (
-    <div className="bg-[#131C1B] rounded-[2rem] shadow-md border border-gray-800 overflow-hidden">
+    <div className="bg-[#131C1B] rounded-xl shadow-md border border-gray-800 overflow-hidden">
       <table className="w-full text-left">
         <thead className="bg-[#1C2326]/50">
           <tr className="text-xs">

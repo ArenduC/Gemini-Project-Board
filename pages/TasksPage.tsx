@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect } from 'react';
-// FIX: Import `Column` type to be used in casting.
 import { Project, User, AugmentedTask, Task, FilterSegment, Column, Sprint } from '../types';
 import { DownloadIcon } from '../components/Icons';
 import { exportAugmentedTasksToCsv } from '../utils/export';
@@ -35,7 +34,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 15;
+  const ITEMS_PER_PAGE = 20;
 
   const storageKey = 'tasks-page-segments';
 
@@ -58,14 +57,13 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
     }
   };
 
-  // FIX: Corrected signature to accept filters and added missing properties `projectId` and `creatorId` to satisfy the `FilterSegment` type.
   const handleAddSegment = async (name: string, filters: FilterSegment['filters']) => {
     if (!name.trim()) return;
 
     const newSegment: FilterSegment = {
       id: Date.now().toString(),
       name: name.trim(),
-      projectId: "global", // Global segments aren't tied to a project
+      projectId: "global", 
       creatorId: currentUser.id,
       filters: filters,
     };
@@ -136,11 +134,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   };
 
   const allTasks = useMemo((): AugmentedTask[] => {
-    // FIX: Cast Object.values to the correct type to avoid type inference issues.
     return (Object.values(projects) as Project[]).flatMap(project =>
-      // FIX: Cast Object.values to the correct type to avoid type inference issues.
       (Object.values(project.board.tasks) as Task[]).map(task => {
-        // FIX: Cast Object.values to the correct type to avoid type inference issues.
         const column = (Object.values(project.board.columns) as Column[]).find(c => c.taskIds.includes(task.id));
         return {
           ...task,
@@ -162,9 +157,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
 
   const allStatuses = useMemo(() => {
     const statusSet = new Set<string>();
-    // FIX: Cast Object.values to the correct type to avoid type inference issues.
     (Object.values(projects) as Project[]).forEach(project => {
-      // FIX: Cast Object.values to the correct type to avoid type inference issues.
       (Object.values(project.board.columns) as Column[]).forEach(column => {
         statusSet.add(column.title);
       });
@@ -253,7 +246,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
         
         if (relativeTimeCondition === 'within') {
             tasks = tasks.filter(task => new Date(task.createdAt).getTime() >= cutoff.getTime());
-        } else { // older_than
+        } else { 
             tasks = tasks.filter(task => new Date(task.createdAt).getTime() < cutoff.getTime());
         }
     }
@@ -261,57 +254,39 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
     return tasks;
   }, [allTasks, viewMode, currentUser.id, searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
   
-  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [filteredTasks.length]);
 
   const totalPages = Math.ceil(filteredTasks.length / ITEMS_PER_PAGE);
-  const paginatedTasks = filteredTasks.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
+  const paginatedTasks = filteredTasks.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const handleExport = () => {
     exportAugmentedTasksToCsv(filteredTasks, users);
   };
 
   return (
-    <div className="max-w-[1600px] mx-auto pb-20">
-      {/* Dynamic Task Insights */}
+    <div className="max-w-[1500px] mx-auto pb-12">
       <TaskInsights tasks={filteredTasks} />
 
-      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-        <h2 className="text-xl font-bold text-white">Tasks</h2>
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
+        <h2 className="text-lg font-bold text-white">Neural Nodes</h2>
         <div className="flex items-center gap-2">
-          {/* View Toggle */}
           <div className="flex items-center p-1 bg-[#1C2326] rounded-lg">
-            <button
-              onClick={() => setViewMode('all')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md ${viewMode === 'all' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50 text-white'}`}
-            >
-              All Tasks
+            <button onClick={() => setViewMode('all')} className={`px-2.5 py-1 text-[10px] font-bold rounded-md ${viewMode === 'all' ? 'bg-gray-700 text-white' : 'hover:bg-gray-800/50 text-gray-400'}`}>
+              Global
             </button>
-            <button
-              onClick={() => setViewMode('my')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md ${viewMode === 'my' ? 'bg-gray-700 text-white shadow-sm' : 'hover:bg-gray-800/50 text-white'}`}
-            >
-              My Tasks
+            <button onClick={() => setViewMode('my')} className={`px-2.5 py-1 text-[10px] font-bold rounded-md ${viewMode === 'my' ? 'bg-gray-700 text-white' : 'hover:bg-gray-800/50 text-gray-400'}`}>
+              Personal
             </button>
           </div>
-          {/* Export Button */}
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 text-white font-semibold rounded-lg shadow-sm hover:bg-gray-700 transition-all text-xs"
-          >
-            <DownloadIcon className="w-4 h-4" />
-            <span>Export</span>
+          <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 border border-gray-700 text-white font-bold rounded-lg hover:bg-gray-700 transition-all text-[10px]">
+            <DownloadIcon className="w-3.5 h-3.5" /> <span>Export</span>
           </button>
         </div>
       </div>
       
-      <div className="mb-6">
+      <div className="mb-4">
         <Filters
             projectId="all-tasks"
             currentUser={currentUser}
@@ -351,37 +326,27 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
           />
       </div>
 
-      <div className="bg-[#131C1B]/80 backdrop-blur-xl rounded-[2rem] border border-white/5 overflow-hidden shadow-2xl">
-        {/* List Header */}
-        <div className="grid grid-cols-12 gap-4 items-center px-6 py-4 border-b border-white/5 bg-white/5">
-          <div className="col-span-4 font-bold text-[10px] uppercase tracking-widest text-gray-500">Node / Title</div>
-          <div className="col-span-2 font-bold text-[10px] uppercase tracking-widest text-gray-500">Project Nexus</div>
-          <div className="col-span-2 font-bold text-[10px] uppercase tracking-widest text-gray-500">Priority</div>
-          <div className="col-span-2 font-bold text-[10px] uppercase tracking-widest text-gray-500">Status</div>
-          <div className="col-span-2 font-bold text-[10px] uppercase tracking-widest text-gray-500 text-right">Resource</div>
+      <div className="bg-[#131C1B]/80 backdrop-blur-xl rounded-xl border border-white/5 overflow-hidden shadow-2xl">
+        <div className="grid grid-cols-12 gap-4 items-center px-5 py-2.5 border-b border-white/5 bg-white/5">
+          <div className="col-span-4 font-bold text-[9px] uppercase tracking-[0.2em] text-gray-500">Node Cluster</div>
+          <div className="col-span-2 font-bold text-[9px] uppercase tracking-[0.2em] text-gray-500">Project Nexus</div>
+          <div className="col-span-2 font-bold text-[9px] uppercase tracking-[0.2em] text-gray-500">Priority</div>
+          <div className="col-span-2 font-bold text-[9px] uppercase tracking-[0.2em] text-gray-500">Status</div>
+          <div className="col-span-2 font-bold text-[9px] uppercase tracking-[0.2em] text-gray-500 text-right">Resource</div>
         </div>
-        {paginatedTasks.length > 0 ? (
-            paginatedTasks.map(task => (
-                <TaskListRow
-                    key={task.id}
-                    task={task}
-                    onClick={onTaskClick}
-                    users={users}
-                />
-            ))
-        ) : (
-            <div className="p-20 text-center text-gray-500 font-mono text-sm italic">
-                NO NEURAL TASKS FOUND IN CURRENT SCOPE
-            </div>
-        )}
+        <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
+            {paginatedTasks.length > 0 ? (
+                paginatedTasks.map(task => (
+                    <TaskListRow key={task.id} task={task} onClick={onTaskClick} users={users} />
+                ))
+            ) : (
+                <div className="p-16 text-center text-gray-500 font-mono text-xs italic">
+                    NO NEURAL TASKS FOUND IN SCOPE
+                </div>
+            )}
+        </div>
       </div>
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        itemsPerPage={ITEMS_PER_PAGE}
-        totalItems={filteredTasks.length}
-      />
+      <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} itemsPerPage={ITEMS_PER_PAGE} totalItems={filteredTasks.length} />
     </div>
   );
 };

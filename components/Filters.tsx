@@ -42,58 +42,6 @@ interface FiltersProps {
   onClearFilters: () => void;
 }
 
-const ViewMenu: React.FC<{
-    segment: FilterSegment;
-    isCreator: boolean;
-    onRename: () => void;
-    onDelete: () => void;
-    onShare: () => void;
-}> = ({ segment, isCreator, onRename, onDelete, onShare }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const menuRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-    
-    return (
-        <div ref={menuRef}>
-            <button
-                onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-                className="absolute top-1/2 right-1 -translate-y-1/2 p-1.5 rounded-full text-gray-400 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-                aria-label={`Options for ${segment.name}`}
-            >
-                <MoreVerticalIcon className="w-4 h-4" />
-            </button>
-            {isOpen && (
-                <div
-                    className="absolute top-full right-0 mt-1 w-40 bg-[#131C1B] border border-gray-700 rounded-md shadow-lg z-10"
-                >
-                    <button onClick={() => { onShare(); setIsOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-xs text-white hover:bg-gray-800">
-                        <CopyIcon className="w-4 h-4" /> Share
-                    </button>
-                    {isCreator && (
-                        <>
-                            <button onClick={() => { onRename(); setIsOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-xs text-white hover:bg-gray-800">
-                                <Edit2Icon className="w-4 h-4" /> Rename
-                            </button>
-                            <button onClick={() => { onDelete(); setIsOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-gray-800">
-                                <TrashIcon className="w-4 h-4" /> Delete
-                            </button>
-                        </>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
-
 const MultiSelectFilter: React.FC<{
     label: string;
     options: { value: string; label: string; }[];
@@ -103,61 +51,36 @@ const MultiSelectFilter: React.FC<{
 }> = ({ label, options, selectedValues, onChange, onRemove }) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
-
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (ref.current && !ref.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
+        const handleClickOutside = (event: MouseEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) setIsOpen(false); };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
-
     const toggleOption = (optionValue: string) => {
-        const newSelected = selectedValues.includes(optionValue)
-            ? selectedValues.filter(v => v !== optionValue)
-            : [...selectedValues, optionValue];
+        const newSelected = selectedValues.includes(optionValue) ? selectedValues.filter(v => v !== optionValue) : [...selectedValues, optionValue];
         onChange(newSelected);
     };
-
-    const selectedLabels = selectedValues
-        .map(v => options.find(o => o.value === v)?.label)
-        .filter(Boolean) as string[];
-
     const displayLabel = useMemo(() => {
-        const count = selectedLabels.length;
-        if (count === 0) {
-            return 'All';
-        }
-        if (count === 1) {
-            return selectedLabels[0];
-        }
-        return `${selectedLabels[0]} & ${count - 1} more`;
-    }, [selectedLabels]);
-
+        const count = selectedValues.length;
+        if (count === 0) return 'All';
+        const firstLabel = options.find(o => o.value === selectedValues[0])?.label || '';
+        return count === 1 ? firstLabel : `${firstLabel} +${count - 1}`;
+    }, [selectedValues, options]);
     return (
-        <div className="relative" ref={ref}>
-            <div className="flex items-center gap-0 bg-[#131C1B] border border-gray-800 rounded-lg">
-                <button type="button" onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 pl-3 pr-2 py-2">
-                    <span className="text-xs font-semibold text-gray-400">{label}:</span>
-                    <span className="text-xs text-white font-medium truncate max-w-[150px]">
-                        {displayLabel}
-                    </span>
+        <div className="relative flex-shrink-0" ref={ref}>
+            <div className="flex items-center gap-0 bg-[#131C1B] border border-white/5 rounded-xl overflow-hidden h-10 shadow-lg">
+                <button type="button" onClick={() => setIsOpen(!isOpen)} className="flex items-center gap-2 pl-3 pr-2 py-1.5 hover:bg-white/5 transition-colors h-full">
+                    <span className="text-[9px] font-black text-gray-500 uppercase tracking-[0.15em] whitespace-nowrap">{label}</span>
+                    <span className="text-[10px] text-white font-bold truncate max-w-[80px]">{displayLabel}</span>
                 </button>
-                <button type="button" onClick={onRemove} className="p-2 text-gray-500 hover:text-white self-stretch hover:bg-gray-700/50 rounded-r-md"><XIcon className="w-4 h-4"/></button>
+                <button type="button" onClick={onRemove} className="p-2 text-gray-500 hover:text-white hover:bg-red-500/10 border-l border-white/5 h-full transition-colors"><XIcon className="w-3.5 h-3.5"/></button>
             </div>
             {isOpen && (
-                <div className="absolute top-full left-0 mt-2 w-56 bg-[#131C1B] border border-gray-700 rounded-md shadow-lg z-20 max-h-60 overflow-y-auto custom-scrollbar">
+                <div className="absolute top-full left-0 mt-2 w-48 bg-[#131C1B] border border-gray-800 rounded-xl shadow-2xl z-[60] max-h-64 overflow-y-auto custom-scrollbar py-2 ring-1 ring-white/5">
                     {options.map(option => (
-                        <label key={option.value} className="flex items-center gap-3 px-3 py-2 text-sm text-white hover:bg-gray-800 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={selectedValues.includes(option.value)}
-                                onChange={() => toggleOption(option.value)}
-                                className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500"
-                            />
-                            {option.label}
+                        <label key={option.value} className="flex items-center gap-3 px-4 py-2 text-[11px] text-gray-300 hover:text-white hover:bg-white/5 cursor-pointer transition-colors">
+                            <input type="checkbox" checked={selectedValues.includes(option.value)} onChange={() => toggleOption(option.value)} className="w-4 h-4 rounded border-gray-700 bg-gray-800 text-emerald-500 focus:ring-emerald-500/50" />
+                            <span className="font-medium">{option.label}</span>
                         </label>
                     ))}
                 </div>
@@ -167,35 +90,18 @@ const MultiSelectFilter: React.FC<{
 };
 
 export const Filters: React.FC<FiltersProps> = ({
-  projectId,
-  currentUser,
-  searchTerm, setSearchTerm,
-  priorityFilter, setPriorityFilter,
-  assigneeFilter, setAssigneeFilter,
-  statusFilter, setStatusFilter,
-  tagFilter, setTagFilter,
-  sprintFilter, setSprintFilter,
-  sprints,
-  startDate, setStartDate,
-  endDate, setEndDate,
-  relativeTimeValue, setRelativeTimeValue,
-  relativeTimeUnit, setRelativeTimeUnit,
-  relativeTimeCondition, setRelativeTimeCondition,
-  assignees, statuses, tags,
-  segments, activeSegmentId,
-  onAddSegment, onUpdateSegment, onDeleteSegment,
-  onApplySegment, onClearFilters,
+  projectId, currentUser, searchTerm, setSearchTerm, priorityFilter, setPriorityFilter, assigneeFilter, setAssigneeFilter, statusFilter, setStatusFilter, tagFilter, setTagFilter, sprintFilter, setSprintFilter, sprints, startDate, setStartDate, endDate, setEndDate, relativeTimeValue, setRelativeTimeValue, relativeTimeUnit, setRelativeTimeUnit, relativeTimeCondition, setRelativeTimeCondition, assignees, statuses, tags, segments, activeSegmentId, onAddSegment, onUpdateSegment, onDeleteSegment, onApplySegment, onClearFilters,
 }) => {
-  const requestConfirmation = useConfirmation();
-  const [isSaveModalOpen, setSaveModalOpen] = useState(false);
-  const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState('');
-  const [copiedViewId, setCopiedViewId] = useState<string | null>(null);
-  
   const [visibleFilters, setVisibleFilters] = useState<Set<string>>(new Set());
   const [isAddFilterOpen, setIsAddFilterOpen] = useState(false);
   const addFilterButtonRef = useRef<HTMLDivElement>(null);
-  const prevActiveSegmentId = useRef(activeSegmentId);
+  const [isSaveModalOpen, setSaveModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => { if (addFilterButtonRef.current && !addFilterButtonRef.current.contains(event.target as Node)) setIsAddFilterOpen(false); };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const filterTypes = useMemo(() => [
     { id: 'priority', name: 'Priority' },
@@ -203,357 +109,82 @@ export const Filters: React.FC<FiltersProps> = ({
     ...(statuses && setStatusFilter ? [{ id: 'status', name: 'Status' }] : []),
     { id: 'tag', name: 'Tag' },
     { id: 'sprint', name: 'Sprint' },
-    { id: 'date', name: 'Date Range' },
-    { id: 'recency', name: 'Creation Date' },
+    { id: 'date', name: 'Range' },
   ], [statuses, setStatusFilter]);
 
-  useEffect(() => {
-    const segmentIdChanged = prevActiveSegmentId.current !== activeSegmentId;
-    prevActiveSegmentId.current = activeSegmentId;
-
-    if (segmentIdChanged && activeSegmentId === 'all') {
-        setVisibleFilters(new Set());
-        return;
-    }
-    
-    if (activeSegmentId && activeSegmentId !== 'all') {
-        const segment = segments.find(s => s.id === activeSegmentId);
-        if (segment) {
-            const newVisible = new Set<string>();
-            const { filters } = segment;
-            if (filters.priorityFilter?.length > 0) newVisible.add('priority');
-            if (filters.assigneeFilter?.length > 0) newVisible.add('assignee');
-            if (filters.statusFilter?.length > 0) newVisible.add('status');
-            if (filters.tagFilter?.length > 0) newVisible.add('tag');
-            if (filters.sprintFilter?.length > 0) newVisible.add('sprint');
-            if (filters.startDate || filters.endDate) newVisible.add('date');
-            if (filters.relativeTimeValue) newVisible.add('recency');
-            setVisibleFilters(newVisible);
-        }
-    }
-  }, [activeSegmentId, segments]);
-
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-        if (isAddFilterOpen && addFilterButtonRef.current && !addFilterButtonRef.current.contains(event.target as Node)) {
-            setIsAddFilterOpen(false);
-        }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isAddFilterOpen]);
-
-  const addFilter = (type: string) => {
-    setVisibleFilters(prev => new Set(prev).add(type));
-    setIsAddFilterOpen(false);
-  };
-
+  const addFilter = (type: string) => { setVisibleFilters(prev => new Set(prev).add(type)); setIsAddFilterOpen(false); };
   const removeFilter = (type: string) => {
-    setVisibleFilters(prev => {
-        const next = new Set(prev);
-        next.delete(type);
-        return next;
-    });
-    // Reset the corresponding filter value
+    setVisibleFilters(prev => { const next = new Set(prev); next.delete(type); return next; });
     if (type === 'priority') setPriorityFilter([]);
     if (type === 'assignee') setAssigneeFilter([]);
     if (type === 'status' && setStatusFilter) setStatusFilter([]);
     if (type === 'tag') setTagFilter([]);
     if (type === 'sprint') setSprintFilter([]);
-    if (type === 'date') {
-        setStartDate('');
-        setEndDate('');
-    }
-    if (type === 'recency') {
-        setRelativeTimeValue('');
-    }
+    if (type === 'date') { setStartDate(''); setEndDate(''); }
   };
 
-  const currentFilters = useMemo(() => ({
-      searchTerm, priorityFilter, assigneeFilter, statusFilter: statusFilter || [],
-      tagFilter, sprintFilter, startDate, endDate,
-      relativeTimeValue, relativeTimeUnit, relativeTimeCondition
-  }), [searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
-
+  const currentFilters = useMemo(() => ({ searchTerm, priorityFilter, assigneeFilter, statusFilter: statusFilter || [], tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition }), [searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
   const hasActiveFilters = Object.values(currentFilters).some(v => (Array.isArray(v) ? v.length > 0 : v !== ''));
 
-  const activeSegment = segments.find(s => s.id === activeSegmentId);
-  
-  const filtersHaveChanged = useMemo(() => {
-    if (!activeSegment) return hasActiveFilters;
-
-    const sortArrayValues = (obj: any) => {
-        const newObj: any = {};
-        for (const key in obj) {
-            if (Array.isArray(obj[key])) {
-                newObj[key] = [...obj[key]].sort();
-            } else {
-                newObj[key] = obj[key];
-            }
-        }
-        return newObj;
-    };
-
-    const sortedCurrent = sortArrayValues(currentFilters);
-    const sortedSegment = sortArrayValues({
-        searchTerm: activeSegment.filters.searchTerm || '',
-        priorityFilter: activeSegment.filters.priorityFilter || [],
-        assigneeFilter: activeSegment.filters.assigneeFilter || [],
-        statusFilter: activeSegment.filters.statusFilter || [],
-        tagFilter: activeSegment.filters.tagFilter || [],
-        sprintFilter: activeSegment.filters.sprintFilter || [],
-        startDate: activeSegment.filters.startDate || '',
-        endDate: activeSegment.filters.endDate || '',
-        relativeTimeValue: activeSegment.filters.relativeTimeValue || '',
-        relativeTimeUnit: activeSegment.filters.relativeTimeUnit || 'hours',
-        relativeTimeCondition: activeSegment.filters.relativeTimeCondition || 'within',
-    });
-
-    return JSON.stringify(sortedCurrent) !== JSON.stringify(sortedSegment);
-  }, [activeSegment, currentFilters, hasActiveFilters]);
-
-  useEffect(() => {
-    if (activeSegmentId === 'all') {
-      const hasAnyFilter =
-        searchTerm ||
-        priorityFilter.length > 0 ||
-        assigneeFilter.length > 0 ||
-        (statusFilter && statusFilter.length > 0) ||
-        tagFilter.length > 0 ||
-        sprintFilter.length > 0 ||
-        startDate ||
-        endDate ||
-        relativeTimeValue;
-
-      if (hasAnyFilter) {
-        onApplySegment(null);
-      }
-    }
-  }, [
-    activeSegmentId,
-    searchTerm,
-    priorityFilter,
-    assigneeFilter,
-    statusFilter,
-    tagFilter,
-    sprintFilter,
-    startDate,
-    endDate,
-    relativeTimeValue,
-    onApplySegment,
-  ]);
-  
-  const handleDelete = (segmentId: string, segmentName: string) => {
-    requestConfirmation({
-      title: 'Delete View',
-      message: <>Are you sure you want to delete the view <strong>"{segmentName}"</strong>?</>,
-      onConfirm: () => onDeleteSegment(segmentId),
-      confirmText: 'Delete',
-    });
-  };
-
-  const handleRename = (segment: FilterSegment) => {
-    setEditingSegmentId(segment.id);
-    setEditingName(segment.name);
-  };
-  
-  const handleSaveRename = (segmentId: string) => {
-    if (editingName.trim()) {
-        onUpdateSegment(segmentId, { name: editingName.trim() });
-    }
-    setEditingSegmentId(null);
-  };
-  
-  const handleShare = (segmentId: string) => {
-    const url = `${window.location.origin}/#/projects/${projectId}?view=${segmentId}`;
-    navigator.clipboard.writeText(url);
-    setCopiedViewId(segmentId);
-    setTimeout(() => setCopiedViewId(null), 2000);
-  };
-
-  const availableFilters = filterTypes.filter(ft => !visibleFilters.has(ft.id));
-
   return (
-    <div className="space-y-4">
-      <div>
-        <h4 className="text-xs font-semibold text-gray-400 mb-2">Views</h4>
-        <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center gap-3 flex-wrap flex-grow">
+      {/* Search Input */}
+      <div className="relative flex-grow max-w-sm">
+        <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+        <input 
+          type="text" 
+          placeholder="Neural Search..." 
+          value={searchTerm} 
+          onChange={(e) => setSearchTerm(e.target.value)} 
+          className="pl-10 pr-4 py-2 w-full border border-white/5 rounded-xl bg-[#1C2326] text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 text-[11px] font-medium h-10 shadow-inner" 
+        />
+      </div>
+      
+      {/* Dynamic Multi-Select Badges */}
+      {visibleFilters.has('priority') && <MultiSelectFilter label="PRIORITY" options={Object.values(TaskPriority).map(p => ({ value: p, label: p }))} selectedValues={priorityFilter} onChange={setPriorityFilter} onRemove={() => removeFilter('priority')} />}
+      {visibleFilters.has('assignee') && <MultiSelectFilter label="ASSIGNEE" options={assignees.map(a => ({ value: a, label: a }))} selectedValues={assigneeFilter} onChange={setAssigneeFilter} onRemove={() => removeFilter('assignee')} />}
+      {visibleFilters.has('status') && statuses && setStatusFilter && <MultiSelectFilter label="STATUS" options={statuses.map(s => ({ value: s, label: s }))} selectedValues={statusFilter || []} onChange={setStatusFilter} onRemove={() => removeFilter('status')} />}
+      {visibleFilters.has('tag') && <MultiSelectFilter label="TAG" options={tags.map(t => ({ value: t, label: t }))} selectedValues={tagFilter} onChange={setTagFilter} onRemove={() => removeFilter('tag')} />}
+      {visibleFilters.has('sprint') && <MultiSelectFilter label="SPRINT" options={sprints.map(s => ({ value: s.id, label: s.name }))} selectedValues={sprintFilter} onChange={setSprintFilter} onRemove={() => removeFilter('sprint')} />}
+      
+      {/* Add Filter Button */}
+      <div className="relative flex-shrink-0" ref={addFilterButtonRef}>
           <button 
-            onClick={() => onApplySegment('all')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${activeSegmentId === 'all' ? 'bg-gray-300 text-black' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
+            onClick={() => setIsAddFilterOpen(prev => !prev)} 
+            className="flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] bg-white/5 border border-white/5 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all h-10"
           >
-            All Tasks
+              <PlusIcon className="w-4 h-4 text-emerald-400"/> Filter
           </button>
-          {segments.map(segment => (
-            <div key={segment.id} className="relative group flex-shrink-0">
-                {editingSegmentId === segment.id ? (
-                     <div className="flex items-center gap-1">
-                        <input
-                            type="text"
-                            value={editingName}
-                            onChange={e => setEditingName(e.target.value)}
-                            onBlur={() => handleSaveRename(segment.id)}
-                            onKeyDown={e => e.key === 'Enter' && handleSaveRename(segment.id)}
-                            className="bg-gray-900 text-white px-2 py-1 rounded text-xs"
-                            autoFocus
-                        />
-                     </div>
-                ) : (
-                    <button
-                        onClick={() => onApplySegment(segment.id)}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors pr-8 ${activeSegmentId === segment.id ? 'bg-gray-300 text-black' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
-                    >
-                        {segment.name}
-                        {activeSegmentId === segment.id && filtersHaveChanged && <span className="ml-1.5 text-inherit opacity-70">*</span>}
-                    </button>
-                )}
-                {copiedViewId === segment.id && <CheckIcon className="absolute top-1/2 right-8 -translate-y-1/2 w-4 h-4 text-green-500" />}
-                <ViewMenu 
-                    segment={segment}
-                    isCreator={segment.creatorId === currentUser.id}
-                    onRename={() => handleRename(segment)}
-                    onDelete={() => handleDelete(segment.id, segment.name)}
-                    onShare={() => handleShare(segment.id)}
-                />
-            </div>
-          ))}
-        </div>
+          {isAddFilterOpen && (
+              <div className="absolute top-full left-0 mt-2 w-32 bg-[#131C1B] border border-gray-800 rounded-xl shadow-2xl z-[60] py-2 ring-1 ring-white/5">
+                  {filterTypes.filter(ft => !visibleFilters.has(ft.id)).map(filter => (
+                      <button key={filter.id} onClick={() => addFilter(filter.id)} className="w-full text-left px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+                        {filter.name}
+                      </button>
+                  ))}
+              </div>
+          )}
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap p-3 bg-[#1C2326] rounded-lg">
-        <div className="relative">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search tasks..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 pr-4 py-2 w-48 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-xs"
-          />
-        </div>
-        
-        {visibleFilters.has('priority') && (
-            <MultiSelectFilter
-                label="Priority"
-                options={Object.values(TaskPriority).map(p => ({ value: p, label: p }))}
-                selectedValues={priorityFilter}
-                onChange={setPriorityFilter}
-                onRemove={() => removeFilter('priority')}
-            />
-        )}
-        {visibleFilters.has('assignee') && (
-            <MultiSelectFilter
-                label="Assignee"
-                options={assignees.map(a => ({ value: a, label: a }))}
-                selectedValues={assigneeFilter}
-                onChange={setAssigneeFilter}
-                onRemove={() => removeFilter('assignee')}
-            />
-        )}
-        {visibleFilters.has('status') && statuses && setStatusFilter && (
-            <MultiSelectFilter
-                label="Status"
-                options={statuses.map(s => ({ value: s, label: s }))}
-                selectedValues={statusFilter || []}
-                onChange={setStatusFilter}
-                onRemove={() => removeFilter('status')}
-            />
-        )}
-        {visibleFilters.has('tag') && (
-            <MultiSelectFilter
-                label="Tag"
-                options={tags.map(t => ({ value: t, label: t }))}
-                selectedValues={tagFilter}
-                onChange={setTagFilter}
-                onRemove={() => removeFilter('tag')}
-            />
-        )}
-        {visibleFilters.has('sprint') && (
-            <MultiSelectFilter
-                label="Sprint"
-                options={sprints.map(s => ({ value: s.id, label: s.name }))}
-                selectedValues={sprintFilter}
-                onChange={setSprintFilter}
-                onRemove={() => removeFilter('sprint')}
-            />
-        )}
-        {visibleFilters.has('date') && (
-            <div className="flex items-center gap-2 bg-[#131C1B] border border-gray-800 rounded-lg pl-3">
-                <label className="text-xs font-semibold text-gray-400">From:</label>
-                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-transparent text-white focus:outline-none text-xs py-2"/>
-                <label className="text-xs font-semibold text-gray-400">To:</label>
-                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent text-white focus:outline-none text-xs py-2"/>
-                <button onClick={() => removeFilter('date')} className="p-2 text-gray-500 hover:text-white self-stretch hover:bg-gray-700/50 rounded-r-md"><XIcon className="w-4 h-4"/></button>
-            </div>
-        )}
-        {visibleFilters.has('recency') && (
-            <div className="flex items-center gap-1 bg-[#131C1B] border border-gray-800 rounded-lg pl-3">
-                <select value={relativeTimeCondition} onChange={(e) => setRelativeTimeCondition(e.target.value as any)} className="bg-transparent text-white focus:outline-none text-xs py-2">
-                    <option value="within">Within last</option>
-                    <option value="older_than">Older than</option>
-                </select>
-                <input 
-                    type="number" 
-                    value={relativeTimeValue} 
-                    onChange={(e) => setRelativeTimeValue(e.target.value)} 
-                    className="bg-transparent text-white focus:outline-none text-xs py-2 w-16 text-center"
-                    placeholder="e.g. 2"
-                />
-                <select value={relativeTimeUnit} onChange={(e) => setRelativeTimeUnit(e.target.value as any)} className="bg-transparent text-white focus:outline-none text-xs py-2">
-                    <option value="seconds">seconds</option>
-                    <option value="minutes">minutes</option>
-                    <option value="hours">hours</option>
-                    <option value="days">days</option>
-                    <option value="months">months</option>
-                    <option value="years">years</option>
-                </select>
-                <button onClick={() => removeFilter('recency')} className="p-2 text-gray-500 hover:text-white self-stretch hover:bg-gray-700/50 rounded-r-md"><XIcon className="w-4 h-4"/></button>
-            </div>
-        )}
-        
-        {availableFilters.length > 0 && (
-          <div className="relative" ref={addFilterButtonRef}>
-              <button onClick={() => setIsAddFilterOpen(prev => !prev)} className="flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-gray-800 border border-gray-700 rounded-lg shadow-sm hover:bg-gray-700 text-white">
-                  <PlusIcon className="w-4 h-4"/> Add Filter
+      {/* Global Filter Actions */}
+      {hasActiveFilters && (
+          <div className="flex items-center gap-1 border-l border-white/10 pl-3 h-10">
+              <button 
+                onClick={onClearFilters} 
+                className="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-gray-500 hover:text-red-400 transition-colors"
+              >
+                Reset
               </button>
-              {isAddFilterOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-40 bg-[#131C1B] border border-gray-700 rounded-md shadow-lg z-10 py-1">
-                      {availableFilters.map(filter => (
-                          <button key={filter.id} onClick={() => addFilter(filter.id)} className="w-full text-left px-3 py-1.5 text-xs text-white hover:bg-gray-800">
-                              {filter.name}
-                          </button>
-                      ))}
-                  </div>
-              )}
+              <button 
+                onClick={() => setSaveModalOpen(true)} 
+                className="flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-all h-10 shadow-lg shadow-emerald-500/5"
+              >
+                  <BookmarkPlusIcon className="w-3.5 h-3.5" /> Save
+              </button>
           </div>
-        )}
+      )}
 
-        {hasActiveFilters && (<button onClick={onClearFilters} className="px-3 py-2 text-xs font-semibold text-white hover:bg-gray-800 rounded-lg">Clear Filters</button>)}
-        
-        {hasActiveFilters && (
-            <>
-                {activeSegmentId && activeSegmentId !== 'all' && filtersHaveChanged ? (
-                    <button onClick={() => onUpdateSegment(activeSegmentId, { filters: currentFilters })} className="flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-gray-300 border border-gray-700 rounded-lg shadow-sm hover:bg-gray-400 text-black">
-                        <SaveIcon className="w-4 h-4" /> Update view
-                    </button>
-                ) : (
-                    <button onClick={() => setSaveModalOpen(true)} className="flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-gray-800 border border-gray-700 rounded-lg shadow-sm hover:bg-gray-700 text-white">
-                        <BookmarkPlusIcon className="w-4 h-4" /> Save as View
-                    </button>
-                )}
-            </>
-        )}
-      </div>
-
-      <SaveViewModal
-        isOpen={isSaveModalOpen}
-        onClose={() => setSaveModalOpen(false)}
-        onSave={async (name: string) => {
-            await onAddSegment(name, currentFilters);
-            setSaveModalOpen(false);
-        }}
-      />
+      <SaveViewModal isOpen={isSaveModalOpen} onClose={() => setSaveModalOpen(false)} onSave={async (name: string) => { await onAddSegment(name, currentFilters); setSaveModalOpen(false); }} />
     </div>
   );
 };

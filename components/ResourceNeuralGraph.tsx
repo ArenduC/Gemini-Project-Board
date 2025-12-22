@@ -118,7 +118,7 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
     }, []);
 
     return (
-        <div className="relative w-full h-[600px] bg-[#0D1117] rounded-3xl border border-white/5 overflow-hidden group">
+        <div className="relative w-full h-[600px] bg-[#0D1117] rounded-xl border border-white/5 overflow-hidden group">
             {/* Controls Overlay */}
             <div className="absolute top-6 left-6 z-10 flex flex-col gap-2">
                 <button onClick={() => setZoom(z => Math.min(z + 0.2, 3))} className="p-3 bg-[#1C2326] border border-white/10 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 transition-all shadow-xl"><ZoomInIcon className="w-5 h-5"/></button>
@@ -133,7 +133,7 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
 
             {/* Hint Overlay */}
             {hoveredNode && (
-                 <div className="absolute bottom-6 right-6 z-10 p-4 bg-[#131C1B]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl pointer-events-none animate-in fade-in slide-in-from-bottom-2">
+                 <div className="absolute bottom-6 right-6 z-10 p-4 bg-[#131C1B]/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl pointer-events-none animate-in fade-in slide-in-from-bottom-2">
                     <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Active Element</p>
                     <p className="text-sm font-bold text-white">
                         {graphData.nodes.find(n => n.id === hoveredNode)?.label}

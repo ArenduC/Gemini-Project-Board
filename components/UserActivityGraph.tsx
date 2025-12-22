@@ -61,81 +61,84 @@ export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, 
 
     return (
         <div className="space-y-12">
-            {userWorkloads.map(({ user, projectWorkload }) => (
-                <div key={user.id} className="relative">
-                    {/* User Anchor */}
-                    <div className="flex items-center gap-4 mb-6 sticky top-0 bg-[#131C1B]/95 backdrop-blur-md py-2 z-10 border-b border-white/5">
-                        <UserAvatar user={user} className="w-14 h-14 text-xl ring-4 ring-white/5" isOnline={onlineUsers.has(user.id)} />
-                        <div>
-                            <h3 className="text-lg font-bold text-white tracking-tight">{user.name}</h3>
-                            <div className="flex items-center gap-3">
-                                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{user.role}</span>
-                                <span className="w-1 h-1 rounded-full bg-gray-700" />
-                                <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">
-                                    {projectWorkload.reduce((acc, p) => acc + p.solvedCount, 0)} Solved Nodes
-                                </span>
+            {userWorkloads.map(({ user, projectWorkload }) => {
+                return (
+                    <div key={user.id} className="relative">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sticky top-0 bg-[#131C1B]/95 backdrop-blur-md py-3 z-10 border-b border-white/5">
+                            <div className="flex items-center gap-4">
+                                <UserAvatar user={user} className="w-14 h-14 text-xl ring-4 ring-white/5" isOnline={onlineUsers.has(user.id)} />
+                                <div>
+                                    <h3 className="text-lg font-bold text-white tracking-tight">{user.name}</h3>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{user.role}</span>
+                                        <span className="w-1 h-1 rounded-full bg-gray-700" />
+                                        <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">
+                                            {projectWorkload.reduce((acc, p) => acc + p.solvedCount, 0)} Nodes Solved
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-4 border-l-2 border-white/5">
-                        {projectWorkload.map(({ project, tasks, bugs }) => (
-                            <div key={project.id} className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-blue-500" />
-                                        {project.name}
-                                    </h4>
-                                    <span className="text-[10px] font-bold text-gray-500 uppercase">{tasks.length + bugs.length} Total</span>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pl-4 border-l-2 border-white/5">
+                            {projectWorkload.map(({ project, tasks, bugs }) => (
+                                <div key={project.id} className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                            {project.name}
+                                        </h4>
+                                        <span className="text-[10px] font-bold text-gray-500 uppercase">{tasks.length + bugs.length} Current Spike</span>
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                        {tasks.map(task => {
+                                            const { name, colorInfo, isDone } = getTaskStatus(task, project.board);
+                                            return (
+                                                <div 
+                                                    key={task.id}
+                                                    onClick={() => onTaskClick(task)}
+                                                    className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group/task
+                                                        ${isDone ? 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30' : 'bg-white/5 border-white/5 hover:border-white/10'}
+                                                    `}
+                                                >
+                                                    <CheckSquareIcon className={`w-4 h-4 ${isDone ? 'text-emerald-500' : 'text-gray-600 group-hover/task:text-gray-400'}`} />
+                                                    <p className={`flex-grow text-xs font-medium truncate ${isDone ? 'text-emerald-400/70 line-through' : 'text-white'}`}>
+                                                        {task.title}
+                                                    </p>
+                                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${colorInfo.bg} ${colorInfo.text}`}>
+                                                        {name}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                        {bugs.map(bug => {
+                                            const { name, colorInfo, isDone } = getBugStatus(bug);
+                                            return (
+                                                <div 
+                                                    key={bug.id}
+                                                    className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group/bug
+                                                        ${isDone ? 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30' : 'bg-red-500/5 border-red-500/10 hover:border-red-500/20'}
+                                                    `}
+                                                >
+                                                    <LifeBuoyIcon className={`w-4 h-4 ${isDone ? 'text-emerald-500' : 'text-red-500/50 group-hover/bug:text-red-500'}`} />
+                                                    <p className={`flex-grow text-xs font-medium truncate ${isDone ? 'text-emerald-400/70 line-through' : 'text-white'}`}>
+                                                        <span className="font-mono text-[10px] text-gray-600 mr-2">{bug.bugNumber}</span>
+                                                        {bug.title}
+                                                    </p>
+                                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${colorInfo.bg} ${colorInfo.text}`}>
+                                                        {name}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                                
-                                <div className="space-y-2">
-                                    {tasks.map(task => {
-                                        const { name, colorInfo, isDone } = getTaskStatus(task, project.board);
-                                        return (
-                                            <div 
-                                                key={task.id}
-                                                onClick={() => onTaskClick(task)}
-                                                className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group/task
-                                                    ${isDone ? 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30' : 'bg-white/5 border-white/5 hover:border-white/10'}
-                                                `}
-                                            >
-                                                <CheckSquareIcon className={`w-4 h-4 ${isDone ? 'text-emerald-500' : 'text-gray-600 group-hover/task:text-gray-400'}`} />
-                                                <p className={`flex-grow text-xs font-medium truncate ${isDone ? 'text-emerald-400/70 line-through' : 'text-white'}`}>
-                                                    {task.title}
-                                                </p>
-                                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${colorInfo.bg} ${colorInfo.text}`}>
-                                                    {name}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                    {bugs.map(bug => {
-                                        const { name, colorInfo, isDone } = getBugStatus(bug);
-                                        return (
-                                            <div 
-                                                key={bug.id}
-                                                className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group/bug
-                                                    ${isDone ? 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30' : 'bg-red-500/5 border-red-500/10 hover:border-red-500/20'}
-                                                `}
-                                            >
-                                                <LifeBuoyIcon className={`w-4 h-4 ${isDone ? 'text-emerald-500' : 'text-red-500/50 group-hover/bug:text-red-500'}`} />
-                                                <p className={`flex-grow text-xs font-medium truncate ${isDone ? 'text-emerald-400/70 line-through' : 'text-white'}`}>
-                                                    <span className="font-mono text-[10px] text-gray-600 mr-2">{bug.bugNumber}</span>
-                                                    {bug.title}
-                                                </p>
-                                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${colorInfo.bg} ${colorInfo.text}`}>
-                                                    {name}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </div>
-            ))}
+                );
+            })}
             {userWorkloads.length === 0 && (
                 <div className="py-20 text-center text-gray-500">
                     <p className="font-bold">No effort matches the current strategic filter.</p>
