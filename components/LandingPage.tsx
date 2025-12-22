@@ -57,7 +57,7 @@ export const LandingPage: React.FC<{ onShowPrivacy: () => void }> = ({ onShowPri
         loginSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
-    const imgFront = "https://zcxsscvheqidzvkhlnwz.supabase.co/storage/v1/object/public/Default%20image/image%2010.png";
+    const imgFront = "https://zcxsscvheqidzvkhlnwz.supabase.co/storage/v1/object/public/Default%20image/image%2012.png";
 
     return (
         <div className="min-h-screen bg-[#1C2326] selection:bg-gray-500 selection:text-white overflow-x-hidden">
