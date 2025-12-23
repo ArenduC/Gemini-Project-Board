@@ -1,6 +1,5 @@
-
 import { supabase } from './supabase';
-import { User, Project, NewTaskData, Task, AppState, ChatMessage, ProjectInviteLink, UserRole, Subtask, Sprint, FilterSegment, BugResponse } from '../types';
+import { User, Project, NewTaskData, Task, AppState, ChatMessage, ProjectInviteLink, UserRole, Subtask, Sprint, FilterSegment, BugResponse, Column } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
 
 /**
@@ -152,12 +151,33 @@ const fetchInitialData = async (userId: string): Promise<AppState> => {
         return { projects: {}, users: {}, projectOrder: [] };
     }
 
+    const rawProjects = rpcData.projects || [];
     const usersData = rpcData.users || [];
-    const projectsData = rpcData.projects || [];
     
+    // Robustly transform project data to match frontend interface
+    const processedProjects = rawProjects.map((p: any) => {
+        let board = p.board;
+        // The RPC returns columns as an array. We must preserve the array's order 
+        // as the definitive sequence (assuming the SQL sorts by position).
+        if (board && Array.isArray(board.columns)) {
+            const columnsArray = board.columns as Column[];
+            const columnsRecord = arrayToRecord(columnsArray);
+            
+            // Map the IDs in the exact order they came from the database
+            const columnOrder = columnsArray.map(c => c.id);
+            
+            board = {
+                ...board,
+                columns: columnsRecord,
+                columnOrder: columnOrder
+            };
+        }
+        return { ...p, board };
+    }) as Project[];
+
     const usersRecord = arrayToRecord(usersData as User[]);
-    const projectsRecord = arrayToRecord(projectsData as Project[]);
-    const projectOrder = projectsData.map((p: any) => p.id).sort((a: string, b: string) => a.localeCompare(b));
+    const projectsRecord = arrayToRecord(processedProjects);
+    const projectOrder = processedProjects.map((p: Project) => p.id);
 
     return {
         projects: projectsRecord,
@@ -179,7 +199,6 @@ const subscribeToProjectChat = (projectId: string, callback: (payload: any) => v
 };
 
 const moveTask = async (taskId: string, newColumnId: string, newPosition: number, actorId: string) => {
-    // Standardizing RPC call with explicit parameter names for move_task
     const { error } = await supabase.rpc('move_task', {
         task_id: taskId,
         new_column_id: newColumnId,
@@ -190,25 +209,11 @@ const moveTask = async (taskId: string, newColumnId: string, newPosition: number
         console.error("Error moving task via RPC:", error.message);
         throw error;
     }
-
-    // Optional: Log history of movement
-    try {
-        const { data: taskData } = await supabase.from('tasks').select('title').eq('id', taskId).single();
-        const { data: colData } = await supabase.from('columns').select('title').eq('id', newColumnId).single();
-        if (taskData && colData) {
-            await supabase.from('task_history').insert({
-                task_id: taskId,
-                user_id: actorId,
-                change_description: `moved this task to '${colData.title}'`,
-            });
-        }
-    } catch (e) {
-        // Silently fail history logging to avoid blocking DnD
-    }
 };
 
 const updateColumnOrder = async (projectId: string, newOrder: string[]) => {
-    // Calling the RPC function with specific parameter names to resolve PGRST203 ambiguity
+    // This MUST match the SQL function parameters exactly:
+    // target_project_id (UUID), new_order_ids (UUID[])
     const { error } = await supabase.rpc('update_column_order', { 
         target_project_id: projectId, 
         new_order_ids: newOrder 
@@ -287,7 +292,11 @@ const deleteTask = async (taskId: string) => {
 };
 
 const addColumn = async (projectId: string, title: string) => {
-    const { data, error } = await supabase.from('columns').insert({ project_id: projectId, title }).select().single();
+    const { data, error } = await supabase.from('columns').insert({ 
+        project_id: projectId, 
+        title,
+        position: 999 
+    }).select().single();
     if (error) throw error;
     return data;
 };
@@ -299,10 +308,12 @@ const deleteColumn = async (columnId: string) => {
 const addProject = async (name: string, description: string, creatorId: string) => {
     const { data, error } = await supabase.from('projects').insert({ name, description, creator_id: creatorId }).select().single();
     if (error) throw error;
-    // Standard default columns
-    await addColumn(data.id, 'To Do');
-    await addColumn(data.id, 'In Progress');
-    await addColumn(data.id, 'Done');
+    // Default Columns with positions
+    await supabase.from('columns').insert([
+        { project_id: data.id, title: 'To Do', position: 1 },
+        { project_id: data.id, title: 'In Progress', position: 2 },
+        { project_id: data.id, title: 'Done', position: 3 }
+    ]);
     return data;
 };
 

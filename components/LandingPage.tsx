@@ -148,7 +148,7 @@ export const LandingPage: React.FC<{ onShowPrivacy: () => void }> = ({ onShowPri
                             <img 
                                 src={imgFront} 
                                 alt="Graphynovus Terminal" 
-                                className="w-full h-auto grayscale-[0.2] contrast-[1.1] brightness-[0.9]"
+                                className="block w-full h-auto object-cover grayscale-[0.2] contrast-[1.1] brightness-[0.9]"
                             />
                         </div>
 

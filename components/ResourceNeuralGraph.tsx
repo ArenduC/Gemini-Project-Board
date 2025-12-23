@@ -36,8 +36,9 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
     const graphData = useMemo(() => {
         const nodes: Node[] = [];
         const edges: Edge[] = [];
-        const projectList = Object.values(projects);
-        const userList = Object.values(users);
+        // FIX: Explicitly cast Object.values to known types to resolve inference issues where properties were missing on type 'unknown'.
+        const projectList = Object.values(projects) as Project[];
+        const userList = Object.values(users) as User[];
 
         const centerX = 500;
         const centerY = 500;
@@ -71,7 +72,8 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
             // Create edges based on membership and tasks
             projectList.forEach(p => {
                 if (p.members.includes(u.id)) {
-                    const tasksInProject = Object.values(p.board.tasks).filter(t => t.assignee?.id === u.id).length;
+                    // FIX: Cast Object.values to Task[] to resolve type-safety issue.
+                    const tasksInProject = (Object.values(p.board.tasks) as Task[]).filter(t => t.assignee?.id === u.id).length;
                     edges.push({
                         source: u.id,
                         target: p.id,

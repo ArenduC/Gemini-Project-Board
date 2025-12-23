@@ -67,7 +67,8 @@ const MiniCalendar: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
 
     const maxEngagement = useMemo(() => {
         const values = Array.from(engagementMap.values());
-        return values.length > 0 ? Math.max(...values) : 1;
+        // FIX: Cast values to number[] to ensure type-safety for Math.max call.
+        return values.length > 0 ? Math.max(...(values as number[])) : 1;
     }, [engagementMap]);
 
     const getEngagementStyle = (day: number) => {
@@ -125,7 +126,7 @@ const MiniCalendar: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
                         <div 
                             key={d} 
                             title={count > 0 ? `${count} engagement nodes` : undefined}
-                            className={`aspect-square flex items-center justify-center rounded-lg text-[9px] transition-all cursor-default relative overflow-hidden
+                            className={`aspect-square flex items-center justify-center rounded-lg text-[9px] transition-all duration-300 cursor-default relative overflow-hidden
                                 ${isToday ? 'ring-1 ring-white/60' : ''}
                                 ${engagementClass}`}
                         >
@@ -195,9 +196,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
     const allTasks = useMemo(() => projects.flatMap(p => Object.values(p.board.tasks)), [projects]);
     const activeTasks = useMemo(() => {
         return projects.flatMap(p => {
-            const doneColumn = Object.values(p.board.columns).find(c => c.title.toLowerCase() === 'done');
-            const doneIds = new Set(doneColumn?.taskIds || []);
-            return Object.values(p.board.tasks).filter(t => !doneIds.has(t.id));
+            // FIX: Explicitly cast Object.values to Column[] and Task[] to resolve type-safety issues where properties were being accessed on unknown.
+            const doneColumn = (Object.values(p.board.columns) as Column[]).find(c => c.title.toLowerCase() === 'done');
+            const doneTaskIds = new Set(doneColumn?.taskIds || []);
+            return (Object.values(p.board.tasks) as Task[]).filter(t => !doneTaskIds.has(t.id));
         });
     }, [projects]);
 

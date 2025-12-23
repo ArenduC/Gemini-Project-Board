@@ -3,11 +3,13 @@ import React from 'react';
 type IconProps = React.SVGProps<SVGSVGElement>;
 
 export const AppLogo: React.FC<{ className?: string }> = ({ className = "w-6 h-6" }) => (
-    <img 
-        src="https://zcxsscvheqidzvkhlnwz.supabase.co/storage/v1/object/public/Default%20image/Union%20(1).png" 
-        alt="Graphynovus Logo" 
-        className={`${className} object-contain`} 
-    />
+    <div className={`${className} flex items-center justify-center overflow-hidden aspect-square`}>
+        <img 
+            src="https://zcxsscvheqidzvkhlnwz.supabase.co/storage/v1/object/public/Default%20image/Union%20(1).png" 
+            alt="Graphynovus" 
+            className="max-w-full max-h-full w-auto h-auto object-contain" 
+        />
+    </div>
 );
 
 export const SunIcon: React.FC<IconProps> = (props) => (
@@ -269,7 +271,6 @@ export const VideoIcon: React.FC<IconProps> = (props) => (
   </svg>
 );
 
-// FIX: Add missing icons used across the app
 export const RotateCwIcon: React.FC<IconProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />

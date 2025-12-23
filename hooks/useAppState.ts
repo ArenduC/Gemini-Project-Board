@@ -25,11 +25,12 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     }
     setLoading(true);
     try {
-        const { projects, users, projectOrder } = await api.data.fetchInitialData(userId);
-        const freshState = { projects, users, projectOrder };
+        const freshState = await api.data.fetchInitialData(userId);
         const cacheKey = `gemini-board-cache-${userId}`;
         
         try {
+            // When fetching from DB, this is the ABSOLUTE source of truth.
+            // Overwrite cache entirely.
             localStorage.setItem(cacheKey, JSON.stringify(freshState));
         } catch (e) {
             console.warn("Could not save state to cache:", e);
@@ -132,39 +133,44 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
 
   const onDragEnd = useCallback(async (projectId: string, result: DropResult) => {
     const { destination, source, draggableId, type } = result;
-    if (!destination || !currentUser) return;
+    if (!destination || !currentUser || !userId) return;
 
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
     
     const project = state.projects[projectId];
     if (!project) return;
 
+    const cacheKey = `gemini-board-cache-${userId}`;
+
     // --- HANDLE COLUMN DRAGGING ---
     if (type === 'column') {
-        const newColumnOrder = Array.from(project.board.columnOrder);
+        const newColumnOrder = Array.from(project.board.columnOrder) as string[];
         newColumnOrder.splice(source.index, 1);
         newColumnOrder.splice(destination.index, 0, draggableId);
 
-        // Immutable update for Column Order
-        setState(prevState => ({
-          ...prevState,
-          projects: {
-            ...prevState.projects,
-            [projectId]: {
-              ...prevState.projects[projectId],
-              board: {
-                ...prevState.projects[projectId].board,
-                columnOrder: newColumnOrder
-              }
-            }
-          }
-        }));
+        setState(prevState => {
+            const updatedState = {
+                ...prevState,
+                projects: {
+                    ...prevState.projects,
+                    [projectId]: {
+                        ...prevState.projects[projectId],
+                        board: {
+                            ...prevState.projects[projectId].board,
+                            columnOrder: newColumnOrder
+                        }
+                    }
+                }
+            };
+            localStorage.setItem(cacheKey, JSON.stringify(updatedState));
+            return updatedState;
+        });
 
         try {
             await api.data.updateColumnOrder(projectId, newColumnOrder);
         } catch (error) {
             console.error("Error updating column order:", error);
-            await fetchData(); // Revert on failure
+            await fetchData(); // Revert from DB on failure
         }
         return;
     }
@@ -185,7 +191,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         newStartTaskIds.splice(destination.index, 0, draggableId);
     }
 
-    // Immutable update for Tasks within Columns
     setState(prevState => {
       const updatedColumns = {
         ...prevState.projects[projectId].board.columns,
@@ -193,7 +198,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         [endCol.id]: { ...endCol, taskIds: newEndTaskIds }
       };
 
-      return {
+      const updatedState = {
         ...prevState,
         projects: {
           ...prevState.projects,
@@ -206,6 +211,8 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
           }
         }
       };
+      localStorage.setItem(cacheKey, JSON.stringify(updatedState));
+      return updatedState;
     });
 
     try {
@@ -215,11 +222,11 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         await fetchData(); // Revert on failure
     }
 
-  }, [state, currentUser, fetchData]);
+  }, [state, currentUser, userId, fetchData]);
   
   const updateTask = useCallback(async (projectId: string, updatedTask: Task) => {
       if (!currentUser) return;
-      await api.data.updateTask(updatedTask, currentUser.id, Object.values(state.users));
+      await api.data.updateTask(updatedTask, currentUser.id, Object.values(state.users) as User[]);
       await fetchData();
   }, [fetchData, currentUser, state.users]);
 
@@ -527,10 +534,10 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     await fetchData();
   }, [fetchData]);
 
-  const updateFilterSegment = useCallback(async (segmentId: string, updates: { name?: string, filters?: FilterSegment['filters'] }) => {
+  const updateFilterSegment = async (segmentId: string, updates: { name?: string, filters?: FilterSegment['filters'] }) => {
     await api.data.updateFilterSegment(segmentId, updates);
     await fetchData();
-  }, [fetchData]);
+  };
 
   const deleteFilterSegment = useCallback(async (segmentId: string) => {
     await api.data.deleteFilterSegment(segmentId);

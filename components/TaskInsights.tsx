@@ -104,7 +104,8 @@ const NeuralEquilibrium: React.FC<{ data: Record<string, number>, total: number 
         const radius = 38;
         const circumference = 2 * Math.PI * radius;
         
-        return Object.entries(data).map(([label, count], i) => {
+        // FIX: Cast Object.entries to resolve arithmetic operation type errors where 'count' was seen as unknown.
+        return (Object.entries(data) as [string, number][]).map(([label, count], i) => {
             const percentage = (count / total) * 100;
             const strokeDasharray = `${((percentage * circumference) / 100) - 2} ${circumference}`;
             const offset = (cumulative * circumference) / 100;
