@@ -93,6 +93,7 @@ const signUp = async ({ email, password, name }: { email: string, password: stri
 };
 
 const sendPasswordResetEmail = async (email: string) => {
+    // Simplify redirectTo to match the exact protocol/origin without extra logic
     return await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin,
     });
@@ -306,21 +307,34 @@ const deleteColumn = async (columnId: string) => {
 };
 
 const addProject = async (name: string, description: string, creatorId: string) => {
-    const { data, error } = await supabase.from('projects').insert({ name, description, creator_id: creatorId }).select().single();
-    if (error) throw error;
+    const { data: project, error: projectError } = await supabase.from('projects').insert({ name, description, creator_id: creatorId }).select().single();
+    if (projectError) throw projectError;
+
+    // IMPORTANT: Add the creator to project_members table. 
+    // The dashboard view (and initial data RPC) typically filters by membership.
+    const { error: memberError } = await supabase.from('project_members').insert({ project_id: project.id, user_id: creatorId });
+    if (memberError) {
+        console.error("Warning: Could not add creator as initial member:", memberError);
+    }
+
     // Default Columns with positions
     await supabase.from('columns').insert([
-        { project_id: data.id, title: 'To Do', position: 1 },
-        { project_id: data.id, title: 'In Progress', position: 2 },
-        { project_id: data.id, title: 'Done', position: 3 }
+        { project_id: project.id, title: 'To Do', position: 1 },
+        { project_id: project.id, title: 'In Progress', position: 2 },
+        { project_id: project.id, title: 'Done', position: 3 }
     ]);
-    return data;
+    
+    return project;
 };
 
 const createProjectShell = async (name: string, description: string, creatorId: string) => {
-    const { data, error } = await supabase.from('projects').insert({ name, description, creator_id: creatorId }).select().single();
-    if (error) throw error;
-    return data;
+    const { data: project, error: projectError } = await supabase.from('projects').insert({ name, description, creator_id: creatorId }).select().single();
+    if (projectError) throw projectError;
+
+    // Add creator to membership for the shell project as well
+    await supabase.from('project_members').insert({ project_id: project.id, user_id: creatorId });
+
+    return project;
 };
 
 const deleteProject = async (projectId: string) => {

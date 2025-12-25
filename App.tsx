@@ -266,10 +266,11 @@ const AppContent: React.FC = () => {
         const { data: { subscription } } = api.auth.onAuthStateChange((event, session) => {
             if (event === 'PASSWORD_RECOVERY') {
                 setIsResettingPassword(true);
-            } else if (isResettingPassword) {
-                // Clear the flag on any other event if it was set.
+            } else if (event === 'SIGNED_OUT') {
                 setIsResettingPassword(false);
             }
+            // Note: We don't automatically clear isResettingPassword on SIGNED_IN 
+            // because SIGNED_IN fires immediately when clicking a recovery link.
             setSession(session);
         });
 
@@ -646,8 +647,7 @@ const AppContent: React.FC = () => {
     const handleResetSuccess = async () => {
         // After password is successfully reset, sign out to force re-login.
         await api.auth.signOut();
-        // The onAuthStateChange listener will handle setting the user/session to null,
-        // and isResettingPassword is now handled within that listener as well.
+        setIsResettingPassword(false);
     };
     
     const handleFeedbackSubmit = async (feedbackData: {

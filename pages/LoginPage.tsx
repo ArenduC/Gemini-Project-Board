@@ -55,6 +55,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
         setLoading(false);
     };
 
+    const navigateToSignup = (msg: string) => {
+        setError(msg);
+        setTimeout(() => {
+            setError('');
+            setMode('signUp');
+        }, 2500);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -64,17 +72,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
         if (mode === 'forgotPassword') {
             const { error } = await api.auth.sendPasswordResetEmail(email);
             if (error) {
-                setError(error.message);
+                const msg = error.message.toLowerCase();
+                // "Error sending recovery email" is Supabase's generic failure string
+                if (msg.includes('user not found') || msg.includes('not registered')) {
+                    navigateToSignup('Account not found. Redirecting to Sign Up...');
+                } else if (msg.includes('rate limit') || msg.includes('too many requests')) {
+                    setError('Too many attempts. Please wait 15-60 minutes before trying again.');
+                } else if (msg.includes('error sending recovery email')) {
+                    setError('Recovery failed. Please ensure the email is correct or try again in an hour (rate limit).');
+                } else if (msg.includes('network') || msg.includes('fetch')) {
+                    setError('Network error. Please check your connection and try again.');
+                } else {
+                    setError(error.message);
+                }
             } else {
-                setSuccessMessage("Password reset link sent! Please check your email.");
+                setSuccessMessage("If an account exists for this email, a reset link has been sent!");
             }
         } else if (mode === 'signIn') {
             const { error } = await api.auth.signInWithPassword({ email, password });
             if (error) {
-                if (error.message.toLowerCase().includes('email not confirmed')) {
+                const msg = error.message.toLowerCase();
+                if (msg.includes('email not confirmed')) {
                     setMode('awaitingConfirmation');
                     setSuccessMessage('');
                     setError('');
+                } else if (msg.includes('invalid login credentials') || msg.includes('user not found') || msg.includes('not registered')) {
+                    navigateToSignup('Account not found. Redirecting to Sign Up...');
                 } else {
                     setError(error.message);
                 }
@@ -228,8 +251,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onShowPrivacy }) => {
                 )}
 
                 {error && (
-                    <div className="p-3 bg-red-900/20 border border-red-800/50 rounded-lg">
-                        <p className="text-xs text-red-400 text-center">{error}</p>
+                    <div className="p-3 bg-red-900/20 border border-red-800/50 rounded-lg animate-pulse">
+                        <p className="text-xs text-red-400 text-center font-bold">{error}</p>
                     </div>
                 )}
                 {successMessage && (
