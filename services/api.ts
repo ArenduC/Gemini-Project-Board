@@ -93,7 +93,6 @@ const signUp = async ({ email, password, name }: { email: string, password: stri
 };
 
 const sendPasswordResetEmail = async (email: string) => {
-    // Simplify redirectTo to match the exact protocol/origin without extra logic
     return await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin,
     });
@@ -155,16 +154,23 @@ const fetchInitialData = async (userId: string): Promise<AppState> => {
     const rawProjects = rpcData.projects || [];
     const usersData = rpcData.users || [];
     
-    // Robustly transform project data to match frontend interface
     const processedProjects = rawProjects.map((p: any) => {
         let board = p.board;
-        // The RPC returns columns as an array. We must preserve the array's order 
-        // as the definitive sequence (assuming the SQL sorts by position).
+        
+        // --- DATA SANITY CHECK: Ensure tasks have valid arrays for tags ---
+        if (board && board.tasks) {
+            Object.keys(board.tasks).forEach(taskId => {
+                const task = board.tasks[taskId];
+                if (!task.tags || !Array.isArray(task.tags)) {
+                    task.tags = [];
+                }
+            });
+        }
+
+        // --- COLUMNS ORDERING ---
         if (board && Array.isArray(board.columns)) {
             const columnsArray = board.columns as Column[];
             const columnsRecord = arrayToRecord(columnsArray);
-            
-            // Map the IDs in the exact order they came from the database
             const columnOrder = columnsArray.map(c => c.id);
             
             board = {
@@ -173,7 +179,15 @@ const fetchInitialData = async (userId: string): Promise<AppState> => {
                 columnOrder: columnOrder
             };
         }
-        return { ...p, board };
+        
+        return { 
+            ...p, 
+            board,
+            filterSegments: p.filterSegments || [],
+            bugs: p.bugs || {},
+            bugOrder: p.bugOrder || [],
+            members: p.members || [] 
+        };
     }) as Project[];
 
     const usersRecord = arrayToRecord(usersData as User[]);
@@ -213,8 +227,6 @@ const moveTask = async (taskId: string, newColumnId: string, newPosition: number
 };
 
 const updateColumnOrder = async (projectId: string, newOrder: string[]) => {
-    // This MUST match the SQL function parameters exactly:
-    // target_project_id (UUID), new_order_ids (UUID[])
     const { error } = await supabase.rpc('update_column_order', { 
         target_project_id: projectId, 
         new_order_ids: newOrder 
@@ -226,30 +238,34 @@ const updateColumnOrder = async (projectId: string, newOrder: string[]) => {
 };
 
 const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) => {
-    const { data: oldTask } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('id', updatedTask.id)
-        .single();
+    // Note: We use RPC to handle text array tags safely
+    const { error } = await supabase.rpc('update_task_v2', {
+        task_id_param: updatedTask.id,
+        title_param: updatedTask.title,
+        description_param: updatedTask.description,
+        priority_param: updatedTask.priority,
+        assignee_id_param: updatedTask.assignee?.id || null,
+        due_date_param: updatedTask.dueDate || null,
+        sprint_id_param: updatedTask.sprintId || null,
+        tags_param: updatedTask.tags || []
+    });
 
-    if (oldTask) {
-        if (oldTask.title !== updatedTask.title) {
-            await supabase.from('task_history').insert({ task_id: updatedTask.id, user_id: actorId, change_description: `changed the title to "${updatedTask.title}"` });
-        }
-        if (oldTask.priority !== updatedTask.priority) {
-            await supabase.from('task_history').insert({ task_id: updatedTask.id, user_id: actorId, change_description: `set the priority to ${updatedTask.priority}` });
+    if (error) {
+        console.error("Supabase RPC error updating task:", error.message, error.code);
+        // Fallback for older schemas that don't have the RPC updated yet
+        if (error.code === 'P0001' || error.message.includes('tags')) {
+             await supabase.from('tasks').update({
+                title: updatedTask.title,
+                description: updatedTask.description,
+                priority: updatedTask.priority,
+                assignee_id: updatedTask.assignee?.id || null,
+                due_date: updatedTask.dueDate || null,
+                sprint_id: updatedTask.sprintId || null
+            }).eq('id', updatedTask.id);
+        } else {
+            throw error;
         }
     }
-
-    await supabase.from('tasks').update({
-        title: updatedTask.title,
-        description: updatedTask.description,
-        priority: updatedTask.priority,
-        assignee_id: updatedTask.assignee?.id || null,
-        due_date: updatedTask.dueDate || null,
-        sprint_id: updatedTask.sprintId || null,
-        tags: updatedTask.tags
-    }).eq('id', updatedTask.id);
 };
 
 const addSubtasks = async (taskId: string, subtasks: Partial<Subtask>[], creatorId: string) => {
@@ -276,7 +292,8 @@ const addTask = async (taskData: NewTaskData, creatorId: string) => {
         assignee_id: taskData.assigneeId || null,
         due_date: taskData.dueDate || null,
         sprint_id: taskData.sprintId || null,
-        creator_id: creatorId
+        creator_id: creatorId,
+        tags: [] 
     }).select().single();
     if (error) throw error;
     return data;
@@ -310,14 +327,11 @@ const addProject = async (name: string, description: string, creatorId: string) 
     const { data: project, error: projectError } = await supabase.from('projects').insert({ name, description, creator_id: creatorId }).select().single();
     if (projectError) throw projectError;
 
-    // IMPORTANT: Add the creator to project_members table. 
-    // The dashboard view (and initial data RPC) typically filters by membership.
     const { error: memberError } = await supabase.from('project_members').insert({ project_id: project.id, user_id: creatorId });
     if (memberError) {
         console.error("Warning: Could not add creator as initial member:", memberError);
     }
 
-    // Default Columns with positions
     await supabase.from('columns').insert([
         { project_id: project.id, title: 'To Do', position: 1 },
         { project_id: project.id, title: 'In Progress', position: 2 },
@@ -331,7 +345,6 @@ const createProjectShell = async (name: string, description: string, creatorId: 
     const { data: project, error: projectError } = await supabase.from('projects').insert({ name, description, creator_id: creatorId }).select().single();
     if (projectError) throw projectError;
 
-    // Add creator to membership for the shell project as well
     await supabase.from('project_members').insert({ project_id: project.id, user_id: creatorId });
 
     return project;

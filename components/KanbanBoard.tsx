@@ -3,7 +3,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautif
 import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority, AiGeneratedTaskFromFile, Sprint, BugResponse } from '../types';
 import { Column } from './Column';
 import { Filters } from './Filters';
-import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon, RocketIcon, DownloadIcon, XIcon, SparklesIcon, ZapIcon } from './Icons';
+import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon, RocketIcon, DownloadIcon, XIcon, SparklesIcon, ZapIcon, TrashIcon } from './Icons';
 import { ProjectChat } from './ProjectChat';
 import { AiTaskCreator } from './AiTaskCreator';
 import { TaskGraphView } from './TaskGraphView';
@@ -20,6 +20,7 @@ import { BulkUpdateSprintModal } from './BulkUpdateSprintModal';
 import { CompleteSprintModal } from './CompleteSprintModal';
 import { exportAugmentedTasksToCsv } from '../utils/export';
 import { AugmentedTask } from '../types';
+import { useConfirmation } from '../App';
 
 
 interface KanbanBoardProps {
@@ -96,9 +97,9 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
       <button
         ref={buttonRef}
         onClick={() => setIsEditing(true)}
-        className="flex items-center gap-2 px-4 py-2 bg-white text-black text-[10px] font-black uppercase tracking-[0.15em] rounded-xl shadow-lg hover:bg-gray-200 transition-all h-10"
+        className="flex items-center gap-2 px-4 py-2 bg-white text-black text-[9px] font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-gray-200 transition-all h-9"
       >
-        <PlusIcon className="w-4 h-4" />
+        <PlusIcon className="w-3.5 h-3.5" />
         Add Column
       </button>
       {isEditing && (
@@ -222,6 +223,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [isAiNexusOpen, setIsAiNexusOpen] = useState(false);
 
   const boardData = project.board;
+  const requestConfirmation = useConfirmation();
   
   const handleNavigateToBug = (bugNumber: string) => {
     setProjectView('bugs');
@@ -295,6 +297,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const handleClearFilters = () => {
     handleApplySegment('all');
   }
+
+  const handleDeleteSegmentConfirmation = (segment: FilterSegment) => {
+    requestConfirmation({
+        title: 'Delete Saved View',
+        message: <>Are you sure you want to delete the saved view <strong>"{segment.name}"</strong>? This cannot be undone.</>,
+        onConfirm: async () => {
+            await deleteFilterSegment(segment.id);
+            if (activeSegmentId === segment.id) {
+                handleApplySegment('all');
+            }
+        },
+        confirmText: 'Delete',
+    });
+  };
 
   const processFileWithAI = async (fileData: { content: string; mimeType: string }, headersToInclude: string[]) => {
     setIsAiParsing(true);
@@ -550,32 +566,42 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       <div className="space-y-4 mb-6">
         {/* Row 1: Segment Tabs */}
         {!['bugs', 'sprints'].includes(projectView) && (
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 px-1">
             <button 
               onClick={() => handleApplySegment('all')} 
-              className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all ${activeSegmentId === 'all' ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+              className={`px-4 py-1.5 text-[9px] font-black uppercase tracking-[0.15em] rounded-full transition-all flex-shrink-0 ${activeSegmentId === 'all' ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-gray-300'}`}
             >
-              All Tasks
+              All Scope
             </button>
             {(project.filterSegments || []).map(segment => (
-              <button 
-                key={segment.id} 
-                onClick={() => handleApplySegment(segment.id)} 
-                className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all ${activeSegmentId === segment.id ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-              >
-                {segment.name}
-              </button>
+              <div key={segment.id} className="relative group flex-shrink-0">
+                  <button 
+                    onClick={() => handleApplySegment(segment.id)} 
+                    className={`pl-4 ${activeSegmentId === segment.id ? 'pr-9' : 'pr-4'} py-1.5 text-[9px] font-black uppercase tracking-[0.15em] rounded-full transition-all ${activeSegmentId === segment.id ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-gray-300'}`}
+                  >
+                    {segment.name}
+                  </button>
+                  {activeSegmentId === segment.id && (
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteSegmentConfirmation(segment); }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-black hover:text-red-600 transition-colors"
+                        title="Delete view"
+                    >
+                        <XIcon className="w-3 h-3" />
+                    </button>
+                  )}
+              </div>
             ))}
           </div>
         )}
 
         {/* Row 2: Unified Neural Control Bar */}
-        <div className="bg-[#131C1B]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-2 flex flex-wrap items-center justify-between gap-4 shadow-2xl relative z-40">
+        <div className="bg-[#131C1B]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-2.5 flex flex-wrap items-center justify-between gap-4 shadow-2xl relative z-40">
           <div className="flex-grow flex items-center gap-4 min-w-0">
             {projectView === 'bugs' ? (
-                <div className="flex items-center gap-3 px-4 h-10">
+                <div className="flex items-center gap-3 px-4 h-9">
                     <LifeBuoyIcon className="w-5 h-5 text-emerald-400" />
-                    <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white">Bug Tracker</h3>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">Bug Tracker</h3>
                 </div>
             ) : !['bugs', 'sprints'].includes(projectView) ? (
               <Filters
@@ -619,43 +645,40 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           </div>
 
           <div className="flex items-center gap-4 flex-shrink-0">
-            {/* View Selection */}
-            <div className="flex items-center gap-3 border-l border-white/10 pl-4 h-10">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden sm:block">View</span>
-              <div className="flex items-center p-1 bg-white/5 rounded-xl border border-white/5">
-                <button onClick={() => handleSetProjectView('board')} className={`p-2 rounded-lg transition-all ${projectView === 'board' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`} title="Board View"><LayoutDashboardIcon className="w-4 h-4" /></button>
-                <button onClick={() => handleSetProjectView('table')} className={`p-2 rounded-lg transition-all ${projectView === 'table' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`} title="Table View"><TableIcon className="w-4 h-4" /></button>
-                <button onClick={() => handleSetProjectView('graph')} className={`p-2 rounded-lg transition-all ${projectView === 'graph' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`} title="Graph View"><GitBranchIcon className="w-4 h-4" /></button>
-                <button onClick={() => handleSetProjectView('bugs')} className={`p-2 rounded-lg transition-all ${projectView === 'bugs' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`} title="Bug Tracker"><LifeBuoyIcon className="w-4 h-4" /></button>
-                <button onClick={() => handleSetProjectView('sprints')} className={`p-2 rounded-lg transition-all ${projectView === 'sprints' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`} title="Sprints"><RocketIcon className="w-4 h-4" /></button>
+            <div className="flex items-center gap-3 border-l border-white/10 pl-4 h-9">
+              <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest hidden sm:block">View</span>
+              <div className="flex items-center p-0.5 bg-white/5 rounded-xl border border-white/5 h-8">
+                <button onClick={() => handleSetProjectView('board')} className={`p-1.5 rounded-lg transition-all ${projectView === 'board' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Board View"><LayoutDashboardIcon className="w-3.5 h-3.5" /></button>
+                <button onClick={() => handleSetProjectView('table')} className={`p-1.5 rounded-lg transition-all ${projectView === 'table' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Table View"><TableIcon className="w-3.5 h-3.5" /></button>
+                <button onClick={() => handleSetProjectView('graph')} className={`p-1.5 rounded-lg transition-all ${projectView === 'graph' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Graph View"><GitBranchIcon className="w-3.5 h-3.5" /></button>
+                <button onClick={() => handleSetProjectView('bugs')} className={`p-1.5 rounded-lg transition-all ${projectView === 'bugs' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Bug Tracker"><LifeBuoyIcon className="w-3.5 h-3.5" /></button>
+                <button onClick={() => handleSetProjectView('sprints')} className={`p-1.5 rounded-lg transition-all ${projectView === 'sprints' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Sprints"><RocketIcon className="w-3.5 h-3.5" /></button>
               </div>
             </div>
 
-            {/* Actions */}
             <div className="flex items-center gap-2">
               {projectView === 'bugs' ? (
                 <>
                   <button
                     onClick={() => setBugTrigger({ type: 'export' })}
-                    className="flex items-center justify-center w-10 h-10 bg-white/5 border border-white/5 text-gray-400 rounded-xl hover:bg-white/10 hover:text-white transition-all shadow-xl"
-                    title="Export bugs to CSV"
+                    className="flex items-center justify-center w-9 h-9 bg-white/5 border border-white/5 text-gray-500 rounded-xl hover:bg-white/10 hover:text-white transition-all shadow-xl"
+                    title="Export bugs"
                   >
-                    <DownloadIcon className="w-4 h-4" />
+                    <DownloadIcon className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => setBugTrigger({ type: 'import' })}
-                    className="flex items-center gap-2 px-4 h-10 bg-white/5 border border-white/5 text-gray-400 rounded-xl hover:bg-white/10 hover:text-white transition-all shadow-xl text-[10px] font-black uppercase tracking-widest"
+                    className="flex items-center gap-2 px-3 h-9 bg-white/5 border border-white/5 text-gray-400 rounded-xl hover:bg-white/10 hover:text-white transition-all shadow-xl text-[9px] font-black uppercase tracking-widest"
                   >
-                    <SparklesIcon className="w-4 h-4 text-emerald-400" />
+                    <SparklesIcon className="w-3.5 h-3.5 text-emerald-400" />
                     <span className="hidden sm:inline">Import</span>
                   </button>
                   <button
                     onClick={() => setBugTrigger({ type: 'create' })}
-                    className="flex items-center gap-2 px-5 h-10 bg-white text-black rounded-xl hover:bg-gray-200 transition-all shadow-xl shadow-white/5 text-[10px] font-black uppercase tracking-widest"
+                    className="flex items-center gap-2 px-4 h-9 bg-white text-black rounded-xl hover:bg-gray-200 transition-all shadow-xl shadow-white/5 text-[9px] font-black uppercase tracking-widest"
                   >
-                    <PlusIcon className="w-4 h-4" />
+                    <PlusIcon className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Report Bug</span>
-                    <span className="sm:hidden">Report</span>
                   </button>
                 </>
               ) : !['bugs', 'sprints'].includes(projectView) && (
@@ -663,20 +686,19 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   {aiFeaturesEnabled && (
                     <button
                         onClick={() => setIsAiNexusOpen(true)}
-                        className="group flex items-center gap-2 px-4 h-10 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-all shadow-xl shadow-emerald-500/5 text-[10px] font-black uppercase tracking-widest overflow-hidden relative"
+                        className="group flex items-center gap-2 px-3 h-9 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-all shadow-xl text-[9px] font-black uppercase tracking-widest overflow-hidden relative"
                     >
-                        <span className="absolute inset-0 bg-emerald-400/10 opacity-0 group-hover:opacity-100 transition-opacity animate-pulse" />
-                        <SparklesIcon className="w-4 h-4 animate-pulse" />
+                        <SparklesIcon className="w-3.5 h-3.5 animate-pulse" />
                         <span className="relative z-10 hidden sm:inline">Neural Nexus</span>
                         <span className="relative z-10 sm:hidden">AI</span>
                     </button>
                   )}
                   <button
                     onClick={handleExport}
-                    className="flex items-center justify-center w-10 h-10 bg-white/5 border border-white/5 text-gray-400 rounded-xl hover:bg-white/10 hover:text-white transition-all shadow-xl"
-                    title="Export tasks to CSV"
+                    className="flex items-center justify-center w-9 h-9 bg-white/5 border border-white/5 text-gray-500 rounded-xl hover:bg-white/10 hover:text-white transition-all shadow-xl"
+                    title="Export tasks"
                   >
-                    <DownloadIcon className="w-4 h-4" />
+                    <DownloadIcon className="w-3.5 h-3.5" />
                   </button>
                   {projectView === 'board' && (
                     <AddColumn onAddColumn={addColumn} />

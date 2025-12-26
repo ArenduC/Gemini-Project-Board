@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, User, AugmentedTask, Task, FilterSegment, Column, Sprint } from '../types';
-import { DownloadIcon } from '../components/Icons';
+import { DownloadIcon, XIcon } from '../components/Icons';
 import { exportAugmentedTasksToCsv } from '../utils/export';
 import { TaskListRow } from '../components/TaskListRow';
 import { Filters } from '../components/Filters';
 import { Pagination } from '../components/Pagination';
 import { TaskInsights } from '../components/TaskInsights';
+import { useConfirmation } from '../App';
 
 interface TasksPageProps {
   projects: Record<string, Project>;
@@ -36,6 +37,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
 
+  const requestConfirmation = useConfirmation();
   const storageKey = 'tasks-page-segments';
 
   useEffect(() => {
@@ -74,12 +76,22 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   };
 
   const handleDeleteSegment = async (segmentId: string) => {
-    const updatedSegments = segments.filter(s => s.id !== segmentId);
-    setSegments(updatedSegments);
-    saveSegmentsToStorage(updatedSegments);
-    if (activeSegmentId === segmentId) {
-      handleClearFilters();
-    }
+    const segment = segments.find(s => s.id === segmentId);
+    if (!segment) return;
+
+    requestConfirmation({
+        title: 'Delete Saved View',
+        message: <>Are you sure you want to delete the saved view <strong>"{segment.name}"</strong> from your local storage?</>,
+        onConfirm: () => {
+            const updatedSegments = segments.filter(s => s.id !== segmentId);
+            setSegments(updatedSegments);
+            saveSegmentsToStorage(updatedSegments);
+            if (activeSegmentId === segmentId) {
+              handleClearFilters();
+            }
+        },
+        confirmText: 'Delete'
+    });
   };
 
   const handleUpdateSegment = async (segmentId: string, updates: { name?: string, filters?: FilterSegment['filters'] }) => {
@@ -287,6 +299,35 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
       </div>
       
       <div className="mb-4">
+        {/* Segment Tabs for Global View */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-3 mb-1">
+            <button 
+                onClick={() => handleApplySegment('all')} 
+                className={`px-4 py-1.5 flex-shrink-0 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all ${activeSegmentId === 'all' ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+            >
+                All Scope
+            </button>
+            {segments.map(segment => (
+                <div key={segment.id} className="relative group flex-shrink-0">
+                    <button 
+                        onClick={() => handleApplySegment(segment.id)} 
+                        className={`pl-4 ${activeSegmentId === segment.id ? 'pr-8' : 'pr-4'} py-1.5 text-[10px] font-bold uppercase tracking-widest rounded-full transition-all ${activeSegmentId === segment.id ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+                    >
+                        {segment.name}
+                    </button>
+                    {activeSegmentId === segment.id && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeleteSegment(segment.id); }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-black hover:text-red-600 transition-colors"
+                            title="Delete this view"
+                        >
+                            <XIcon className="w-3 h-3" />
+                        </button>
+                    )}
+                </div>
+            ))}
+        </div>
+
         <Filters
             projectId="all-tasks"
             currentUser={currentUser}
@@ -340,7 +381,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
                     <TaskListRow key={task.id} task={task} onClick={onTaskClick} users={users} />
                 ))
             ) : (
-                <div className="p-16 text-center text-gray-500 font-mono text-xs italic">
+                <div className="p-16 text-center text-gray-500 font-mono text-xs italic uppercase tracking-widest">
                     NO NEURAL TASKS FOUND IN SCOPE
                 </div>
             )}

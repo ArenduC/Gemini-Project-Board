@@ -487,9 +487,15 @@ const AppContent: React.FC = () => {
   };
 
   const projectForSelectedTask = selectedTask ? findProjectForTask(selectedTask.id) : null;
-  const projectMembersForModal = projectForSelectedTask
-    ? projectForSelectedTask.members.map(id => state.users[id]).filter(Boolean)
-    : [];
+  
+  // Robustly derive project members for the modal. 
+  // It checks the project's member IDs and looks them up in the global user state.
+  const projectMembersForModal = useMemo(() => {
+    if (!projectForSelectedTask) return [];
+    return projectForSelectedTask.members
+      .map(id => state.users[id])
+      .filter((u): u is User => !!u);
+  }, [projectForSelectedTask, state.users]);
   
   const allProjectTagsForModal = useMemo(() => {
     if (!projectForSelectedTask) return [];
@@ -504,7 +510,22 @@ const AppContent: React.FC = () => {
   const handleUpdateTask = async (updatedTaskData: Task) => {
     const project = findProjectForTask(updatedTaskData.id);
     if (project) {
-        await updateTask(project.id, updatedTaskData);
+        try {
+            await updateTask(project.id, updatedTaskData);
+        } catch (error: any) {
+            console.error("Task update error details:", error);
+            const msg = error?.message || "Unknown error";
+            const code = error?.code || "";
+            
+            // Detailed debugging for common Supabase permission issues
+            if (msg.toLowerCase().includes("policy") || msg.toLowerCase().includes("permission") || code === "42501") {
+                alert("Permission Denied: Only project members (and in some cases only the creator) can modify this task. Please check your Supabase RLS policies for the 'tasks' table.");
+            } else if (msg.toLowerCase().includes("not find") || code === "PGRST204") {
+                alert(`Schema Error: The database reported that it couldn't find a column (likely 'tags'). Your schema might be out of sync. Error: ${msg}`);
+            } else {
+                alert(`Failed to update task: ${msg}. If you are not the task creator, this might be an RLS permission restriction.`);
+            }
+        }
     }
   };
 
