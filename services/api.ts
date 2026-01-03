@@ -477,14 +477,14 @@ const submitFeedback = async (feedbackData: any) => {
 };
 
 const getInviteLinksForProject = async (projectId: string) => {
-    const { data, error } = await supabase.from('project_invite_links').select('*').eq('project_id', projectId);
+    const { data, error } = await supabase.from('project_invites').select('*').eq('project_id', projectId);
     if (error) throw error;
     return data;
 };
 
 const createInviteLink = async (projectId: string, creatorId: string, role: UserRole, expiresDays: number | null) => {
     const expiresAt = expiresDays ? new Date(Date.now() + expiresDays * 24 * 60 * 60 * 1000).toISOString() : null;
-    await supabase.from('project_invite_links').insert({
+    await supabase.from('project_invites').insert({
         project_id: projectId,
         created_by: creatorId,
         role,
@@ -494,7 +494,7 @@ const createInviteLink = async (projectId: string, creatorId: string, role: User
 };
 
 const updateInviteLink = async (linkId: string, updates: any) => {
-    await supabase.from('project_invite_links').update(updates).eq('id', linkId);
+    await supabase.from('project_invites').update(updates).eq('id', linkId);
 };
 
 /**

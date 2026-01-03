@@ -1,9 +1,10 @@
+
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority, AiGeneratedTaskFromFile, Sprint, BugResponse } from '../types';
 import { Column } from './Column';
 import { Filters } from './Filters';
-import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon, RocketIcon, DownloadIcon, XIcon, SparklesIcon, ZapIcon, TrashIcon } from './Icons';
+import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon, RocketIcon, DownloadIcon, XIcon, SparklesIcon, ZapIcon, TrashIcon, LinkIcon, CheckIcon } from './Icons';
 import { ProjectChat } from './ProjectChat';
 import { AiTaskCreator } from './AiTaskCreator';
 import { TaskGraphView } from './TaskGraphView';
@@ -204,6 +205,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [initialBugSearch, setInitialBugSearch] = useState<string>('');
 
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>('all');
+  const [copiedViewId, setCopiedViewId] = useState<string | null>(null);
   
   const [tasksToConfirm, setTasksToConfirm] = useState<AiGeneratedTaskFromFile[] | null>(null);
   const [isAiParsing, setIsAiParsing] = useState(false);
@@ -274,6 +276,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const handleApplySegment = (segmentId: string | null) => {
       setActiveSegmentId(segmentId);
+      
+      // Update URL hash to reflect the active view for sharing
+      const currentPath = window.location.hash.split('?')[0];
+      if (segmentId && segmentId !== 'all') {
+          window.location.hash = `${currentPath}?view=${segmentId}`;
+      } else {
+          window.location.hash = currentPath;
+      }
+
       if (segmentId === 'all' || segmentId === null) {
           setSearchTerm('');
           setPriorityFilter([]);
@@ -292,6 +303,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             applySegmentFilters(segment)
           }
       }
+  };
+
+  const handleCopyViewLink = (e: React.MouseEvent, segmentId: string) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}${window.location.pathname}${window.location.hash}`;
+    navigator.clipboard.writeText(url);
+    setCopiedViewId(segmentId);
+    setTimeout(() => setCopiedViewId(null), 2000);
   };
 
   const handleClearFilters = () => {
@@ -577,18 +596,27 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               <div key={segment.id} className="relative group flex-shrink-0">
                   <button 
                     onClick={() => handleApplySegment(segment.id)} 
-                    className={`pl-4 ${activeSegmentId === segment.id ? 'pr-9' : 'pr-4'} py-1.5 text-[9px] font-black uppercase tracking-[0.15em] rounded-full transition-all ${activeSegmentId === segment.id ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-gray-300'}`}
+                    className={`pl-4 ${activeSegmentId === segment.id ? 'pr-14' : 'pr-4'} py-1.5 text-[9px] font-black uppercase tracking-[0.15em] rounded-full transition-all ${activeSegmentId === segment.id ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-gray-300'}`}
                   >
                     {segment.name}
                   </button>
                   {activeSegmentId === segment.id && (
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); handleDeleteSegmentConfirmation(segment); }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-black hover:text-red-600 transition-colors"
-                        title="Delete view"
-                    >
-                        <XIcon className="w-3 h-3" />
-                    </button>
+                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                        <button 
+                            onClick={(e) => handleCopyViewLink(e, segment.id)}
+                            className="w-5 h-5 flex items-center justify-center text-black hover:text-emerald-600 transition-colors"
+                            title="Copy shareable link"
+                        >
+                            {copiedViewId === segment.id ? <CheckIcon className="w-3 h-3" /> : <LinkIcon className="w-3 h-3" />}
+                        </button>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeleteSegmentConfirmation(segment); }}
+                            className="w-5 h-5 flex items-center justify-center text-black hover:text-red-600 transition-colors"
+                            title="Delete view"
+                        >
+                            <XIcon className="w-3 h-3" />
+                        </button>
+                    </div>
                   )}
               </div>
             ))}
@@ -727,6 +755,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       ) : projectView === 'sprints' ? (
         <SprintsPage
             project={project}
+            // FIX: Using the correct destructured prop name 'addSprint'.
             onAddSprint={addSprint}
             onUpdateSprint={updateSprint}
             onDeleteSprint={deleteSprint}
