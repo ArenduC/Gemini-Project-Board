@@ -1,9 +1,9 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { TaskPriority, Project, User, ProjectLink, AiGeneratedProjectPlan, AiGeneratedTaskFromFile, BugResponse } from "../types";
+import { GEMINI_API_KEY } from "../config";
 
-// FIX: Initialize GoogleGenAI exclusively using process.env.API_KEY as per guidelines.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Initialize GoogleGenAI using the key from config.ts as requested.
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 // Helper to handle API errors consistently
 const handleApiError = (error: unknown, action: string) => {
@@ -250,7 +250,6 @@ export const generateSubtasks = async (title: string, description: string): Prom
       Main Task Description: "${description}"
     `;
 
-    // FIX: Use gemini-3-flash-preview model.
     const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
@@ -280,7 +279,6 @@ export const generateTaskFromPrompt = async (prompt: string): Promise<TaskRespon
             User Request: "${prompt}"
         `;
 
-        // FIX: Use gemini-3-flash-preview model.
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: fullPrompt,
@@ -321,7 +319,6 @@ export const performGlobalSearch = async (query: string, projects: Record<string
             If no matches are found for a category, return an empty array for it. Respond with only the JSON object.
         `;
 
-        // FIX: Use gemini-3-pro-preview for complex search tasks.
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
             contents: prompt,
@@ -348,7 +345,6 @@ export const interpretVoiceCommand = async (command: string, context: any): Prom
             Return ONLY the JSON object.
         `;
 
-        // FIX: Use gemini-3-pro-preview for complex instruction following.
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
             contents: prompt,
@@ -374,7 +370,6 @@ export const generateProjectLinks = async (projectName: string, projectDescripti
             suggest relevant links for development and management (e.g., GitHub, Figma). Provide valid URLs.
         `;
 
-        // FIX: Use gemini-3-flash-preview.
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: prompt,
@@ -401,7 +396,6 @@ export const generateProjectFromCsv = async (csvContent: string): Promise<AiGene
             Ensure the output is ONLY the JSON object matching the schema.
         `;
 
-        // FIX: Use gemini-3-pro-preview for complex data extraction.
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
             contents: prompt,
@@ -431,7 +425,6 @@ export const generateBugsFromFile = async (fileContent: string, headersToInclude
             File Content: --- ${fileContent} ---
         `;
 
-        // FIX: Use gemini-3-pro-preview.
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
             contents: prompt,
@@ -474,7 +467,6 @@ export const generateTasksFromFile = async (fileData: { content: string; mimeTyp
                 { inlineData: { mimeType: fileData.mimeType, data: fileData.content } }
             ]};
 
-        // FIX: Use gemini-3-pro-preview.
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
             contents: contents,
