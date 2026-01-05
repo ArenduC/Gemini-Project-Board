@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, ReactNode, useLayoutEffect } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
@@ -183,13 +183,22 @@ const AppContent: React.FC = () => {
       window.location.hash = safePath;
   }, []);
 
+  // Capture invitation tokens IMMEDIATELY before layout/rendering
+  useLayoutEffect(() => {
+      const pathname = window.location.pathname;
+      if (pathname.startsWith('/invite/')) {
+          const token = pathname.split('/invite/')[1];
+          if (token) {
+              localStorage.setItem('project_invite_token', token);
+              // Clean up URL to root so SPA routing works properly
+              window.history.replaceState({}, '', '/');
+              setLocationPath('/');
+          }
+      }
+  }, []);
+
   // Derive view and active project ID from the URL hash or path
   const { view, activeProjectId } = useMemo(() => {
-    // Check path first for invite
-    if (locationPath.startsWith('/invite/')) {
-        return { view: 'invite' as View, activeProjectId: null };
-    }
-
     const path = (locationHash.startsWith('#') ? locationHash.substring(1) : locationHash).split('?')[0] || '/';
 
     if (path.startsWith('/projects/')) {
@@ -200,8 +209,9 @@ const AppContent: React.FC = () => {
     if (path === '/resources') return { view: 'resources' as View, activeProjectId: null };
     if (path === '/privacy') return { view: 'privacy' as View, activeProjectId: null };
     
+    // Fallback/Default
     return { view: 'dashboard' as View, activeProjectId: null };
-  }, [locationHash, locationPath]);
+  }, [locationHash]);
 
   // Feature Flags
   const [featureFlags, setFeatureFlags] = useState({
@@ -368,36 +378,29 @@ const AppContent: React.FC = () => {
 
     useEffect(() => {
         const handleInvite = async () => {
-            const pathname = window.location.pathname;
-            const urlToken = pathname.startsWith('/invite/') ? pathname.split('/invite/')[1] : null;
-            const token = urlToken || localStorage.getItem('project_invite_token');
+            const token = localStorage.getItem('project_invite_token');
 
-            if (token) {
-                if (currentUser) {
-                    setIsJoiningProject(true);
-                    localStorage.removeItem('project_invite_token'); 
-                    try {
-                        const joinedProject = await api.data.acceptInvite(token);
-                        console.log(`Successfully joined project: ${joinedProject.name}`);
-                        // Clean URL and move to project
-                        window.history.replaceState({}, '', '/');
-                        window.location.hash = `/projects/${joinedProject.id}`;
-                    } catch (error) {
-                        console.error(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                        window.history.replaceState({}, '', '/');
-                        window.location.hash = '/';
-                    } finally {
-                        setIsJoiningProject(false);
-                    }
-                } else {
-                    // Store token for post-login
-                    localStorage.setItem('project_invite_token', token);
+            if (token && currentUser) {
+                setIsJoiningProject(true);
+                localStorage.removeItem('project_invite_token'); 
+                try {
+                    const joinedProject = await api.data.acceptInvite(token);
+                    console.log(`Successfully joined project: ${joinedProject.name}`);
+                    // Force navigation to the project board using hash
+                    window.location.hash = `#/projects/${joinedProject.id}`;
+                } catch (error) {
+                    console.error(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                    window.location.hash = '#/';
+                } finally {
+                    setIsJoiningProject(false);
                 }
             }
         };
 
-        handleInvite();
-    }, [currentUser]);
+        if (currentUser && !appStateLoading) {
+            handleInvite();
+        }
+    }, [currentUser, appStateLoading]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -698,7 +701,7 @@ const AppContent: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#1C2326]">
         <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
-        <p className="mt-4 text-sm font-semibold text-gray-400">{isJoiningProject ? 'Joining project...' : 'Restoring your session...'}</p>
+        <p className="mt-4 text-sm font-semibold text-gray-400">{isJoiningProject ? 'Joining project node...' : 'Restoring your session...'}</p>
       </div>
     );
   }
@@ -909,13 +912,13 @@ const AppContent: React.FC = () => {
               {view === 'privacy' && (
                   <PrivacyPolicyPage isEmbedded={true} />
               )}
-              {(view === 'invite' || isJoiningProject) && (
+              {isJoiningProject && (
                   <div className="flex flex-col items-center justify-center pt-20">
                       <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
                       <p className="mt-4 text-sm font-semibold text-gray-400">Finalizing project alignment...</p>
                   </div>
               )}
-              {view === 'project' && !activeProject && (
+              {view === 'project' && !activeProject && !isJoiningProject && (
                 <div className="text-center pt-20 text-gray-400">
                   <h2 className="text-lg font-bold text-white">Project Not Found</h2>
                   <p className="mt-2">The project may have been deleted or you don't have access.</p>
