@@ -2,31 +2,60 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TaskPriority, Project, User, ProjectLink, AiGeneratedProjectPlan, AiGeneratedTaskFromFile, BugResponse } from "../types";
 
-// Always use named parameter for initialization
-// process.env.API_KEY is handled by the execution environment
+// The API key must be obtained exclusively from the environment variable process.env.API_KEY
+// We initialize a single instance for the service.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
-const handleApiError = (error: unknown, action: string) => {
-    console.error(`Error calling Gemini API for ${action}:`, error);
-    if (error instanceof Error) {
-        if (error.message.includes('token count exceeds')) {
-            throw new Error("Neural capacity exceeded. Use a smaller data segment.");
-        }
-        if (error.message.includes('API key expired') || error.message.includes('API_KEY_INVALID')) {
-            throw new Error("Neural link expired. Please renew your API credentials.");
-        }
+const handleApiError = (error: any, action: string) => {
+    console.error(`Neural Link Error [${action}]:`, error);
+    
+    // Extract specific error details if available from the Google GenAI SDK
+    const message = error?.message || "Unknown neural interference.";
+    
+    if (message.includes('400') || message.includes('INVALID_ARGUMENT')) {
+        throw new Error("Neural protocol mismatch (400). This often means the selected model is not yet available for your API key tier in this region.");
     }
-    throw new Error(`Neural processing failed during ${action}.`);
+    if (message.includes('403') || message.includes('PERMISSION_DENIED')) {
+        throw new Error("Neural access denied (403). Please verify your API key permissions and billing status.");
+    }
+    if (message.includes('401') || message.includes('API_KEY_INVALID')) {
+        throw new Error("Neural link unauthorized (401). Your API key is invalid or has expired.");
+    }
+    
+    throw new Error(`Neural processing failed: ${message}`);
 };
 
-const truncateContent = (text: string, maxChars: number = 200000): string => {
+const truncateContent = (text: string, maxChars: number = 100000): string => {
     if (!text || typeof text !== 'string') return "";
-    return text.length <= maxChars ? text : text.substring(0, maxChars) + "... [TRUNCATED]";
+    return text.length <= maxChars ? text : text.substring(0, maxChars) + "... [DATA TRUNCATED]";
 };
 
-interface SubtaskResponse {
-    title: string;
+// --- INTERFACES ---
+
+// FIX: Added missing VoiceCommandAction export for App.tsx
+export interface VoiceCommandAction {
+    action: 'CREATE_TASK' | 'MOVE_TASK' | 'ASSIGN_TASK' | 'NAVIGATE' | 'OPEN_LINK' | 'UNKNOWN';
+    params: {
+        title: string;
+        description?: string;
+        priority?: TaskPriority;
+        taskTitle?: string;
+        targetColumnName?: string;
+        assigneeName?: string;
+        destination?: string;
+        linkTitle?: string;
+        reason?: string;
+    };
 }
+
+// FIX: Added missing SearchResponse export for GlobalSearchModal.tsx
+export interface SearchResponse {
+    projects: string[];
+    tasks: string[];
+    users: string[];
+}
+
+// --- SCHEMAS ---
 
 const subtaskResponseSchema = {
     type: Type.ARRAY,
@@ -39,13 +68,6 @@ const subtaskResponseSchema = {
     },
 };
 
-export interface TaskResponse {
-    title: string;
-    description: string;
-    priority: TaskPriority;
-    dueDate?: string;
-}
-
 const taskResponseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -57,12 +79,6 @@ const taskResponseSchema = {
     required: ["title", "description", "priority"]
 };
 
-export interface SearchResponse {
-    projects: string[];
-    tasks: string[];
-    users: string[];
-}
-
 const searchResponseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -72,14 +88,6 @@ const searchResponseSchema = {
     },
     required: ["projects", "tasks", "users"]
 };
-
-export type VoiceCommandAction = 
-  | { action: 'CREATE_TASK', params: { title: string, description?: string, priority?: TaskPriority } }
-  | { action: 'MOVE_TASK', params: { taskTitle: string, targetColumnName: string } }
-  | { action: 'ASSIGN_TASK', params: { taskTitle: string, assigneeName: string } }
-  | { action: 'NAVIGATE', params: { destination: string } }
-  | { action: 'OPEN_LINK', params: { linkTitle: string } }
-  | { action: 'UNKNOWN', params: { reason: string } };
 
 const voiceCommandResponseSchema = {
     type: Type.OBJECT,
@@ -103,28 +111,39 @@ const voiceCommandResponseSchema = {
     required: ['action', 'params']
 };
 
-export const generateSubtasks = async (title: string, description: string): Promise<SubtaskResponse[]> => {
+// --- SERVICE METHODS ---
+
+export const generateSubtasks = async (title: string, description: string): Promise<{title: string}[]> => {
   try {
     const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Deconstruct task into subtasks:\nTitle: ${title}\nContext: ${description}`,
-        config: { responseMimeType: "application/json", responseSchema: subtaskResponseSchema },
+        contents: `Deconstruct this task into a JSON array of subtasks. Title: ${title}. Context: ${description}`,
+        config: { 
+            responseMimeType: "application/json", 
+            responseSchema: subtaskResponseSchema 
+        },
     });
-    return JSON.parse(response.text || "[]");
+    // Access .text property directly (do not call as function)
+    const text = response.text || "[]";
+    return JSON.parse(text);
   } catch (error) {
     handleApiError(error, 'generate subtasks');
     return [];
   }
 };
 
-export const generateTaskFromPrompt = async (prompt: string): Promise<TaskResponse> => {
+export const generateTaskFromPrompt = async (prompt: string): Promise<any> => {
     try {
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
-            contents: `Generate a structured task from requirements: ${prompt}`,
-            config: { responseMimeType: "application/json", responseSchema: taskResponseSchema },
+            contents: `Synthesize a structured task object from this requirement: ${prompt}`,
+            config: { 
+                responseMimeType: "application/json", 
+                responseSchema: taskResponseSchema 
+            },
         });
-        return JSON.parse(response.text || "{}");
+        const text = response.text || "{}";
+        return JSON.parse(text);
     } catch (error) {
         handleApiError(error, 'generate task');
         throw error;
@@ -140,10 +159,14 @@ export const performGlobalSearch = async (query: string, projects: Record<string
         };
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
-            contents: `Identify IDs for "${query}" in context:\n${JSON.stringify(context)}`,
-            config: { responseMimeType: "application/json", responseSchema: searchResponseSchema },
+            contents: `Search query: "${query}". Context: ${JSON.stringify(context)}. Return matching IDs.`,
+            config: { 
+                responseMimeType: "application/json", 
+                responseSchema: searchResponseSchema 
+            },
         });
-        return JSON.parse(response.text || '{"projects":[], "tasks":[], "users":[]}');
+        const text = response.text || '{"projects":[], "tasks":[], "users":[]}';
+        return JSON.parse(text);
     } catch (error) {
         handleApiError(error, 'search');
         return { projects: [], tasks: [], users: [] };
@@ -154,13 +177,17 @@ export const interpretVoiceCommand = async (command: string, context: any): Prom
     try {
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
-            contents: `Interpret command: "${command}" with context:\n${JSON.stringify(context)}`,
-            config: { responseMimeType: "application/json", responseSchema: voiceCommandResponseSchema },
+            contents: `Command: "${command}". Context: ${JSON.stringify(context)}. Identify action and params.`,
+            config: { 
+                responseMimeType: "application/json", 
+                responseSchema: voiceCommandResponseSchema 
+            },
         });
-        return JSON.parse(response.text || "{}");
+        const text = response.text || "{}";
+        return JSON.parse(text);
     } catch (error) {
         handleApiError(error, 'process voice');
-        return { action: 'UNKNOWN', params: { reason: "Parsing failure." } } as any;
+        return { action: 'UNKNOWN', params: { reason: "Neural parsing failed." } };
     }
 };
 
@@ -168,10 +195,11 @@ export const generateProjectLinks = async (projectName: string, projectDescripti
     try {
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
-            contents: `Suggest URLs for: ${projectName} (${projectDescription}). JSON array of {title, url}`,
+            contents: `Generate suggested resource URLs for project: ${projectName}. Description: ${projectDescription}. Return JSON array of {title, url}.`,
             config: { responseMimeType: "application/json" },
         });
-        return JSON.parse(response.text || "[]");
+        const text = response.text || "[]";
+        return JSON.parse(text);
     } catch (error) {
         handleApiError(error, 'generate links');
         return [];
@@ -182,10 +210,11 @@ export const generateProjectFromCsv = async (csvContent: string): Promise<AiGene
     try {
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
-            contents: `Create project plan from CSV:\n${truncateContent(csvContent)}`,
+            contents: `Create a full project plan (name, description, columns, tasks) from this CSV data:\n${truncateContent(csvContent)}`,
             config: { responseMimeType: "application/json" },
         });
-        return JSON.parse(response.text || "{}");
+        const text = response.text || "{}";
+        return JSON.parse(text);
     } catch (error) {
         handleApiError(error, 'parse project');
         throw error;
@@ -196,10 +225,11 @@ export const generateBugsFromFile = async (fileContent: string, headers: string[
     try {
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
-            contents: `Find bugs in file (Headers: ${headers.join(',')}). Content:\n${truncateContent(fileContent)}`,
+            contents: `Extract bugs from this file. Headers: ${headers.join(',')}. Content:\n${truncateContent(fileContent)}`,
             config: { responseMimeType: "application/json" },
         });
-        return JSON.parse(response.text || "[]");
+        const text = response.text || "[]";
+        return JSON.parse(text);
     } catch (error) {
         handleApiError(error, 'parse bugs');
         return [];
@@ -209,7 +239,7 @@ export const generateBugsFromFile = async (fileContent: string, headers: string[
 export const generateTasksFromFile = async (fileData: { content: string; mimeType: string }, columnNames: string[], headers: string[]): Promise<AiGeneratedTaskFromFile[]> => {
     try {
         const isText = fileData.mimeType.startsWith('text/') || fileData.mimeType === 'application/json' || fileData.mimeType === 'text/csv';
-        const instruction = `Extract tasks for columns: ${columnNames.join(',')}. Headers: ${headers.join(',')}.`;
+        const instruction = `Extract tasks for these columns: ${columnNames.join(',')}. Data headers: ${headers.join(',')}. Return JSON array.`;
 
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
@@ -219,7 +249,8 @@ export const generateTasksFromFile = async (fileData: { content: string; mimeTyp
             config: { responseMimeType: "application/json" },
         });
 
-        return JSON.parse(response.text || "[]");
+        const text = response.text || "[]";
+        return JSON.parse(text);
     } catch (error) {
         handleApiError(error, 'parse tasks from file');
         return [];
