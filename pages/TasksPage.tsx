@@ -146,9 +146,15 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   };
 
   const allTasks = useMemo((): AugmentedTask[] => {
-    return (Object.values(projects) as Project[]).flatMap(project =>
-      (Object.values(project.board.tasks) as Task[]).map(task => {
-        const column = (Object.values(project.board.columns) as Column[]).find(c => c.taskIds.includes(task.id));
+    return (Object.values(projects) as Project[]).flatMap(project => {
+      const board = project.board;
+      if (!board?.tasks) return [];
+      
+      const tasks = Object.values(board.tasks) as Task[];
+      const columns = board.columns ? (Object.values(board.columns) as Column[]) : [];
+
+      return tasks.map(task => {
+        const column = columns.find(c => c.taskIds.includes(task.id));
         return {
           ...task,
           projectId: project.id,
@@ -156,8 +162,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
           columnId: column?.id || '',
           columnName: column?.title || 'Uncategorized',
         };
-      })
-    );
+      });
+    });
   }, [projects]);
 
   const uniqueAssignees = useMemo(() => {
@@ -170,9 +176,11 @@ export const TasksPage: React.FC<TasksPageProps> = ({ projects, users, currentUs
   const allStatuses = useMemo(() => {
     const statusSet = new Set<string>();
     (Object.values(projects) as Project[]).forEach(project => {
-      (Object.values(project.board.columns) as Column[]).forEach(column => {
-        statusSet.add(column.title);
-      });
+      if (project.board?.columns) {
+        (Object.values(project.board.columns) as Column[]).forEach(column => {
+          statusSet.add(column.title);
+        });
+      }
     });
     return Array.from(statusSet).sort();
   }, [projects]);

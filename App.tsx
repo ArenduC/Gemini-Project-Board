@@ -12,7 +12,6 @@ import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './components/LandingPage';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import CallbackPage from './pages/CallbackPage';
-// FIX: Import `Column` type to be used in casting.
 import { User, Task, TaskPriority, NewTaskData, Project, ChatMessage, FeedbackType, Column, Subtask, AiGeneratedTaskFromFile, Sprint, BugResponse } from './types';
 import { api } from './services/api';
 import { Session, RealtimeChannel } from '@supabase/supabase-js';
@@ -178,7 +177,6 @@ const AppContent: React.FC = () => {
 
   // Navigation function using hash
   const navigate = useCallback((path: string) => {
-      // Ensure path starts with a slash
       const safePath = path.startsWith('/') ? path : `/${path}`;
       window.location.hash = safePath;
   }, []);
@@ -186,7 +184,6 @@ const AppContent: React.FC = () => {
   // Derive view and active project ID from the URL hash
   const { view, activeProjectId } = useMemo(() => {
     const path = (locationHash.startsWith('#') ? locationHash.substring(1) : locationHash).split('?')[0] || '/';
-
 
     if (path.startsWith('/projects/')) {
         const id = path.split('/')[2];
@@ -218,7 +215,6 @@ const AppContent: React.FC = () => {
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
   const appState = useAppState(session, currentUser, activeProjectId);
-  // FIX: Added `updateProjectMembers` to the destructuring to make it available in the component's scope.
   const { state, loading: appStateLoading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, updateUserProfile, deleteProject, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch, updateProjectMembers, addTasksBatch, addSprint, updateSprint, deleteSprint, bulkUpdateTaskSprint, completeSprint, addFilterSegment, updateFilterSegment, deleteFilterSegment } = appState;
 
   const hasData = useMemo(() => Object.keys(state.projects).length > 0 || Object.keys(state.users).length > 0, [state]);
@@ -226,7 +222,6 @@ const AppContent: React.FC = () => {
   const activeProject = activeProjectId ? state.projects[activeProjectId] : null;
   const projectToManageMembers = projectForMemberManagementId ? state.projects[projectForMemberManagementId] : null;
 
-    // Listen to hash changes
     useEffect(() => {
         const onHashChange = () => {
             setLocationHash(window.location.hash);
@@ -238,19 +233,13 @@ const AppContent: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        // This effect helps prevent race conditions and issues with third-party libraries
-        // like react-beautiful-dnd on initial load by ensuring the app is "settled"
-        // before rendering complex, stateful components.
-        const timer = setTimeout(() => setIsAppReady(true), 50); // Small delay is sufficient
+        const timer = setTimeout(() => setIsAppReady(true), 50);
         return () => clearTimeout(timer);
     }, []);
 
-    // Effect 1: Manages the session object and the initial loading state.
-    // It's responsible for making sure the "Restoring session..." screen ALWAYS goes away.
     useEffect(() => {
         setIsAuthLoading(true);
 
-        // Check the initial session state when the app loads.
         api.auth.getSession()
             .then(({ data: { session } }) => {
                 setSession(session);
@@ -262,32 +251,25 @@ const AppContent: React.FC = () => {
                 setIsAuthLoading(false);
             });
 
-        // Listen for any subsequent changes in auth state (login, logout, etc.).
         const { data: { subscription } } = api.auth.onAuthStateChange((event, session) => {
             if (event === 'PASSWORD_RECOVERY') {
                 setIsResettingPassword(true);
             } else if (event === 'SIGNED_OUT') {
                 setIsResettingPassword(false);
             }
-            // Note: We don't automatically clear isResettingPassword on SIGNED_IN 
-            // because SIGNED_IN fires immediately when clicking a recovery link.
             setSession(session);
         });
 
         return () => {
             subscription.unsubscribe();
         };
-    }, []); // Runs only once on mount.
+    }, []);
 
-    // Effect 2: Reacts to changes in the session to fetch the user's profile.
-    // This keeps the profile data in sync with the auth session.
     useEffect(() => {
-        // If there's a user object in the session, we need to ensure we have a profile.
         if (session?.user) {
             const resolveUserProfile = async () => {
                 try {
                     let userProfile = await api.auth.getUserProfile(session.user.id);
-                    // Self-healing: if a user is authenticated but has no profile, create one.
                     if (!userProfile) {
                         console.log("No user profile found, creating one.");
                         userProfile = await api.auth.createUserProfile(session.user!);
@@ -295,18 +277,15 @@ const AppContent: React.FC = () => {
                     setCurrentUser(userProfile);
                 } catch (error) {
                     console.error("Error resolving user profile:", error);
-                    // If we can't get a profile for a valid session, something is wrong. Sign out.
                     api.auth.signOut();
                 }
             };
             resolveUserProfile();
         } else {
-            // If the session is null, there is no current user.
             setCurrentUser(null);
         }
-    }, [session]); // This should only depend on `session`.
+    }, [session]);
 
-    // Effect for Supabase Presence
     useEffect(() => {
       if (session?.user && api.realtime.isConfigured()) {
         const channel = api.realtime.getPresenceChannel();
@@ -360,14 +339,12 @@ const AppContent: React.FC = () => {
       }
     }, [activeProject, currentUser, isChatOpen]);
 
-    // Effect to calculate initial unread counts from localStorage on data load
     useEffect(() => {
         if (!currentUser || Object.keys(state.projects).length === 0) return;
 
         const initialUnreadCounts: Record<string, number> = {};
         for (const project of Object.values(state.projects) as Project[]) {
             const lastRead = getLastReadTimestamp(project.id, currentUser.id);
-            // Count messages that are not from the current user and are newer than the last read timestamp.
             const unreadCount = project.chatMessages.filter(
                 msg => msg.author.id !== currentUser.id && new Date(msg.createdAt).getTime() > new Date(lastRead || 0).getTime()
             ).length;
@@ -379,33 +356,27 @@ const AppContent: React.FC = () => {
     }, [state.projects, currentUser]);
 
 
-    // Effect to handle invite link from URL
     useEffect(() => {
         const handleInvite = async () => {
-            const token = localStorage.getItem('project_invite_token') || (window.location.pathname.startsWith('/invite/') ? window.location.pathname.split('/invite/')[1] : null);
+            const pathname = window.location.pathname;
+            const urlToken = pathname.startsWith('/invite/') ? pathname.split('/invite/')[1] : null;
+            const token = urlToken || localStorage.getItem('project_invite_token');
 
             if (token && currentUser) {
                 localStorage.removeItem('project_invite_token'); 
                 try {
                     const joinedProject = await api.data.acceptInvite(token);
-                    // Can't use alert, will just log.
                     console.log(`Successfully joined project: ${joinedProject.name}`);
-                    // Force a full page reload by adding a query parameter. This ensures the new project
-                    // data is fetched correctly and avoids race conditions where the database update from
-                    // accepting the invite hasn't propagated before the app's state is re-fetched.
-                    window.location.assign(`/?c=${Date.now()}#/projects/${joinedProject.id}`);
+                    // Redirect to the new project view using hash routing
+                    window.location.assign(`/#/projects/${joinedProject.id}`);
                 } catch (error) {
                     console.error(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                    if (window.location.pathname.startsWith('/invite/')) {
-                       window.location.assign('/#/'); // Redirect home on failure
-                    }
-                }
-            } else if (token && !currentUser) {
-                localStorage.setItem('project_invite_token', token);
-                if (window.location.pathname.startsWith('/invite/')) {
-                    // Redirect to login page, the token is saved.
+                    // If accept fails, just go home
                     window.location.assign('/#/');
                 }
+            } else if (token && !currentUser) {
+                // If not logged in, store the token and let them see the landing/login page
+                localStorage.setItem('project_invite_token', token);
             }
         };
 
@@ -424,10 +395,8 @@ const AppContent: React.FC = () => {
     };
   }, []);
   
-  // Effect to update the modal's task data when the global state changes
   useEffect(() => {
       if (selectedTask) {
-          // FIX: Cast Object.values to the correct type to avoid type inference issues.
           for (const project of Object.values(state.projects) as Project[]) {
               if (project.board.tasks[selectedTask.id]) {
                   setSelectedTask(project.board.tasks[selectedTask.id]);
@@ -482,14 +451,11 @@ const AppContent: React.FC = () => {
   };
 
   const findProjectForTask = (taskId: string) => {
-    // FIX: Cast Object.values to the correct type to avoid type inference issues.
     return (Object.values(state.projects) as Project[]).find(p => p.board.tasks[taskId]);
   };
 
   const projectForSelectedTask = selectedTask ? findProjectForTask(selectedTask.id) : null;
   
-  // Robustly derive project members for the modal. 
-  // It checks the project's member IDs and looks them up in the global user state.
   const projectMembersForModal = useMemo(() => {
     if (!projectForSelectedTask) return [];
     return projectForSelectedTask.members
@@ -500,7 +466,6 @@ const AppContent: React.FC = () => {
   const allProjectTagsForModal = useMemo(() => {
     if (!projectForSelectedTask) return [];
     const tags = new Set<string>();
-    // FIX: Cast Object.values to the correct type to avoid type inference issues.
     (Object.values(projectForSelectedTask.board.tasks) as Task[]).forEach(task => {
         task.tags.forEach(tag => tags.add(tag));
     });
@@ -517,7 +482,6 @@ const AppContent: React.FC = () => {
             const msg = error?.message || "Unknown error";
             const code = error?.code || "";
             
-            // Detailed debugging for common Supabase permission issues
             if (msg.toLowerCase().includes("policy") || msg.toLowerCase().includes("permission") || code === "42501") {
                 alert("Permission Denied: Only project members (and in some cases only the creator) can modify this task. Please check your Supabase RLS policies for the 'tasks' table.");
             } else if (msg.toLowerCase().includes("not find") || code === "PGRST204") {
@@ -551,7 +515,6 @@ const AppContent: React.FC = () => {
     const context = {
         currentView: view,
         activeProject: activeProject ? { name: activeProject.name, id: activeProject.id } : null,
-        // FIX: Cast Object.values results to avoid type errors.
         projects: (Object.values(state.projects) as Project[]).map(p => ({ name: p.name, id: p.id })),
         users: (Object.values(state.users) as User[]).map(u => ({ name: u.name, id: u.id })),
         columns: activeProject ? (Object.values(activeProject.board.columns) as Column[]).map(c => ({ name: c.title, id: c.id })) : [],
@@ -582,21 +545,18 @@ const AppContent: React.FC = () => {
                     return "I'm not sure which task to move or where to move it. Please be more specific.";
                  }
                  
-                 // FIX: Cast Object.values results to avoid type errors.
                  const taskToMove = (Object.values(activeProject.board.tasks) as Task[]).find(t => t.title.toLowerCase() === result.params.taskTitle.toLowerCase());
                  const destColumn = (Object.values(activeProject.board.columns) as Column[]).find(c => c.title.toLowerCase() === result.params.targetColumnName.toLowerCase());
 
                  if (!taskToMove) return `I couldn't find a task named "${result.params.taskTitle}".`;
                  if (!destColumn) return `I couldn't find a column named "${result.params.targetColumnName}".`;
 
-                 // FIX: Cast Object.values results to avoid type errors.
                  const sourceColumn = (Object.values(activeProject.board.columns) as Column[]).find(c => c.taskIds.includes(taskToMove.id));
                  if (!sourceColumn) return "I couldn't determine the task's current location.";
 
                  const dragResult: DropResult = {
                      draggableId: taskToMove.id,
                      source: { droppableId: sourceColumn.id, index: sourceColumn.taskIds.indexOf(taskToMove.id) },
-                     // FIX: Use destColumn.id and default index 0 for the destination to fix missing variable errors.
                      destination: { droppableId: destColumn.id, index: 0 },
                      reason: 'DROP',
                      type: 'DEFAULT',
@@ -611,7 +571,6 @@ const AppContent: React.FC = () => {
                 if (!result.params.taskTitle || !result.params.assigneeName) {
                     return "I'm not sure which task to assign or who to assign it to. Please be more specific.";
                 }
-                // FIX: Cast Object.values results to avoid type errors.
                 const taskToAssign = (Object.values(activeProject.board.tasks) as Task[]).find(t => t.title.toLowerCase() === result.params.taskTitle.toLowerCase());
                 const userToAssign = (Object.values(state.users) as User[]).find(u => u.name.toLowerCase() === result.params.assigneeName.toLowerCase());
                 
@@ -632,7 +591,6 @@ const AppContent: React.FC = () => {
                 if (dest === 'resources') { navigate('/resources'); return `Navigating to resources.`; }
                 if (dest === 'bugs') { navigate('/bugs'); return `Navigating to bug tracker.`; }
                 
-                // FIX: Cast Object.values results to avoid type errors.
                 const projectToNav = (Object.values(state.projects) as Project[]).find(p => p.name.toLowerCase() === dest);
                 if (projectToNav) {
                     navigate(`/projects/${projectToNav.id}`);
@@ -666,7 +624,6 @@ const AppContent: React.FC = () => {
   };
   
     const handleResetSuccess = async () => {
-        // After password is successfully reset, sign out to force re-login.
         await api.auth.signOut();
         setIsResettingPassword(false);
     };
@@ -721,7 +678,6 @@ const AppContent: React.FC = () => {
 
   const unreadCount = activeProjectId ? unreadCounts[activeProjectId] || 0 : 0;
   
-  // This state prevents the login page from flashing on refresh for logged-in users.
   if (isAuthLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1C2326]">
@@ -776,11 +732,9 @@ const AppContent: React.FC = () => {
                       setIsChatOpen(!wasOpen);
                       if (!wasOpen && activeProjectId && activeProject && currentUser) {
                           setUnreadCounts(prev => ({ ...prev, [activeProjectId]: 0 }));
-                          // Get the timestamp of the very last message in the chat
                           const latestMessage = activeProject.chatMessages.length > 0
                               ? activeProject.chatMessages[activeProject.chatMessages.length - 1]
                               : null;
-                          // Store its timestamp, or the current time if no messages exist.
                           const timestampToStore = latestMessage ? latestMessage.createdAt : new Date().toISOString();
                           setLastReadTimestamp(activeProjectId, currentUser.id, timestampToStore);
                       }
@@ -907,7 +861,6 @@ const AppContent: React.FC = () => {
                   addBug={addBug}
                   updateBug={updateBug}
                   deleteBug={deleteBug}
-                  // FIX: Wrap addBugsBatch to provide the active project's ID.
                   addBugsBatch={(bugs) => addBugsBatch(activeProject.id, bugs)}
                   deleteBugsBatch={deleteBugsBatch}
                   addTasksBatch={(tasks, sprintId) => addTasksBatch(activeProject.id, tasks, sprintId)}
@@ -986,7 +939,6 @@ const AppContent: React.FC = () => {
             await addTask(activeProject.id, taskData, currentUser.id);
             setCreateTaskModalOpen(false);
           }}
-          // FIX: The type for new sprint data should not include properties that are auto-generated by the database, like `status`.
           onAddSprint={async (sprintData: Omit<Sprint, 'id' | 'projectId' | 'createdAt' | 'status' | 'isDefault'> & { isDefault?: boolean; }) => {
              return await addSprint(activeProject.id, sprintData);
           }}

@@ -36,7 +36,6 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
     const graphData = useMemo(() => {
         const nodes: Node[] = [];
         const edges: Edge[] = [];
-        // FIX: Explicitly cast Object.values to known types to resolve inference issues where properties were missing on type 'unknown'.
         const projectList = Object.values(projects) as Project[];
         const userList = Object.values(users) as User[];
 
@@ -45,7 +44,6 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
         const projectRadius = 250;
         const userRadius = 450;
 
-        // Positioning logic: Simple circular layout
         projectList.forEach((p, i) => {
             const angle = (i / projectList.length) * 2 * Math.PI;
             nodes.push({
@@ -64,20 +62,20 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
                 id: u.id,
                 type: 'user',
                 label: u.name,
-                x: centerX + userRadius * Math.cos(angle + 0.5), // offset slightly
+                x: centerX + userRadius * Math.cos(angle + 0.5),
                 y: centerY + userRadius * Math.sin(angle + 0.5),
                 data: u
             });
 
-            // Create edges based on membership and tasks
             projectList.forEach(p => {
-                if (p.members.includes(u.id)) {
-                    // FIX: Cast Object.values to Task[] to resolve type-safety issue.
-                    const tasksInProject = (Object.values(p.board.tasks) as Task[]).filter(t => t.assignee?.id === u.id).length;
+                const members = p.members || [];
+                if (members.includes(u.id)) {
+                    const tasks = p.board?.tasks ? (Object.values(p.board.tasks) as Task[]) : [];
+                    const tasksInProject = tasks.filter(t => t.assignee?.id === u.id).length;
                     edges.push({
                         source: u.id,
                         target: p.id,
-                        weight: tasksInProject + 1 // minimum 1 for membership
+                        weight: tasksInProject + 1
                     });
                 }
             });
@@ -121,7 +119,6 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
 
     return (
         <div className="relative w-full h-[600px] bg-[#0D1117] rounded-xl border border-white/5 overflow-hidden group">
-            {/* Controls Overlay */}
             <div className="absolute top-6 left-6 z-10 flex flex-col gap-2">
                 <button onClick={() => setZoom(z => Math.min(z + 0.2, 3))} className="p-3 bg-[#1C2326] border border-white/10 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 transition-all shadow-xl"><ZoomInIcon className="w-5 h-5"/></button>
                 <button onClick={() => setZoom(z => Math.max(z - 0.2, 0.2))} className="p-3 bg-[#1C2326] border border-white/10 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 transition-all shadow-xl"><ZoomOutIcon className="w-5 h-5"/></button>
@@ -133,7 +130,6 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
                 <p className="text-[10px] text-gray-600 font-mono">DRAG TO PAN • SCROLL TO ZOOM</p>
             </div>
 
-            {/* Hint Overlay */}
             {hoveredNode && (
                  <div className="absolute bottom-6 right-6 z-10 p-4 bg-[#131C1B]/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl pointer-events-none animate-in fade-in slide-in-from-bottom-2">
                     <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Active Element</p>
@@ -154,8 +150,6 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
             >
                 <svg width="100%" height="100%" viewBox="0 0 1000 1000" className="transition-transform duration-75 ease-out">
                     <g style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`, transformOrigin: 'center' }}>
-                        
-                        {/* Define connection lines glow */}
                         <defs>
                             <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
                                 <feGaussianBlur stdDeviation="3" result="blur" />
@@ -163,7 +157,6 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
                             </filter>
                         </defs>
 
-                        {/* Connection Lines (Edges) */}
                         {graphData.edges.map((edge, i) => {
                             const source = graphData.nodes.find(n => n.id === edge.source)!;
                             const target = graphData.nodes.find(n => n.id === edge.target)!;
@@ -183,7 +176,6 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
                             );
                         })}
 
-                        {/* Nodes */}
                         {graphData.nodes.map(node => {
                             const isProject = node.type === 'project';
                             const isActive = hoveredNode === node.id;
@@ -199,7 +191,6 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
                                     onMouseLeave={() => setHoveredNode(null)}
                                     className="cursor-pointer"
                                 >
-                                    {/* Base Node Circle */}
                                     <circle 
                                         cx={node.x} cy={node.y} 
                                         r={isProject ? 24 : 18}
@@ -209,14 +200,12 @@ export const ResourceNeuralGraph: React.FC<ResourceNeuralGraphProps> = ({ projec
                                         className="transition-all duration-300"
                                     />
                                     
-                                    {/* Icon Placeholder */}
                                     <foreignObject x={node.x - (isProject ? 12 : 9)} y={node.y - (isProject ? 12 : 9)} width={isProject ? 24 : 18} height={isProject ? 24 : 18}>
                                         <div className="flex items-center justify-center text-gray-500">
                                             {isProject ? <LayoutDashboardIcon className="w-full h-full" /> : <UsersIcon className="w-full h-full" />}
                                         </div>
                                     </foreignObject>
 
-                                    {/* Label */}
                                     <text 
                                         x={node.x} y={node.y + (isProject ? 45 : 35)}
                                         textAnchor="middle"

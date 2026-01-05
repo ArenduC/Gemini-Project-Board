@@ -133,7 +133,8 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
     
     // FIX: Explicitly cast Object.values to Project[] and User[] to ensure property access on known types and resolve compilation errors.
     const pList = Object.values(projects) as Project[], uList = Object.values(users) as User[];
-    const allT = pList.flatMap(p => Object.values(p.board.tasks) as Task[]), allB = pList.flatMap(p => Object.values(p.bugs || {}) as Bug[]);
+    const allT = pList.flatMap(p => p.board?.tasks ? (Object.values(p.board.tasks) as Task[]) : []);
+    const allB = pList.flatMap(p => p.bugs ? (Object.values(p.bugs) as Bug[]) : []);
 
     const filteredUsers = useMemo(() => uList.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase())), [uList, searchQuery]);
     const pgs = Math.ceil(filteredUsers.length / 15);

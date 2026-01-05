@@ -11,6 +11,7 @@ const statusColors: Record<string, { dot: string, text: string, bg: string }> = 
 };
 
 const getTaskStatus = (task: Task, board: BoardData): { name: string; colorInfo: typeof statusColors['default']; isDone: boolean } => {
+    if (!board || !board.columns) return { name: 'Unknown', colorInfo: statusColors.default, isDone: false };
     const column = Object.values(board.columns).find(c => c.taskIds.includes(task.id));
     const statusName = column?.title || 'Uncategorized';
     const colorInfo = statusColors[statusName] || statusColors.default;
@@ -18,9 +19,10 @@ const getTaskStatus = (task: Task, board: BoardData): { name: string; colorInfo:
 };
 
 const getBugStatus = (bug: Bug): { name: string; colorInfo: typeof statusColors['default']; isDone: boolean } => {
-    const isDone = bug.status.toLowerCase().includes('done') || bug.status.toLowerCase().includes('resolved');
-    const colorInfo = isDone ? statusColors['Done'] : (bug.status.toLowerCase().includes('progress') ? statusColors['In Progress'] : statusColors['To Do']);
-    return { name: bug.status, colorInfo, isDone };
+    const status = bug.status || 'New';
+    const isDone = status.toLowerCase().includes('done') || status.toLowerCase().includes('resolved');
+    const colorInfo = isDone ? statusColors['Done'] : (status.toLowerCase().includes('progress') ? statusColors['In Progress'] : statusColors['To Do']);
+    return { name: status, colorInfo, isDone };
 };
 
 interface UserActivityGraphProps {
@@ -42,13 +44,16 @@ interface UserWorkload {
 
 export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, users, onlineUsers, onTaskClick }) => {
     const userWorkloads = useMemo((): UserWorkload[] => {
-        return (Object.values(users) as User[]).map(user => {
-            const projectWorkload = (Object.values(projects) as Project[])
+        const uList = Object.values(users) as User[];
+        const pList = Object.values(projects) as Project[];
+
+        return uList.map(user => {
+            const projectWorkload = pList
                 .map(project => {
-                    const tasks = (Object.values(project.board.tasks) as Task[]).filter(task => task.assignee?.id === user.id);
-                    const bugs = (Object.values(project.bugs || {}) as Bug[]).filter(bug => bug.assignee?.id === user.id);
+                    const tasks = project.board?.tasks ? (Object.values(project.board.tasks) as Task[]).filter(task => task.assignee?.id === user.id) : [];
+                    const bugs = project.bugs ? (Object.values(project.bugs) as Bug[]).filter(bug => bug.assignee?.id === user.id) : [];
                     
-                    const solvedTasks = tasks.filter(t => getTaskStatus(t, project.board).isDone).length;
+                    const solvedTasks = tasks.filter(t => project.board ? getTaskStatus(t, project.board).isDone : false).length;
                     const solvedBugs = bugs.filter(b => getBugStatus(b).isDone).length;
 
                     return { project, tasks, bugs, solvedCount: solvedTasks + solvedBugs };
@@ -93,7 +98,7 @@ export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, 
                                     
                                     <div className="space-y-2">
                                         {tasks.map(task => {
-                                            const { name, colorInfo, isDone } = getTaskStatus(task, project.board);
+                                            const { name, colorInfo, isDone } = project.board ? getTaskStatus(task, project.board) : { name: 'Unknown', colorInfo: statusColors.default, isDone: false };
                                             return (
                                                 <div 
                                                     key={task.id}
