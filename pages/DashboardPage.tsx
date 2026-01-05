@@ -67,7 +67,6 @@ const MiniCalendar: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
 
     const maxEngagement = useMemo(() => {
         const values = Array.from(engagementMap.values());
-        // FIX: Cast values to number[] to ensure type-safety for Math.max call.
         return values.length > 0 ? Math.max(...(values as number[])) : 1;
     }, [engagementMap]);
 
@@ -193,13 +192,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 8;
 
-    const allTasks = useMemo(() => projects.flatMap(p => Object.values(p.board.tasks)), [projects]);
+    const allTasks = useMemo(() => projects.flatMap(p => p.board?.tasks ? Object.values(p.board.tasks) : []), [projects]);
+    
     const activeTasks = useMemo(() => {
         return projects.flatMap(p => {
-            // FIX: Explicitly cast Object.values to Column[] and Task[] to resolve type-safety issues where properties were being accessed on unknown.
-            const doneColumn = (Object.values(p.board.columns) as Column[]).find(c => c.title.toLowerCase() === 'done');
+            if (!p.board?.columns || !p.board?.tasks) return [];
+            
+            const columns = Object.values(p.board.columns) as Column[];
+            const doneColumn = columns.find(c => c.title.toLowerCase() === 'done');
             const doneTaskIds = new Set(doneColumn?.taskIds || []);
-            return (Object.values(p.board.tasks) as Task[]).filter(t => !doneTaskIds.has(t.id));
+            
+            const tasks = Object.values(p.board.tasks) as Task[];
+            return tasks.filter(t => !doneTaskIds.has(t.id));
         });
     }, [projects]);
 
@@ -303,7 +307,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
                 <div className="col-span-12 lg:col-span-3 space-y-4">
                     <MiniCalendar tasks={allTasks} />
                     <DeadlineTracker tasks={activeTasks} onTaskClick={(task) => {
-                        const parentProj = projects.find(p => p.board.tasks[task.id]);
+                        const parentProj = projects.find(p => p.board?.tasks?.[task.id]);
                         if (parentProj) onSelectProject(parentProj.id);
                     }} />
                     <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-violet-500/10 border border-white/10 shadow-2xl">

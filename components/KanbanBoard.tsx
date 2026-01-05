@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
 import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority, AiGeneratedTaskFromFile, Sprint, BugResponse } from '../types';
@@ -411,7 +410,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   const filteredBoardData: BoardData = useMemo(() => {
-    if (!boardData.tasks || !boardData.columns) return boardData;
+    if (!boardData?.tasks || !boardData?.columns) return boardData || { tasks: {}, columns: {}, columnOrder: [] };
 
     const taskIdToColumnIdMap = new Map<string, string>();
     for (const column of Object.values(boardData.columns) as ColumnType[]) {
@@ -506,26 +505,29 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   }, [boardData, searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
   
   const uniqueAssignees = useMemo(() => {
+      if (!boardData?.tasks) return [];
       const assignees = (Object.values(boardData.tasks) as Task[])
           .map(task => task.assignee?.name)
           .filter((name): name is string => !!name);
       return [...new Set(assignees)];
-  }, [boardData.tasks]);
+  }, [boardData?.tasks]);
 
   const uniqueStatuses = useMemo(() => {
-      if (!boardData.columns) return [];
+      if (!boardData?.columns) return [];
       return [...new Set((Object.values(boardData.columns) as ColumnType[]).map(c => c.title))];
-  }, [boardData.columns]);
+  }, [boardData?.columns]);
 
   const uniqueTags = useMemo(() => {
+    if (!boardData?.tasks) return [];
     const tags = new Set<string>();
     (Object.values(boardData.tasks) as Task[]).forEach(task => {
         task.tags.forEach(tag => tags.add(tag));
     });
     return Array.from(tags).sort();
-  }, [boardData.tasks]);
+  }, [boardData?.tasks]);
 
   const filteredTasksForTable = useMemo(() => {
+    if (!filteredBoardData?.columnOrder || !filteredBoardData?.columns || !filteredBoardData?.tasks) return [];
     return filteredBoardData.columnOrder.flatMap(columnId => {
         const column = filteredBoardData.columns[columnId];
         if (!column) return [];
@@ -541,7 +543,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const handleExport = () => {
     const augmentedTasks: AugmentedTask[] = filteredTasksForTable.map(task => {
-        const column = (Object.values(project.board.columns) as ColumnType[]).find(c => c.taskIds.includes(task.id));
+        const columnsArray = project.board?.columns ? (Object.values(project.board.columns) as ColumnType[]) : [];
+        const column = columnsArray.find(c => c.taskIds.includes(task.id));
         return {
             ...task,
             projectId: project.id,

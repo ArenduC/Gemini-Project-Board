@@ -13,14 +13,19 @@ interface ProjectCardProps {
 }
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, onlineUsers, onSelect, onManageMembers, onShare }) => {
-  const totalTasks = Object.keys(project.board.tasks).length;
-  const doneColumn = (Object.values(project.board.columns) as Column[]).find(c => c.title.toLowerCase() === 'done');
+  // Defensive checks for nested board data
+  const board = project.board;
+  const tasks = board?.tasks || {};
+  const columns = board?.columns || {};
+
+  const totalTasks = Object.keys(tasks).length;
+  const doneColumn = (Object.values(columns) as Column[]).find(c => c.title.toLowerCase() === 'done');
   const completedTasks = doneColumn ? doneColumn.taskIds.length : 0;
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   const creator = users[project.creatorId];
 
   const meetLink = useMemo(() => {
-    return project.links.find(link => link.url.includes('meet.google.com'));
+    return (project.links || []).find(link => link.url.includes('meet.google.com'));
   }, [project.links]);
 
   return (
@@ -76,7 +81,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, online
 
         <div className="flex items-center justify-between pt-3 border-t border-white/5">
             <div className="flex items-center -space-x-2">
-                {project.members.slice(0, 3).map(id => users[id] && (
+                {(project.members || []).slice(0, 3).map(id => users[id] && (
                     <UserAvatar
                         key={id}
                         user={users[id]}
@@ -84,9 +89,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, users, online
                         className="w-6 h-6 rounded-full ring-1 ring-[#131C1B] text-[8px]"
                     />
                 ))}
-                {project.members.length > 3 && (
+                {(project.members || []).length > 3 && (
                     <div className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-[8px] font-bold ring-1 ring-[#131C1B] text-gray-400">
-                        +{project.members.length - 3}
+                        +{(project.members || []).length - 3}
                     </div>
                 )}
             </div>

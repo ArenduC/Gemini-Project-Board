@@ -13,8 +13,13 @@ interface ProjectListRowProps {
 }
 
 export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, onlineUsers, onSelect, onManageMembers, onShare }) => {
-  const totalTasks = Object.keys(project.board.tasks).length;
-  const doneColumn = (Object.values(project.board.columns) as Column[]).find(c => c.title.toLowerCase() === 'done');
+  // Defensive checks for nested board data
+  const board = project.board;
+  const tasks = board?.tasks || {};
+  const columns = board?.columns || {};
+
+  const totalTasks = Object.keys(tasks).length;
+  const doneColumn = (Object.values(columns) as Column[]).find(c => c.title.toLowerCase() === 'done');
   const completedTasks = doneColumn ? doneColumn.taskIds.length : 0;
   const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
@@ -43,7 +48,7 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, 
       </div>
 
       <div className="col-span-2 flex items-center justify-end -space-x-3">
-        {project.members.slice(0, 4).map(id => users[id] && (
+        {(project.members || []).slice(0, 4).map(id => users[id] && (
           <UserAvatar
             key={id}
             user={users[id]}
@@ -51,9 +56,9 @@ export const ProjectListRow: React.FC<ProjectListRowProps> = ({ project, users, 
             className="w-8 h-8 rounded-full ring-2 ring-[#131C1B]"
           />
         ))}
-        {project.members.length > 4 && (
+        {(project.members || []).length > 4 && (
           <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-[10px] font-bold ring-2 ring-[#131C1B] text-gray-500">
-            +{project.members.length - 4}
+            +{(project.members || []).length - 4}
           </div>
         )}
       </div>
