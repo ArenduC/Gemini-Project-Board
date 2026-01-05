@@ -2,18 +2,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TaskPriority, Project, User, ProjectLink, AiGeneratedProjectPlan, AiGeneratedTaskFromFile, BugResponse } from "../types";
 
-// The API key must be obtained exclusively from the environment variable process.env.API_KEY
-// We initialize a single instance for the service.
+// Initialize the AI client
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+
+// Model Constants
+const FLASH_MODEL = "gemini-3-flash-preview";
+const PRO_MODEL = "gemini-3-pro-preview";
+const FALLBACK_MODEL = "gemini-flash-lite-latest"; // Universal stable fallback
 
 const handleApiError = (error: any, action: string) => {
     console.error(`Neural Link Error [${action}]:`, error);
-    
-    // Extract specific error details if available from the Google GenAI SDK
     const message = error?.message || "Unknown neural interference.";
     
     if (message.includes('400') || message.includes('INVALID_ARGUMENT')) {
-        throw new Error("Neural protocol mismatch (400). This often means the selected model is not yet available for your API key tier in this region.");
+        throw new Error("Neural protocol mismatch (400). The selected model (Gemini 3) might not be available in your region or for your API tier yet. Try a different region in Google Cloud Console or wait for the roll-out.");
     }
     if (message.includes('403') || message.includes('PERMISSION_DENIED')) {
         throw new Error("Neural access denied (403). Please verify your API key permissions and billing status.");
@@ -32,7 +34,6 @@ const truncateContent = (text: string, maxChars: number = 100000): string => {
 
 // --- INTERFACES ---
 
-// FIX: Added missing VoiceCommandAction export for App.tsx
 export interface VoiceCommandAction {
     action: 'CREATE_TASK' | 'MOVE_TASK' | 'ASSIGN_TASK' | 'NAVIGATE' | 'OPEN_LINK' | 'UNKNOWN';
     params: {
@@ -48,7 +49,6 @@ export interface VoiceCommandAction {
     };
 }
 
-// FIX: Added missing SearchResponse export for GlobalSearchModal.tsx
 export interface SearchResponse {
     projects: string[];
     tasks: string[];
@@ -111,21 +111,46 @@ const voiceCommandResponseSchema = {
     required: ['action', 'params']
 };
 
+// --- UTILITY: SMART GENERATE (With Fallback) ---
+
+async function smartGenerate(contents: string, schema: any, modelPreference: string = FLASH_MODEL) {
+    try {
+        const response = await ai.models.generateContent({
+            model: modelPreference,
+            contents,
+            config: { 
+                responseMimeType: "application/json", 
+                responseSchema: schema 
+            },
+        });
+        return response.text || "";
+    } catch (error: any) {
+        // If it's a 404 or 400 (Model not found/available), try the stable fallback
+        if (error?.message?.includes('404') || error?.message?.includes('400') || error?.message?.includes('not found')) {
+            console.warn(`Model ${modelPreference} unavailable. Falling back to stability mode...`);
+            const fallbackResponse = await ai.models.generateContent({
+                model: FALLBACK_MODEL,
+                contents,
+                config: { 
+                    responseMimeType: "application/json", 
+                    responseSchema: schema 
+                },
+            });
+            return fallbackResponse.text || "";
+        }
+        throw error;
+    }
+}
+
 // --- SERVICE METHODS ---
 
 export const generateSubtasks = async (title: string, description: string): Promise<{title: string}[]> => {
   try {
-    const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Deconstruct this task into a JSON array of subtasks. Title: ${title}. Context: ${description}`,
-        config: { 
-            responseMimeType: "application/json", 
-            responseSchema: subtaskResponseSchema 
-        },
-    });
-    // Access .text property directly (do not call as function)
-    const text = response.text || "[]";
-    return JSON.parse(text);
+    const text = await smartGenerate(
+        `Deconstruct this task into subtasks. Title: ${title}. Context: ${description}`,
+        subtaskResponseSchema
+    );
+    return JSON.parse(text || "[]");
   } catch (error) {
     handleApiError(error, 'generate subtasks');
     return [];
@@ -134,16 +159,11 @@ export const generateSubtasks = async (title: string, description: string): Prom
 
 export const generateTaskFromPrompt = async (prompt: string): Promise<any> => {
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: `Synthesize a structured task object from this requirement: ${prompt}`,
-            config: { 
-                responseMimeType: "application/json", 
-                responseSchema: taskResponseSchema 
-            },
-        });
-        const text = response.text || "{}";
-        return JSON.parse(text);
+        const text = await smartGenerate(
+            `Generate a task from this requirement: ${prompt}`,
+            taskResponseSchema
+        );
+        return JSON.parse(text || "{}");
     } catch (error) {
         handleApiError(error, 'generate task');
         throw error;
@@ -157,16 +177,12 @@ export const performGlobalSearch = async (query: string, projects: Record<string
             users: Object.values(users).map(u => ({ id: u.id, name: u.name })),
             tasks: Object.values(projects).flatMap(p => Object.values(p.board.tasks).map(t => ({ id: t.id, title: t.title }))).slice(0, 100)
         };
-        const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
-            contents: `Search query: "${query}". Context: ${JSON.stringify(context)}. Return matching IDs.`,
-            config: { 
-                responseMimeType: "application/json", 
-                responseSchema: searchResponseSchema 
-            },
-        });
-        const text = response.text || '{"projects":[], "tasks":[], "users":[]}';
-        return JSON.parse(text);
+        const text = await smartGenerate(
+            `Search query: "${query}". Context: ${JSON.stringify(context)}. Return matching IDs.`,
+            searchResponseSchema,
+            PRO_MODEL
+        );
+        return JSON.parse(text || '{"projects":[], "tasks":[], "users":[]}');
     } catch (error) {
         handleApiError(error, 'search');
         return { projects: [], tasks: [], users: [] };
@@ -175,26 +191,23 @@ export const performGlobalSearch = async (query: string, projects: Record<string
 
 export const interpretVoiceCommand = async (command: string, context: any): Promise<VoiceCommandAction> => {
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
-            contents: `Command: "${command}". Context: ${JSON.stringify(context)}. Identify action and params.`,
-            config: { 
-                responseMimeType: "application/json", 
-                responseSchema: voiceCommandResponseSchema 
-            },
-        });
-        const text = response.text || "{}";
-        return JSON.parse(text);
+        const text = await smartGenerate(
+            `Interpret command: "${command}". Context: ${JSON.stringify(context)}. Identify action and params.`,
+            voiceCommandResponseSchema,
+            PRO_MODEL
+        );
+        return JSON.parse(text || "{}");
     } catch (error) {
         handleApiError(error, 'process voice');
-        return { action: 'UNKNOWN', params: { reason: "Neural parsing failed." } };
+        // FIX: Added 'title' property to the params object to satisfy the VoiceCommandAction interface.
+        return { action: 'UNKNOWN', params: { title: '', reason: "Neural parsing failed." } };
     }
 };
 
 export const generateProjectLinks = async (projectName: string, projectDescription: string): Promise<any[]> => {
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: FLASH_MODEL,
             contents: `Generate suggested resource URLs for project: ${projectName}. Description: ${projectDescription}. Return JSON array of {title, url}.`,
             config: { responseMimeType: "application/json" },
         });
@@ -208,13 +221,12 @@ export const generateProjectLinks = async (projectName: string, projectDescripti
 
 export const generateProjectFromCsv = async (csvContent: string): Promise<AiGeneratedProjectPlan> => {
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
-            contents: `Create a full project plan (name, description, columns, tasks) from this CSV data:\n${truncateContent(csvContent)}`,
-            config: { responseMimeType: "application/json" },
-        });
-        const text = response.text || "{}";
-        return JSON.parse(text);
+        const text = await smartGenerate(
+            `Create a full project plan from this CSV data:\n${truncateContent(csvContent)}`,
+            null, // No strict schema here as it's a deep object, reliance on system prompt
+            PRO_MODEL
+        );
+        return JSON.parse(text || "{}");
     } catch (error) {
         handleApiError(error, 'parse project');
         throw error;
@@ -223,13 +235,12 @@ export const generateProjectFromCsv = async (csvContent: string): Promise<AiGene
 
 export const generateBugsFromFile = async (fileContent: string, headers: string[]): Promise<BugResponse[]> => {
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
-            contents: `Extract bugs from this file. Headers: ${headers.join(',')}. Content:\n${truncateContent(fileContent)}`,
-            config: { responseMimeType: "application/json" },
-        });
-        const text = response.text || "[]";
-        return JSON.parse(text);
+        const text = await smartGenerate(
+            `Extract bugs from this file. Headers: ${headers.join(',')}. Content:\n${truncateContent(fileContent)}`,
+            null,
+            PRO_MODEL
+        );
+        return JSON.parse(text || "[]");
     } catch (error) {
         handleApiError(error, 'parse bugs');
         return [];
@@ -242,7 +253,7 @@ export const generateTasksFromFile = async (fileData: { content: string; mimeTyp
         const instruction = `Extract tasks for these columns: ${columnNames.join(',')}. Data headers: ${headers.join(',')}. Return JSON array.`;
 
         const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
+            model: PRO_MODEL,
             contents: isText 
                 ? `${instruction}\n\nDATA:\n${truncateContent(fileData.content)}`
                 : { parts: [{ text: instruction }, { inlineData: { mimeType: fileData.mimeType, data: fileData.content } }] },
