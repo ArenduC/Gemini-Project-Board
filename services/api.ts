@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase';
 import { User, Project, NewTaskData, Task, AppState, ChatMessage, ProjectInviteLink, UserRole, Subtask, Sprint, FilterSegment, BugResponse, Column } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
@@ -19,20 +20,32 @@ const onAuthStateChange = (callback: (event: AuthChangeEvent, session: Session |
 };
 
 const getSession = async () => {
-    return await supabase.auth.getSession();
+    try {
+        return await supabase.auth.getSession();
+    } catch (e) {
+        console.error("Critical Network Error in getSession. AdBlocker likely active:", e);
+        throw e;
+    }
 };
 
 const getUserProfile = async (userId: string): Promise<User | null> => {
-    const { data: userProfile, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-    if (error && error.code !== 'PGRST116') { 
-        console.error("Error fetching user profile:", error.message || error);
-        throw error; 
+    try {
+        const { data: userProfile, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+        
+        if (error) {
+            if (error.code === 'PGRST116') return null; // No profile found
+            console.error("Database error fetching user profile:", error.message);
+            throw error;
+        }
+        return userProfile as User;
+    } catch (e) {
+        console.error("Network error fetching user profile (Failed to fetch):", e);
+        throw e;
     }
-    return userProfile as User;
 };
 
 const createUserProfile = async (supabaseUser: SupabaseUser): Promise<User> => {
@@ -157,7 +170,6 @@ const fetchInitialData = async (userId: string): Promise<AppState> => {
     const processedProjects = rawProjects.map((p: any) => {
         let board = p.board;
         
-        // --- DATA SANITY CHECK: Ensure tasks have valid arrays for tags ---
         if (board && board.tasks) {
             Object.keys(board.tasks).forEach(taskId => {
                 const task = board.tasks[taskId];
@@ -167,7 +179,6 @@ const fetchInitialData = async (userId: string): Promise<AppState> => {
             });
         }
 
-        // --- COLUMNS ORDERING ---
         if (board && Array.isArray(board.columns)) {
             const columnsArray = board.columns as Column[];
             const columnsRecord = arrayToRecord(columnsArray);
@@ -238,7 +249,6 @@ const updateColumnOrder = async (projectId: string, newOrder: string[]) => {
 };
 
 const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) => {
-    // Note: We use RPC to handle text array tags safely
     const { error } = await supabase.rpc('update_task_v2', {
         task_id_param: updatedTask.id,
         title_param: updatedTask.title,
@@ -252,7 +262,6 @@ const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) 
 
     if (error) {
         console.error("Supabase RPC error updating task:", error.message, error.code);
-        // Fallback for older schemas that don't have the RPC updated yet
         if (error.code === 'P0001' || error.message.includes('tags')) {
              await supabase.from('tasks').update({
                 title: updatedTask.title,
@@ -300,14 +309,11 @@ const addTask = async (taskData: NewTaskData, creatorId: string) => {
 };
 
 const addTasksBatch = async (tasks: any[]) => {
-    // CRITICAL FIX: The incoming 'tasks' might have camelCase property names like 'columnId' 
-    // from useAppState.ts or geminiService.ts. We must explicitly map them to snake_case
-    // to match the database column names and avoid PGRST204.
     const mappedTasks = tasks.map(t => ({
         title: t.title,
         description: t.description,
         priority: t.priority,
-        column_id: t.columnId || t.column_id, // Handle both potential cases
+        column_id: t.columnId || t.column_id,
         assignee_id: t.assigneeId || t.assignee_id || null,
         due_date: t.dueDate || t.due_date || null,
         sprint_id: t.sprintId || t.sprint_id || null,

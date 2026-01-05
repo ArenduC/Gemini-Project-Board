@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext, ReactNode, useLayoutEffect } from 'react';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ManageMembersModal } from './components/ManageMembersModal';
-import { AppLogo, BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon, RotateCwIcon, LifeBuoyIcon, XIcon } from './components/Icons';
+import { AppLogo, BotMessageSquareIcon, PlusIcon, LayoutDashboardIcon, UsersIcon, ArrowLeftIcon, LoaderCircleIcon, MessageCircleIcon, ClipboardListIcon, SearchIcon, MicrophoneIcon, SettingsIcon, RotateCwIcon, LifeBuoyIcon, XIcon, ZapIcon } from './components/Icons';
 import { useAppState } from './hooks/useAppState';
 import { DashboardPage } from './pages/DashboardPage';
 import { TasksPage } from './pages/TasksPage';
@@ -165,6 +166,7 @@ const AppContent: React.FC = () => {
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isJoiningProject, setIsJoiningProject] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -258,6 +260,7 @@ const AppContent: React.FC = () => {
 
     useEffect(() => {
         setIsAuthLoading(true);
+        setConnectionError(null);
 
         api.auth.getSession()
             .then(({ data: { session } }) => {
@@ -265,6 +268,7 @@ const AppContent: React.FC = () => {
             })
             .catch(err => {
                 console.error("Error getting initial session:", err);
+                setConnectionError("A network error occurred. Please disable any AdBlockers and refresh the page.");
             })
             .finally(() => {
                 setIsAuthLoading(false);
@@ -287,6 +291,7 @@ const AppContent: React.FC = () => {
     useEffect(() => {
         if (session?.user) {
             const resolveUserProfile = async () => {
+                setConnectionError(null);
                 try {
                     let userProfile = await api.auth.getUserProfile(session.user.id);
                     if (!userProfile) {
@@ -296,7 +301,7 @@ const AppContent: React.FC = () => {
                     setCurrentUser(userProfile);
                 } catch (error) {
                     console.error("Error resolving user profile:", error);
-                    api.auth.signOut();
+                    setConnectionError("Failed to reach the database cluster. This is often caused by an AdBlocker blocking the connection to Supabase.");
                 }
             };
             resolveUserProfile();
@@ -701,6 +706,25 @@ const AppContent: React.FC = () => {
         <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
         <p className="mt-4 text-sm font-semibold text-gray-400">{isJoiningProject ? 'Joining project node...' : 'Restoring your session...'}</p>
       </div>
+    );
+  }
+
+  if (connectionError) {
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-[#1C2326] p-6 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 mb-6">
+                <ZapIcon className="w-10 h-10" />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">Neural Link Interrupted</h2>
+            <p className="text-gray-400 text-sm max-w-md mb-8">{connectionError}</p>
+            <button 
+                onClick={() => window.location.reload()} 
+                className="px-6 py-3 bg-white text-black font-bold rounded-xl hover:scale-105 transition-all shadow-xl shadow-white/5 flex items-center gap-2"
+            >
+                <RotateCwIcon className="w-4 h-4" />
+                Retry Connection
+            </button>
+        </div>
     );
   }
 
