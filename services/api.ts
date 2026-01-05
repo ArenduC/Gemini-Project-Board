@@ -300,7 +300,22 @@ const addTask = async (taskData: NewTaskData, creatorId: string) => {
 };
 
 const addTasksBatch = async (tasks: any[]) => {
-    const { data, error } = await supabase.from('tasks').insert(tasks).select();
+    // CRITICAL FIX: The incoming 'tasks' might have camelCase property names like 'columnId' 
+    // from useAppState.ts or geminiService.ts. We must explicitly map them to snake_case
+    // to match the database column names and avoid PGRST204.
+    const mappedTasks = tasks.map(t => ({
+        title: t.title,
+        description: t.description,
+        priority: t.priority,
+        column_id: t.columnId || t.column_id, // Handle both potential cases
+        assignee_id: t.assigneeId || t.assignee_id || null,
+        due_date: t.dueDate || t.due_date || null,
+        sprint_id: t.sprintId || t.sprint_id || null,
+        creator_id: t.creator_id || t.creatorId,
+        tags: t.tags || []
+    }));
+
+    const { data, error } = await supabase.from('tasks').insert(mappedTasks).select();
     if (error) throw error;
     return data;
 };

@@ -190,14 +190,14 @@ const AppContent: React.FC = () => {
           const token = pathname.split('/invite/')[1];
           if (token) {
               localStorage.setItem('project_invite_token', token);
-              // Clean up URL to root so SPA routing works properly
+              // Clean up URL to root so SPA routing works properly and we don't 404 on refresh
               window.history.replaceState({}, '', '/');
               setLocationPath('/');
           }
       }
   }, []);
 
-  // Derive view and active project ID from the URL hash or path
+  // Derive view and active project ID from the URL hash
   const { view, activeProjectId } = useMemo(() => {
     const path = (locationHash.startsWith('#') ? locationHash.substring(1) : locationHash).split('?')[0] || '/';
 
@@ -209,7 +209,6 @@ const AppContent: React.FC = () => {
     if (path === '/resources') return { view: 'resources' as View, activeProjectId: null };
     if (path === '/privacy') return { view: 'privacy' as View, activeProjectId: null };
     
-    // Fallback/Default
     return { view: 'dashboard' as View, activeProjectId: null };
   }, [locationHash]);
 
@@ -380,14 +379,15 @@ const AppContent: React.FC = () => {
         const handleInvite = async () => {
             const token = localStorage.getItem('project_invite_token');
 
-            if (token && currentUser) {
+            if (token && currentUser && !appStateLoading) {
                 setIsJoiningProject(true);
                 localStorage.removeItem('project_invite_token'); 
                 try {
                     const joinedProject = await api.data.acceptInvite(token);
                     console.log(`Successfully joined project: ${joinedProject.name}`);
-                    // Force navigation to the project board using hash
+                    // Force clean up and navigation
                     window.location.hash = `#/projects/${joinedProject.id}`;
+                    await fetchData();
                 } catch (error) {
                     console.error(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
                     window.location.hash = '#/';
@@ -397,10 +397,8 @@ const AppContent: React.FC = () => {
             }
         };
 
-        if (currentUser && !appStateLoading) {
-            handleInvite();
-        }
-    }, [currentUser, appStateLoading]);
+        handleInvite();
+    }, [currentUser, appStateLoading, fetchData]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

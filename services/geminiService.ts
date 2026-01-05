@@ -1,22 +1,29 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TaskPriority, Project, User, ProjectLink, AiGeneratedProjectPlan, AiGeneratedTaskFromFile, BugResponse } from "../types";
-import { GEMINI_API_KEY } from "../config";
 
-// Initialize GoogleGenAI using the key from config.ts as requested.
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+// The API key must be obtained exclusively from the environment variable process.env.API_KEY
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 
 // Helper to handle API errors consistently
 const handleApiError = (error: unknown, action: string) => {
     console.error(`Error calling Gemini API for ${action}:`, error);
     if (error instanceof Error) {
+        if (error.message.includes('token count exceeds')) {
+            throw new Error("The file is too large for the AI to process at once. Please try a smaller file or a snippet.");
+        }
         if (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID')) {
-            throw new Error("The configured Gemini API key is invalid or has been rejected by the service.");
+            throw new Error("The Gemini API key is invalid or unauthorized for this domain.");
         }
     }
-    // Generic fallback
     throw new Error(`Failed to ${action}. Please try again later.`);
 };
 
+// Simple text truncation to prevent token overflow (approx 500k characters for safety)
+const truncateContent = (text: string, maxLength: number = 500000): string => {
+    if (!text || typeof text !== 'string') return "";
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "\n\n[... Content truncated due to size limits ...]";
+};
 
 interface SubtaskResponse {
     title: string;
@@ -48,11 +55,11 @@ const taskResponseSchema = {
     properties: {
         title: {
             type: Type.STRING,
-            description: "A concise, actionable title for the task. Maximum 15 words."
+            description: "A concise, actionable title for the task."
         },
         description: {
             type: Type.STRING,
-            description: "A detailed description of the task, outlining the goals and requirements. Maximum 100 words."
+            description: "A detailed description of the task."
         },
         priority: {
             type: Type.STRING,
@@ -61,7 +68,7 @@ const taskResponseSchema = {
         },
         dueDate: {
             type: Type.STRING,
-            description: "An optional due date for the task in 'YYYY-MM-DD' format if applicable, based on the current date and context."
+            description: "Optional due date in 'YYYY-MM-DD' format."
         }
     },
     required: ["title", "description", "priority"]
@@ -76,21 +83,9 @@ export interface SearchResponse {
 const searchResponseSchema = {
     type: Type.OBJECT,
     properties: {
-        projects: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: "An array of IDs for projects that match the search query."
-        },
-        tasks: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: "An array of IDs for tasks that match the search query."
-        },
-        users: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: "An array of IDs for users that match the search query."
-        }
+        projects: { type: Type.ARRAY, items: { type: Type.STRING } },
+        tasks: { type: Type.ARRAY, items: { type: Type.STRING } },
+        users: { type: Type.ARRAY, items: { type: Type.STRING } }
     },
     required: ["projects", "tasks", "users"]
 };
@@ -109,20 +104,19 @@ const voiceCommandResponseSchema = {
         action: { 
             type: Type.STRING,
             enum: ['CREATE_TASK', 'MOVE_TASK', 'ASSIGN_TASK', 'NAVIGATE', 'OPEN_LINK', 'UNKNOWN'],
-            description: 'The type of action to perform.'
         },
         params: {
             type: Type.OBJECT,
             properties: {
-                title: { type: Type.STRING, description: 'Title for a new task.' },
-                description: { type: Type.STRING, description: 'Description for a new task.' },
-                priority: { type: Type.STRING, enum: Object.values(TaskPriority), description: 'Priority for a new task.' },
-                taskTitle: { type: Type.STRING, description: 'The title of the task to be moved or assigned.' },
-                targetColumnName: { type: Type.STRING, description: 'The name of the column to move a task to.' },
-                assigneeName: { type: Type.STRING, description: 'The name of the user to assign a task to.' },
-                destination: { type: Type.STRING, description: 'The page or project name to navigate to.' },
-                linkTitle: { type: Type.STRING, description: 'The title of the project link to open.' },
-                reason: { type: Type.STRING, description: 'Reason for an unknown command.' }
+                title: { type: Type.STRING },
+                description: { type: Type.STRING },
+                priority: { type: Type.STRING, enum: Object.values(TaskPriority) },
+                taskTitle: { type: Type.STRING },
+                targetColumnName: { type: Type.STRING },
+                assigneeName: { type: Type.STRING },
+                destination: { type: Type.STRING },
+                linkTitle: { type: Type.STRING },
+                reason: { type: Type.STRING }
             }
         }
     },
@@ -139,14 +133,8 @@ const projectLinkResponseSchema = {
     items: {
         type: Type.OBJECT,
         properties: {
-            title: {
-                type: Type.STRING,
-                description: "A descriptive title for the link (e.g., 'Figma Mockups', 'GitHub Repository')."
-            },
-            url: {
-                type: Type.STRING,
-                description: "The full URL for the resource."
-            }
+            title: { type: Type.STRING },
+            url: { type: Type.STRING }
         },
         required: ["title", "url"],
     },
@@ -155,29 +143,27 @@ const projectLinkResponseSchema = {
 const projectFromCsvResponseSchema = {
     type: Type.OBJECT,
     properties: {
-        name: { type: Type.STRING, description: "A suitable name for the project, derived from the CSV content." },
-        description: { type: Type.STRING, description: "A brief, one-sentence description of the project's goal." },
+        name: { type: Type.STRING },
+        description: { type: Type.STRING },
         columns: {
             type: Type.ARRAY,
             items: {
                 type: Type.OBJECT,
                 properties: {
-                    title: { type: Type.STRING, description: "The title of a status column (e.g., 'To Do', 'In Progress', 'Done')." },
+                    title: { type: Type.STRING },
                     tasks: {
                         type: Type.ARRAY,
                         items: {
                             type: Type.OBJECT,
                             properties: {
-                                title: { type: Type.STRING, description: "The title of the task." },
-                                description: { type: Type.STRING, description: "A detailed description of the task." },
-                                priority: { type: Type.STRING, enum: Object.values(TaskPriority), description: "The priority of the task." },
+                                title: { type: Type.STRING },
+                                description: { type: Type.STRING },
+                                priority: { type: Type.STRING, enum: Object.values(TaskPriority) },
                                 subtasks: {
                                     type: Type.ARRAY,
                                     items: {
                                         type: Type.OBJECT,
-                                        properties: {
-                                            title: { type: Type.STRING, description: "The title of a subtask." }
-                                        },
+                                        properties: { title: { type: Type.STRING } },
                                         required: ["title"]
                                     }
                                 }
@@ -198,14 +184,8 @@ const bugsFromFileResponseSchema = {
     items: {
         type: Type.OBJECT,
         properties: {
-            title: {
-                type: Type.STRING,
-                description: "A concise title for the bug, extracted or summarized from the source."
-            },
-            description: {
-                type: Type.STRING,
-                description: "A detailed description of the bug, including any relevant context from the source file."
-            }
+            title: { type: Type.STRING },
+            description: { type: Type.STRING }
         },
         required: ["title", "description"],
     },
@@ -216,40 +196,18 @@ export const tasksFromFileResponseSchema = {
     items: {
         type: Type.OBJECT,
         properties: {
-            title: {
-                type: Type.STRING,
-                description: "A concise title for the task, extracted or summarized from the source."
-            },
-            description: {
-                type: Type.STRING,
-                description: "A detailed description of the task, including any relevant context from the source file."
-            },
-            priority: {
-                type: Type.STRING,
-                enum: Object.values(TaskPriority),
-                description: "The priority of the task. Default to 'Medium' if not specified."
-            },
-            status: {
-                type: Type.STRING,
-                description: "The status of the task, which should match one of the provided column names."
-            }
+            title: { type: Type.STRING },
+            description: { type: Type.STRING },
+            priority: { type: Type.STRING, enum: Object.values(TaskPriority) },
+            status: { type: Type.STRING }
         },
         required: ["title", "description", "priority", "status"],
     },
 };
 
-
 export const generateSubtasks = async (title: string, description: string): Promise<SubtaskResponse[]> => {
   try {
-    const prompt = `
-      Based on the following main task, break it down into smaller, actionable subtasks. 
-      Each subtask should be a clear, concise action item. 
-      Provide only the JSON array of subtasks.
-
-      Main Task Title: "${title}"
-      Main Task Description: "${description}"
-    `;
-
+    const prompt = `Based on the following main task, break it down into smaller, actionable subtasks.\n\nTitle: "${title}"\nDescription: "${description}"`;
     const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
@@ -258,27 +216,17 @@ export const generateSubtasks = async (title: string, description: string): Prom
             responseSchema: subtaskResponseSchema,
         },
     });
-
-    const jsonText = response.text.trim();
-    return jsonText ? JSON.parse(jsonText) as SubtaskResponse[] : [];
-
+    const jsonText = response.text || "[]";
+    return JSON.parse(jsonText.trim()) as SubtaskResponse[];
   } catch (error) {
     handleApiError(error, 'generate subtasks');
-    return []; // Satisfy TypeScript, will not be reached
+    return [];
   }
 };
 
 export const generateTaskFromPrompt = async (prompt: string): Promise<TaskResponse> => {
     try {
-        const fullPrompt = `
-            You are an expert project manager. Based on the user's request, create a detailed task.
-            Generate a concise title, a helpful description, and suggest an appropriate priority from the available options.
-            If the prompt implies a deadline (e.g., "by Friday", "in two weeks"), suggest a 'dueDate' in 'YYYY-MM-DD' format. The current date is ${new Date().toISOString().split('T')[0]}.
-            Ensure the title and description are distinct and provide clear actions.
-            
-            User Request: "${prompt}"
-        `;
-
+        const fullPrompt = `Create a project task based on this request: "${prompt}". Current date is ${new Date().toISOString().split('T')[0]}.`;
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: fullPrompt,
@@ -287,38 +235,22 @@ export const generateTaskFromPrompt = async (prompt: string): Promise<TaskRespon
                 responseSchema: taskResponseSchema,
             },
         });
-
-        const jsonText = response.text.trim();
-        if (!jsonText) throw new Error("AI returned an empty response.");
-        return JSON.parse(jsonText) as TaskResponse;
+        const jsonText = response.text || "{}";
+        return JSON.parse(jsonText.trim()) as TaskResponse;
     } catch (error) {
-        handleApiError(error, 'generate task from prompt');
-        throw error; // Re-throw to be handled by caller
+        handleApiError(error, 'generate task');
+        throw error;
     }
 };
 
 export const performGlobalSearch = async (query: string, projects: Record<string, Project>, users: Record<string, User>): Promise<SearchResponse> => {
     try {
         const searchContext = {
-            projects: Object.values(projects).map(p => ({ id: p.id, name: p.name, description: p.description })),
+            projects: Object.values(projects).map(p => ({ id: p.id, name: p.name })),
             users: Object.values(users).map(u => ({ id: u.id, name: u.name })),
-            tasks: Object.values(projects).flatMap(p =>
-                Object.values(p.board.tasks).map(t => {
-                    const column = Object.values(p.board.columns).find(c => c.taskIds.includes(t.id));
-                    return { id: t.id, title: t.title, projectId: p.id };
-                })
-            )
+            tasks: Object.values(projects).flatMap(p => Object.values(p.board.tasks).map(t => ({ id: t.id, title: t.title, projectId: p.id }))).slice(0, 50) 
         };
-
-        const prompt = `
-            You are an intelligent search engine for a project management tool.
-            The user's search query is: "${query}"
-            Here is a summary of all the data: ${JSON.stringify(searchContext)}
-            Based on the query, return a JSON object with arrays of matching 'projects', 'tasks', and 'users' IDs.
-            Search all fields. If a query is natural language like "high priority tasks for Bob", interpret it.
-            If no matches are found for a category, return an empty array for it. Respond with only the JSON object.
-        `;
-
+        const prompt = `Search the following context for: "${query}". Return matching IDs.\nContext: ${JSON.stringify(searchContext)}`;
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
             contents: prompt,
@@ -327,24 +259,17 @@ export const performGlobalSearch = async (query: string, projects: Record<string
                 responseSchema: searchResponseSchema,
             },
         });
-
-        const jsonText = response.text.trim();
-        return jsonText ? JSON.parse(jsonText) as SearchResponse : { projects: [], tasks: [], users: [] };
+        const jsonText = response.text || '{"projects":[], "tasks":[], "users":[]}';
+        return JSON.parse(jsonText.trim()) as SearchResponse;
     } catch (error) {
-        handleApiError(error, 'perform global search');
-        return { projects: [], tasks: [], users: [] }; // Satisfy TypeScript
+        handleApiError(error, 'search');
+        return { projects: [], tasks: [], users: [] };
     }
 };
 
 export const interpretVoiceCommand = async (command: string, context: any): Promise<VoiceCommandAction> => {
     try {
-        const prompt = `
-            You are a voice assistant for a project management app. Interpret the command: "${command}"
-            Here is the application context: ${JSON.stringify(context)}
-            Translate the command into a JSON object for one of these actions: CREATE_TASK, MOVE_TASK, ASSIGN_TASK, NAVIGATE, OPEN_LINK, UNKNOWN.
-            Return ONLY the JSON object.
-        `;
-
+        const prompt = `Interpret voice command: "${command}"\nContext: ${JSON.stringify(context)}`;
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
             contents: prompt,
@@ -353,23 +278,17 @@ export const interpretVoiceCommand = async (command: string, context: any): Prom
                 responseSchema: voiceCommandResponseSchema,
             },
         });
-        
-        const jsonText = response.text.trim();
-        if (!jsonText) throw new Error("AI returned an empty response.");
-        return JSON.parse(jsonText) as VoiceCommandAction;
+        const jsonText = response.text || "{}";
+        return JSON.parse(jsonText.trim()) as VoiceCommandAction;
     } catch (error) {
-        handleApiError(error, 'interpret voice command');
-        return { action: 'UNKNOWN', params: { reason: "Failed to communicate with the AI assistant." } };
+        handleApiError(error, 'process voice');
+        return { action: 'UNKNOWN', params: { reason: "Error." } } as any;
     }
 };
 
 export const generateProjectLinks = async (projectName: string, projectDescription: string): Promise<ProjectLinkResponse[]> => {
     try {
-        const prompt = `
-            Based on the project name "${projectName}" and description "${projectDescription}", 
-            suggest relevant links for development and management (e.g., GitHub, Figma). Provide valid URLs.
-        `;
-
+        const prompt = `Suggest relevant links for: ${projectName} - ${projectDescription}`;
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: prompt,
@@ -378,24 +297,18 @@ export const generateProjectLinks = async (projectName: string, projectDescripti
                 responseSchema: projectLinkResponseSchema,
             },
         });
-
-        const jsonText = response.text.trim();
-        return jsonText ? JSON.parse(jsonText) as ProjectLinkResponse[] : [];
+        const jsonText = response.text || "[]";
+        return JSON.parse(jsonText.trim()) as ProjectLinkResponse[];
     } catch (error) {
-        handleApiError(error, 'generate project links');
+        handleApiError(error, 'generate links');
         return [];
     }
 };
 
 export const generateProjectFromCsv = async (csvContent: string): Promise<AiGeneratedProjectPlan> => {
     try {
-        const prompt = `
-            Analyze the following CSV content and structure it into a project plan JSON object.
-            Infer a project name, description, columns (like 'To Do', 'In Progress'), and tasks with titles, descriptions, priorities, and subtasks.
-            CSV Content: --- ${csvContent} ---
-            Ensure the output is ONLY the JSON object matching the schema.
-        `;
-
+        const safeContent = truncateContent(csvContent);
+        const prompt = `Structure this CSV into a project plan JSON.\nCSV: ${safeContent}`;
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
             contents: prompt,
@@ -404,27 +317,18 @@ export const generateProjectFromCsv = async (csvContent: string): Promise<AiGene
                 responseSchema: projectFromCsvResponseSchema,
             },
         });
-
-        const jsonText = response.text.trim();
-        if (!jsonText) throw new Error("AI returned an empty response.");
-        return JSON.parse(jsonText) as AiGeneratedProjectPlan;
+        const jsonText = response.text || "{}";
+        return JSON.parse(jsonText.trim()) as AiGeneratedProjectPlan;
     } catch (error) {
-        handleApiError(error, 'generate project from CSV');
+        handleApiError(error, 'parse project');
         throw error;
     }
 };
 
 export const generateBugsFromFile = async (fileContent: string, headersToInclude: string[]): Promise<BugResponse[]> => {
     try {
-        const prompt = `
-            Parse the following file content (CSV or plain text) into a JSON array of bug objects. Each object must have a 'title' and a 'description'.
-            For each bug's main description, also append a formatted list of data from the following columns: ${JSON.stringify(headersToInclude)}.
-            The format for each appended item should be "Header Name: Value". Only include the headers specified.
-            If the file is not a CSV or the headers are not found, do your best to extract a title and a detailed description.
-            Handle messy data gracefully. Ensure the output is ONLY the JSON array.
-            File Content: --- ${fileContent} ---
-        `;
-
+        const safeContent = truncateContent(fileContent);
+        const prompt = `Parse this into bugs JSON. Columns: ${headersToInclude.join(',')}.\nContent: ${safeContent}`;
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
             contents: prompt,
@@ -433,39 +337,30 @@ export const generateBugsFromFile = async (fileContent: string, headersToInclude
                 responseSchema: bugsFromFileResponseSchema,
             },
         });
-
-        const jsonText = response.text.trim();
-        return jsonText ? JSON.parse(jsonText) as BugResponse[] : [];
+        const jsonText = response.text || "[]";
+        return JSON.parse(jsonText.trim()) as BugResponse[];
     } catch (error) {
-        handleApiError(error, 'parse bugs from file');
+        handleApiError(error, 'parse bugs');
         return [];
     }
 };
 
 export const generateTasksFromFile = async (fileData: { content: string; mimeType: string }, columnNames: string[], headersToInclude: string[]): Promise<AiGeneratedTaskFromFile[]> => {
     try {
-        const isTextFile = fileData.mimeType === 'text/csv' || fileData.mimeType === 'text/plain';
+        const isTextFile = fileData.mimeType.startsWith('text/') || fileData.mimeType === 'application/json' || fileData.mimeType === 'text/csv';
+        const promptText = `Analyze the provided file and extract a JSON array of tasks. Allowed statuses: ${columnNames.join(',')}. Header metadata: ${headersToInclude.join(',')}. Response must strictly match the task schema.`;
 
-        const headerInstruction = headersToInclude.length > 0 
-            ? `For each task's main description, also append a formatted list of data from the following columns from the CSV: ${JSON.stringify(headersToInclude)}. The format for each appended item should be "Header Name: Value". Only include the headers specified.`
-            : 'If the file is not a CSV or no specific headers are requested, do your best to extract a title and a detailed description.';
-
-        const promptText = `
-            Parse the provided file into a JSON array of task objects. Each object must have a 'title', 'description', 'priority', and 'status'.
-            The 'status' for each task MUST be one of the following: ${JSON.stringify(columnNames)}.
-            Assign tasks to the most logical column, or '${columnNames[0]}' if unclear.
-            Default priority to 'Medium' if not specified.
-            ${headerInstruction}
-            Ensure the output is ONLY the JSON array.
-            ${isTextFile ? `\nFile content:\n---\n${fileData.content}\n---` : ''}
-        `;
-
-        const contents = isTextFile 
-            ? promptText
-            : { parts: [
+        let contents;
+        if (isTextFile) {
+            // Ensure no binary objects are passed as strings
+            contents = `${promptText}\n\nFILE CONTENT:\n${truncateContent(fileData.content)}`;
+        } else {
+            // Correct way to send binary data as per guidelines
+            contents = { parts: [
                 { text: promptText },
                 { inlineData: { mimeType: fileData.mimeType, data: fileData.content } }
             ]};
+        }
 
         const response = await ai.models.generateContent({
             model: "gemini-3-pro-preview",
@@ -476,8 +371,8 @@ export const generateTasksFromFile = async (fileData: { content: string; mimeTyp
             },
         });
 
-        const jsonText = response.text.trim();
-        return jsonText ? JSON.parse(jsonText) as AiGeneratedTaskFromFile[] : [];
+        const jsonText = response.text || "[]";
+        return JSON.parse(jsonText.trim()) as AiGeneratedTaskFromFile[];
     } catch (error) {
         handleApiError(error, 'parse tasks from file');
         return [];
