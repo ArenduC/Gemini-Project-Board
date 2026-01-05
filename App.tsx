@@ -135,7 +135,7 @@ const ConfirmationProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 };
 
 
-type View = 'dashboard' | 'project' | 'tasks' | 'resources' | 'privacy';
+type View = 'dashboard' | 'project' | 'tasks' | 'resources' | 'privacy' | 'invite';
 
 const getLastReadTimestamp = (projectId: string, userId: string): string | null => {
   return localStorage.getItem(`lastReadTimestamp_${userId}_${projectId}`);
@@ -148,6 +148,7 @@ const setLastReadTimestamp = (projectId: string, userId: string, timestamp: stri
 
 const AppContent: React.FC = () => {
   const [locationHash, setLocationHash] = useState(window.location.hash);
+  const [locationPath, setLocationPath] = useState(window.location.pathname);
   
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isCreateTaskModalOpen, setCreateTaskModalOpen] = useState(false);
@@ -163,6 +164,7 @@ const AppContent: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isJoiningProject, setIsJoiningProject] = useState(false);
 
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -181,8 +183,13 @@ const AppContent: React.FC = () => {
       window.location.hash = safePath;
   }, []);
 
-  // Derive view and active project ID from the URL hash
+  // Derive view and active project ID from the URL hash or path
   const { view, activeProjectId } = useMemo(() => {
+    // Check path first for invite
+    if (locationPath.startsWith('/invite/')) {
+        return { view: 'invite' as View, activeProjectId: null };
+    }
+
     const path = (locationHash.startsWith('#') ? locationHash.substring(1) : locationHash).split('?')[0] || '/';
 
     if (path.startsWith('/projects/')) {
@@ -194,7 +201,7 @@ const AppContent: React.FC = () => {
     if (path === '/privacy') return { view: 'privacy' as View, activeProjectId: null };
     
     return { view: 'dashboard' as View, activeProjectId: null };
-  }, [locationHash]);
+  }, [locationHash, locationPath]);
 
   // Feature Flags
   const [featureFlags, setFeatureFlags] = useState({
@@ -225,10 +232,13 @@ const AppContent: React.FC = () => {
     useEffect(() => {
         const onHashChange = () => {
             setLocationHash(window.location.hash);
+            setLocationPath(window.location.pathname);
         };
         window.addEventListener('hashchange', onHashChange);
+        window.addEventListener('popstate', onHashChange);
         return () => {
             window.removeEventListener('hashchange', onHashChange);
+            window.removeEventListener('popstate', onHashChange);
         };
     }, []);
 
@@ -362,21 +372,27 @@ const AppContent: React.FC = () => {
             const urlToken = pathname.startsWith('/invite/') ? pathname.split('/invite/')[1] : null;
             const token = urlToken || localStorage.getItem('project_invite_token');
 
-            if (token && currentUser) {
-                localStorage.removeItem('project_invite_token'); 
-                try {
-                    const joinedProject = await api.data.acceptInvite(token);
-                    console.log(`Successfully joined project: ${joinedProject.name}`);
-                    // Redirect to the new project view using hash routing
-                    window.location.assign(`/#/projects/${joinedProject.id}`);
-                } catch (error) {
-                    console.error(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                    // If accept fails, just go home
-                    window.location.assign('/#/');
+            if (token) {
+                if (currentUser) {
+                    setIsJoiningProject(true);
+                    localStorage.removeItem('project_invite_token'); 
+                    try {
+                        const joinedProject = await api.data.acceptInvite(token);
+                        console.log(`Successfully joined project: ${joinedProject.name}`);
+                        // Clean URL and move to project
+                        window.history.replaceState({}, '', '/');
+                        window.location.hash = `/projects/${joinedProject.id}`;
+                    } catch (error) {
+                        console.error(`Failed to accept invite: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                        window.history.replaceState({}, '', '/');
+                        window.location.hash = '/';
+                    } finally {
+                        setIsJoiningProject(false);
+                    }
+                } else {
+                    // Store token for post-login
+                    localStorage.setItem('project_invite_token', token);
                 }
-            } else if (token && !currentUser) {
-                // If not logged in, store the token and let them see the landing/login page
-                localStorage.setItem('project_invite_token', token);
             }
         };
 
@@ -678,11 +694,11 @@ const AppContent: React.FC = () => {
 
   const unreadCount = activeProjectId ? unreadCounts[activeProjectId] || 0 : 0;
   
-  if (isAuthLoading) {
+  if (isAuthLoading || (isJoiningProject && currentUser)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#1C2326]">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#1C2326]">
         <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
-        <p className="ml-4 text-sm font-semibold text-gray-400">Restoring your session...</p>
+        <p className="mt-4 text-sm font-semibold text-gray-400">{isJoiningProject ? 'Joining project...' : 'Restoring your session...'}</p>
       </div>
     );
   }
@@ -892,6 +908,12 @@ const AppContent: React.FC = () => {
               )}
               {view === 'privacy' && (
                   <PrivacyPolicyPage isEmbedded={true} />
+              )}
+              {(view === 'invite' || isJoiningProject) && (
+                  <div className="flex flex-col items-center justify-center pt-20">
+                      <LoaderCircleIcon className="w-10 h-10 animate-spin text-gray-400"/>
+                      <p className="mt-4 text-sm font-semibold text-gray-400">Finalizing project alignment...</p>
+                  </div>
               )}
               {view === 'project' && !activeProject && (
                 <div className="text-center pt-20 text-gray-400">
