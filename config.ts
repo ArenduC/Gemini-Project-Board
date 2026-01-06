@@ -1,5 +1,5 @@
 // FIX: Restore hardcoded GEMINI_API_KEY as requested for deployment compatibility.
-export const GEMINI_API_KEY: string = "AIzaSyBivRDxCpQRGOqjPk43ksuPHCByW6MA1Bo";
+export const GEMINI_API_KEY: string = "AIzaSyBaGdoq-J-_u-Z1ICi-5m0nJwk96lKAkkE";
 
 // FIX: Added explicit string types to prevent TypeScript from inferring literal types, which causes comparison errors.
 export const SUPABASE_URL: string = "https://gusrrfpuzjpgowblvjkl.supabase.co";
