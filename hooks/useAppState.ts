@@ -18,6 +18,20 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   const [loading, setLoading] = useState(true);
   const userId = session?.user?.id;
 
+  // Track project access telemetry
+  useEffect(() => {
+    if (activeProjectId) {
+      const affinityKey = `neural-affinity-${userId}`;
+      try {
+        const affinityMap = JSON.parse(localStorage.getItem(affinityKey) || '{}');
+        affinityMap[activeProjectId] = Date.now();
+        localStorage.setItem(affinityKey, JSON.stringify(affinityMap));
+      } catch (e) {
+        console.warn("Affinity telemetry failed", e);
+      }
+    }
+  }, [activeProjectId, userId]);
+
   const fetchData = useCallback(async (isInitial = false) => {
     if (!userId) {
       setState(initialState);
@@ -25,7 +39,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
       return;
     }
     
-    // Only set global loading for first-time boot
     if (isInitial) setLoading(true);
 
     try {
@@ -65,7 +78,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
       }
     }
 
-    // Silent background fetch
     fetchData(Object.keys(state.projects).length === 0);
 
   }, [userId, fetchData]);
@@ -298,6 +310,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
       await fetchData();
   }, [fetchData]);
 
+  // FIX: api.from was incorrectly used. Switched to api.data.deleteColumn which uses the correct service layer architecture.
   const deleteColumn = useCallback(async (projectId: string, columnId: string) => {
     await api.data.deleteColumn(columnId);
     await fetchData();

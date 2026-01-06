@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AppLogo, BotMessageSquareIcon, SparklesIcon, UsersIcon, LayoutDashboardIcon, ArrowLeftIcon, RocketIcon, ZapIcon, ShieldCheckIcon, ChevronRightIcon, CheckSquareIcon, TrendingUpIcon } from './Icons';
 import { LoginPage } from '../pages/LoginPage';
@@ -41,6 +42,20 @@ const ParallaxBackground: React.FC = () => {
 export const LandingPage: React.FC<{ onShowPrivacy: () => void }> = ({ onShowPrivacy }) => {
     const loginSectionRef = useRef<HTMLDivElement>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+    // Handle invite tokens in the URL
+    useEffect(() => {
+        const path = window.location.pathname;
+        if (path.startsWith('/invite/')) {
+            const token = path.split('/invite/')[1];
+            if (token) {
+                localStorage.setItem('project_invite_token', token);
+                // Clean up URL without reload
+                window.history.replaceState({}, '', '/');
+                scrollToLogin();
+            }
+        }
+    }, []);
 
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {

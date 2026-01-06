@@ -45,6 +45,7 @@ const App: React.FC = () => {
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isJoiningProject, setIsJoiningProject] = useState(false);
   
   // BYOK & Feature Flags
   const [featureFlags, setFeatureFlags] = useState({
@@ -84,6 +85,30 @@ const App: React.FC = () => {
       setCurrentUser(null);
     }
   }, [session]);
+
+  // Invite Logic Effect
+  useEffect(() => {
+    const processInvite = async () => {
+        if (currentUser && !isJoiningProject) {
+            const token = localStorage.getItem('project_invite_token');
+            if (token) {
+                setIsJoiningProject(true);
+                try {
+                    console.log("Mesh: Accepting stored invite token...");
+                    await api.data.acceptInvite(token);
+                    localStorage.removeItem('project_invite_token');
+                    await fetchData(true); // Re-sync entire mesh to show new project
+                } catch (e) {
+                    console.error("Mesh Error: Failed to join project node.", e);
+                    localStorage.removeItem('project_invite_token');
+                } finally {
+                    setIsJoiningProject(false);
+                }
+            }
+        }
+    };
+    processInvite();
+  }, [currentUser, fetchData]);
 
   // Listen for link failure
   useEffect(() => {
@@ -125,8 +150,15 @@ const App: React.FC = () => {
 
   if (!session || !currentUser) return <LandingPage onShowPrivacy={() => {}} />;
   
-  // Only show full screen loader if we have NO data at all
-  if (loading && Object.keys(state.projects).length === 0) return <div className="min-h-screen bg-[#1C2326] flex items-center justify-center font-mono text-emerald-500 uppercase tracking-widest text-xs animate-pulse">Initializing Neural Mesh...</div>;
+  // Only show full screen loader if we have NO data at all or are currently reconfiguring mesh
+  if (isJoiningProject || (loading && Object.keys(state.projects).length === 0)) {
+      return (
+          <div className="min-h-screen bg-[#1C2326] flex flex-col items-center justify-center font-mono text-emerald-500 uppercase tracking-[0.3em] text-[10px]">
+              <div className="w-12 h-12 mb-6 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+              {isJoiningProject ? 'Reconfiguring Mesh Clusters...' : 'Initializing Neural Link...'}
+          </div>
+      );
+  }
 
   const project = activeProjectId ? state.projects[activeProjectId] : null;
 

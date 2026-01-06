@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, User, AiGeneratedProjectPlan, Task, Column } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
@@ -214,9 +215,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
         return 'Evening';
     }, []);
 
+    // Neural Affinity Sorting: prioritizes projects you last interacted with
     const sortedProjects = useMemo(() => {
-        return [...projects].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    }, [projects]);
+        const affinityKey = `neural-affinity-${currentUser.id}`;
+        let affinityMap: Record<string, number> = {};
+        try {
+            affinityMap = JSON.parse(localStorage.getItem(affinityKey) || '{}');
+        } catch (e) {
+            console.error("Affinity read error", e);
+        }
+
+        return [...projects].sort((a, b) => {
+            const timeA = affinityMap[a.id] || new Date(a.createdAt).getTime();
+            const timeB = affinityMap[b.id] || new Date(b.createdAt).getTime();
+            return timeB - timeA;
+        });
+    }, [projects, currentUser.id]);
 
     const totalPages = Math.ceil(sortedProjects.length / ITEMS_PER_PAGE);
     const paginatedProjects = sortedProjects.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -282,8 +296,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
                         </div>
                     ) : view === 'grid' ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {paginatedProjects.map(p => (
-                                <ProjectCard key={p.id} project={p} users={users} onlineUsers={onlineUsers} onSelect={onSelectProject} onManageMembers={onManageMembers} onShare={() => onShareProject(p)} />
+                            {paginatedProjects.map((p, idx) => (
+                                <div key={p.id} className="relative">
+                                    {idx === 0 && currentPage === 1 && (
+                                        <div className="absolute -top-2 -left-2 z-10 px-2 py-0.5 bg-emerald-500 text-black text-[8px] font-black uppercase tracking-widest rounded-md shadow-lg rotate-[-5deg] animate-bounce">
+                                            Current Nexus
+                                        </div>
+                                    )}
+                                    <ProjectCard project={p} users={users} onlineUsers={onlineUsers} onSelect={onSelectProject} onManageMembers={onManageMembers} onShare={() => onShareProject(p)} />
+                                </div>
                             ))}
                         </div>
                     ) : (
