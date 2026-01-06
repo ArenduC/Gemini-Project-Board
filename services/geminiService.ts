@@ -280,7 +280,7 @@ export const generateTaskFromPrompt = async (prompt: string): Promise<TaskRespon
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-1.5-flash",
             contents: fullPrompt,
             config: {
                 responseMimeType: "application/json",
