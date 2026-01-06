@@ -19,7 +19,8 @@ const InsightCard: React.FC<{ title: string; value: string | number; icon: React
                 <h4 className="text-2xl font-bold text-white tracking-tighter">{value}</h4>
             </div>
             <div className={`p-2 rounded-xl bg-white/5 text-gray-400 group-hover:scale-110 group-hover:text-white transition-all duration-500`}>
-                {icon}
+                {/* FIX: Ensure icon is a valid React element and cast to any to support className injection via cloneElement */}
+                {React.isValidElement(icon) ? React.cloneElement(icon as React.ReactElement<any>, { className: 'w-5 h-5' }) : icon}
             </div>
         </div>
         {footer && (
@@ -103,6 +104,7 @@ const NeuralEquilibrium: React.FC<{ data: Record<string, number>, total: number 
         const radius = 38;
         const circumference = 2 * Math.PI * radius;
         
+        // FIX: Cast Object.entries to resolve arithmetic operation type errors where 'count' was seen as unknown.
         return (Object.entries(data) as [string, number][]).map(([label, count], i) => {
             const percentage = (count / total) * 100;
             const strokeDasharray = `${((percentage * circumference) / 100) - 2} ${circumference}`;
@@ -169,8 +171,7 @@ export const TaskInsights: React.FC<TaskInsightsProps> = ({ tasks }) => {
             projectCounts[t.projectName] = (projectCounts[t.projectName] || 0) + 1;
             statusCounts[t.columnName] = (statusCounts[t.columnName] || 0) + 1;
         });
-        const sortedEntries = Object.entries(projectCounts).sort((a,b) => b[1] - a[1]);
-        const peakProject = sortedEntries[0]?.[0] || 'None';
+        const peakProject = Object.entries(projectCounts).sort((a,b) => b[1] - a[1])[0]?.[0] || 'None';
         return { total, urgent, done, completionRate, peakProject, statusCounts };
     }, [tasks]);
 
@@ -179,10 +180,10 @@ export const TaskInsights: React.FC<TaskInsightsProps> = ({ tasks }) => {
     return (
         <div className="space-y-4 mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <InsightCard title="Neural Load" value={stats.total} icon={<LayoutDashboardIcon className="w-5 h-5" />} colorClass="bg-blue-500" footer="Nodes Active" />
-                <InsightCard title="Mesh Sync" value={`${stats.completionRate}%`} icon={<TrendingUpIcon className="w-5 h-5" />} colorClass="bg-emerald-500" footer="Successful Syncs" />
-                <InsightCard title="High Friction" value={stats.urgent} icon={<ZapIcon className="w-5 h-5" />} colorClass="bg-orange-500" footer="Critical Overload" />
-                <InsightCard title="Active Nexus" value={stats.peakProject.length > 12 ? stats.peakProject.slice(0, 12) + '...' : stats.peakProject} icon={<CheckSquareIcon className="w-5 h-5" />} colorClass="bg-purple-500" footer="Active Sector" />
+                <InsightCard title="Neural Load" value={stats.total} icon={<LayoutDashboardIcon />} colorClass="bg-blue-500" footer="Nodes Active" />
+                <InsightCard title="Mesh Sync" value={`${stats.completionRate}%`} icon={<TrendingUpIcon />} colorClass="bg-emerald-500" footer="Successful Syncs" />
+                <InsightCard title="High Friction" value={stats.urgent} icon={<ZapIcon />} colorClass="bg-orange-500" footer="Critical Overload" />
+                <InsightCard title="Active Nexus" value={stats.peakProject.length > 12 ? stats.peakProject.slice(0, 12) + '...' : stats.peakProject} icon={<CheckSquareIcon />} colorClass="bg-purple-500" footer="Active Sector" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
