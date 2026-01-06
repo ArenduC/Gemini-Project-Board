@@ -20,7 +20,7 @@ import { VoiceAssistantModal } from './components/VoiceAssistantModal';
 import { FeedbackFab } from './components/FeedbackFab';
 import { FeedbackModal } from './components/FeedbackModal';
 import { NotificationToast } from './components/NotificationToast';
-import { AppLogo, SearchIcon, BotMessageSquareIcon, LogOutIcon, SettingsIcon, MessageSquareIcon, RotateCwIcon } from './components/Icons';
+import { AppLogo, SearchIcon, BotMessageSquareIcon, LogOutIcon, SettingsIcon, MessageSquareIcon, RotateCwIcon, ArrowLeftIcon } from './components/Icons';
 import { Session } from '@supabase/supabase-js';
 import { interpretVoiceCommand } from './services/geminiService';
 
@@ -178,9 +178,19 @@ const App: React.FC = () => {
             {project && (
               <>
                 <div className="h-4 w-px bg-white/10 mx-2" />
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[10px] font-black text-emerald-500/70 uppercase tracking-widest leading-none mb-1">Active Project</span>
-                  <h1 className="text-xs font-bold text-white truncate max-w-[150px] sm:max-w-[200px] leading-none">{project.name}</h1>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => {setActiveProjectId(null); setCurrentView('dashboard');}}
+                    className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 transition-all flex items-center gap-1.5 group/back"
+                    title="Exit Project"
+                  >
+                    <ArrowLeftIcon className="w-3.5 h-3.5 group-hover/back:-translate-x-0.5 transition-transform" />
+                    <span className="text-[9px] font-black uppercase tracking-widest hidden sm:block">Back</span>
+                  </button>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[10px] font-black text-emerald-500/70 uppercase tracking-widest leading-none mb-1">Active Project</span>
+                    <h1 className="text-xs font-bold text-white truncate max-w-[150px] sm:max-w-[200px] leading-none">{project.name}</h1>
+                  </div>
                 </div>
               </>
             )}
