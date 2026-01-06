@@ -1,9 +1,10 @@
+
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from 'react-beautiful-dnd';
-import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority, AiGeneratedTaskFromFile, Sprint, BugResponse } from '../types';
+import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority, AiGeneratedTaskFromFile, Sprint, BugResponse, NewTaskData } from '../types';
 import { Column } from './Column';
 import { Filters } from './Filters';
-import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon, RocketIcon, DownloadIcon, XIcon, SparklesIcon, ZapIcon, TrashIcon, LinkIcon, CheckIcon } from './Icons';
+import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon, RocketIcon, DownloadIcon, XIcon, SparklesIcon, ZapIcon, LinkIcon, CheckIcon } from './Icons';
 import { ProjectChat } from './ProjectChat';
 import { AiTaskCreator } from './AiTaskCreator';
 import { TaskGraphView } from './TaskGraphView';
@@ -18,6 +19,7 @@ import { SprintsPage } from './SprintsPage';
 import { BulkActionsBar } from './BulkActionsBar';
 import { BulkUpdateSprintModal } from './BulkUpdateSprintModal';
 import { CompleteSprintModal } from './CompleteSprintModal';
+import { CreateTaskModal } from './CreateTaskModal';
 import { exportAugmentedTasksToCsv } from '../utils/export';
 import { AugmentedTask } from '../types';
 import { useConfirmation } from '../App';
@@ -34,6 +36,7 @@ interface KanbanBoardProps {
   addSubtasks: (taskId: string, subtasks: Partial<Subtask>[], creatorId: string) => Promise<void>;
   addComment: (taskId: string, commentText: string) => Promise<void>;
   addAiTask: (prompt: string) => Promise<void>;
+  addTask: (taskData: NewTaskData) => Promise<void>;
   deleteTask: (taskId: string, columnId: string) => Promise<void>;
   addColumn: (title: string) => Promise<void>;
   deleteColumn: (columnId: string) => Promise<void>;
@@ -97,10 +100,10 @@ const AddColumn: React.FC<{onAddColumn: (title: string) => void}> = ({ onAddColu
       <button
         ref={buttonRef}
         onClick={() => setIsEditing(true)}
-        className="flex items-center gap-2 px-4 py-2 bg-white text-black text-[9px] font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-gray-200 transition-all h-9"
+        className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-white/10 transition-all h-9"
       >
         <PlusIcon className="w-3.5 h-3.5" />
-        Add Column
+        Column
       </button>
       {isEditing && (
         <div ref={formRef} className="absolute top-full right-0 mt-2 p-3 bg-[#131C1B] border border-gray-800 rounded-xl shadow-2xl z-50 w-64">
@@ -179,7 +182,7 @@ const SelectHeadersModal: React.FC<{
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({ 
     project, currentUser, users, onlineUsers, aiFeaturesEnabled, onDragEnd, 
-    updateTask, addSubtasks, addComment, addAiTask, deleteTask, addColumn, 
+    updateTask, addSubtasks, addComment, addAiTask, addTask, deleteTask, addColumn, 
     deleteColumn, isChatOpen, onCloseChat, chatMessages, onSendMessage, onTaskClick, 
     addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch,
     addTasksBatch, addSprint, updateSprint, deleteSprint, bulkUpdateTaskSprint, completeSprint,
@@ -220,8 +223,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   // Bug specific triggers
   const [bugTrigger, setBugTrigger] = useState<{ type: 'create' | 'import' | 'export' | null }>({ type: null });
 
-  // AI Nexus specific state
+  // Modals state
   const [isAiNexusOpen, setIsAiNexusOpen] = useState(false);
+  const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
 
   const boardData = project.board;
   const requestConfirmation = useConfirmation();
@@ -333,9 +337,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const processFileWithAI = async (fileData: { content: string; mimeType: string }, headersToInclude: string[]) => {
     setIsAiParsing(true);
     try {
-        const columnNames = project.board.columnOrder.map(id => project.board.columns[id].title);
+        const columnNames = project.board.columnOrder.map(id => project.board.columns[id]?.title || 'Unknown');
         const tasks = await generateTasksFromFile(fileData, columnNames, headersToInclude);
-        if (tasks.length > 0) {
+        if (tasks && tasks.length > 0) {
             setTasksToConfirm(tasks);
         } else {
             alert("AI could not find any tasks in the provided file.");
@@ -424,8 +428,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
     if (searchTerm) {
       filteredTasks = filteredTasks.filter(task => 
-        task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.description.toLowerCase().includes(searchTerm.toLowerCase())
+        task.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        task.description?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -442,12 +446,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             const columnId = taskIdToColumnIdMap.get(task.id);
             if (!columnId) return false;
             const column = boardData.columns[columnId];
-            return statusFilter.includes(column.title);
+            return column?.title && statusFilter.includes(column.title);
         });
     }
 
     if (tagFilter.length > 0) {
-      filteredTasks = filteredTasks.filter(task => task.tags.some(tag => tagFilter.includes(tag)));
+      filteredTasks = filteredTasks.filter(task => task.tags?.some(tag => tagFilter.includes(tag)));
     }
 
     if (sprintFilter.length > 0) {
@@ -514,14 +518,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const uniqueStatuses = useMemo(() => {
       if (!boardData?.columns) return [];
-      return [...new Set((Object.values(boardData.columns) as ColumnType[]).map(c => c.title))];
+      return [...new Set((Object.values(boardData.columns) as ColumnType[]).map(c => c.title).filter(Boolean))];
   }, [boardData?.columns]);
 
   const uniqueTags = useMemo(() => {
     if (!boardData?.tasks) return [];
     const tags = new Set<string>();
     (Object.values(boardData.tasks) as Task[]).forEach(task => {
-        task.tags.forEach(tag => tags.add(tag));
+        task.tags?.forEach(tag => tags.add(tag));
     });
     return Array.from(tags).sort();
   }, [boardData?.tasks]);
@@ -574,6 +578,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     if (relativeTimeValue) count++;
     return count;
   }, [searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, relativeTimeValue]);
+
+  const activeBugsCount = useMemo(() => Object.keys(project.bugs || {}).length, [project.bugs]);
 
   return (
     <>
@@ -633,6 +639,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 <div className="flex items-center gap-3 px-4 h-9">
                     <LifeBuoyIcon className="w-5 h-5 text-emerald-400" />
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">Bug Tracker</h3>
+                    <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md min-w-[20px] text-center animate-pulse">
+                        {activeBugsCount}
+                    </span>
                 </div>
             ) : !['bugs', 'sprints'].includes(projectView) ? (
               <Filters
@@ -682,7 +691,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 <button onClick={() => handleSetProjectView('board')} className={`p-1.5 rounded-lg transition-all ${projectView === 'board' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Board View"><LayoutDashboardIcon className="w-3.5 h-3.5" /></button>
                 <button onClick={() => handleSetProjectView('table')} className={`p-1.5 rounded-lg transition-all ${projectView === 'table' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Table View"><TableIcon className="w-3.5 h-3.5" /></button>
                 <button onClick={() => handleSetProjectView('graph')} className={`p-1.5 rounded-lg transition-all ${projectView === 'graph' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Graph View"><GitBranchIcon className="w-3.5 h-3.5" /></button>
-                <button onClick={() => handleSetProjectView('bugs')} className={`p-1.5 rounded-lg transition-all ${projectView === 'bugs' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Bug Tracker"><LifeBuoyIcon className="w-3.5 h-3.5" /></button>
+                <button onClick={() => handleSetProjectView('bugs')} className={`p-1.5 rounded-lg transition-all ${projectView === 'bugs' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'} relative`} title="Bug Tracker">
+                    <LifeBuoyIcon className="w-3.5 h-3.5" />
+                    {activeBugsCount > 0 && projectView !== 'bugs' && (
+                        <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-red-500 rounded-full" />
+                    )}
+                </button>
                 <button onClick={() => handleSetProjectView('sprints')} className={`p-1.5 rounded-lg transition-all ${projectView === 'sprints' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Sprints"><RocketIcon className="w-3.5 h-3.5" /></button>
               </div>
             </div>
@@ -697,13 +711,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   >
                     <DownloadIcon className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    onClick={() => setBugTrigger({ type: 'import' })}
-                    className="flex items-center gap-2 px-3 h-9 bg-white/5 border border-white/5 text-gray-400 rounded-xl hover:bg-white/10 hover:text-white transition-all shadow-xl text-[9px] font-black uppercase tracking-widest"
-                  >
-                    <SparklesIcon className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="hidden sm:inline">Import</span>
-                  </button>
+                  {aiFeaturesEnabled && (
+                    <button
+                        onClick={() => setBugTrigger({ type: 'import' })}
+                        className="flex items-center gap-2 px-3 h-9 bg-white/5 border border-white/5 text-gray-400 rounded-xl hover:bg-white/10 hover:text-white transition-all shadow-xl text-[9px] font-black uppercase tracking-widest"
+                    >
+                        <SparklesIcon className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="hidden sm:inline">Import</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => setBugTrigger({ type: 'create' })}
                     className="flex items-center gap-2 px-4 h-9 bg-white text-black rounded-xl hover:bg-gray-200 transition-all shadow-xl shadow-white/5 text-[9px] font-black uppercase tracking-widest"
@@ -714,6 +730,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 </>
               ) : !['bugs', 'sprints'].includes(projectView) && (
                 <>
+                  <button
+                    onClick={() => setIsCreateTaskOpen(true)}
+                    className="flex items-center gap-2 px-4 h-9 bg-white text-black rounded-xl hover:bg-gray-200 transition-all shadow-xl shadow-white/5 text-[9px] font-black uppercase tracking-widest"
+                  >
+                    <PlusIcon className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">New Task</span>
+                  </button>
+
                   {aiFeaturesEnabled && (
                     <button
                         onClick={() => setIsAiNexusOpen(true)}
@@ -724,6 +748,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                         <span className="relative z-10 sm:hidden">AI</span>
                     </button>
                   )}
+                  
                   <button
                     onClick={handleExport}
                     className="flex items-center justify-center w-9 h-9 bg-white/5 border border-white/5 text-gray-500 rounded-xl hover:bg-white/10 hover:text-white transition-all shadow-xl"
@@ -731,6 +756,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   >
                     <DownloadIcon className="w-3.5 h-3.5" />
                   </button>
+                  
                   {projectView === 'board' && (
                     <AddColumn onAddColumn={addColumn} />
                   )}
@@ -753,12 +779,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             onDeleteBugsBatch={deleteBugsBatch}
             initialSearchTerm={initialBugSearch}
             trigger={bugTrigger}
+            aiFeaturesEnabled={aiFeaturesEnabled}
             onTriggerComplete={() => setBugTrigger({ type: null })}
         />
       ) : projectView === 'sprints' ? (
         <SprintsPage
             project={project}
-            // FIX: Using the correct destructured prop name 'addSprint'.
             onAddSprint={addSprint}
             onUpdateSprint={updateSprint}
             onDeleteSprint={deleteSprint}
@@ -898,10 +924,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 </div>
 
                 <footer className="p-6 border-t border-white/5 text-center">
-                    <p className="text-[9px] font-mono text-gray-600 uppercase tracking-widest italic">Authorized Session | User: {currentUser.name.split(' ')[0]}</p>
+                    <p className="text-[9px] font-mono text-gray-600 uppercase tracking-widest italic">Authorized Session | User: {currentUser.name?.split(' ')[0] || 'Unknown'}</p>
                 </footer>
             </div>
         </div>
+      )}
+
+      {isCreateTaskOpen && (
+        <CreateTaskModal 
+          columns={Object.values(project.board.columns)} 
+          users={users} 
+          sprints={project.sprints} 
+          onClose={() => setIsCreateTaskOpen(false)} 
+          onAddTask={addTask} 
+          onAddSprint={addSprint} 
+        />
       )}
 
       {isSelectHeadersModalOpen && fileForProcessing && (

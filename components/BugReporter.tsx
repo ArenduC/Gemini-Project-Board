@@ -1,3 +1,4 @@
+
 import React, { useState, FormEvent, DragEvent, useRef, useMemo, useEffect } from 'react';
 import { Project, User, Bug, TaskPriority, BugResponse } from '../types';
 import { LifeBuoyIcon, PlusIcon, FileUpIcon, LoaderCircleIcon, SparklesIcon, XIcon, TrashIcon, SearchIcon, DownloadIcon } from './Icons';
@@ -274,6 +275,7 @@ interface BugReporterProps {
   onDeleteBugsBatch: (bugIds: string[]) => Promise<void>;
   initialSearchTerm?: string;
   trigger?: { type: 'create' | 'import' | 'export' | null };
+  aiFeaturesEnabled?: boolean;
   onTriggerComplete?: () => void;
 }
 
@@ -285,7 +287,7 @@ const priorityStyles: Record<TaskPriority, string> = {
 };
 
 const getStatusStyle = (status: string): string => {
-    const lowerCaseStatus = status.toLowerCase();
+    const lowerCaseStatus = (status || '').toLowerCase();
     if (lowerCaseStatus.includes('done') || lowerCaseStatus.includes('resolved') || lowerCaseStatus.includes('closed')) {
         return 'bg-green-800 text-green-300';
     }
@@ -296,7 +298,7 @@ const getStatusStyle = (status: string): string => {
 };
 
 
-export const BugReporter: React.FC<BugReporterProps> = ({ project, users, currentUser, onAddBug, onUpdateBug, onDeleteBug, onAddBugsBatch, onDeleteBugsBatch, initialSearchTerm = '', trigger, onTriggerComplete }) => {
+export const BugReporter: React.FC<BugReporterProps> = ({ project, users, currentUser, onAddBug, onUpdateBug, onDeleteBug, onAddBugsBatch, onDeleteBugsBatch, initialSearchTerm = '', trigger, aiFeaturesEnabled = false, onTriggerComplete }) => {
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [isExportModalOpen, setExportModalOpen] = useState(false);
@@ -314,10 +316,11 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
 
   useEffect(() => {
     if (trigger?.type === 'create') setCreateModalOpen(true);
-    if (trigger?.type === 'import') setImportModalOpen(true);
+    if (trigger?.type === 'import' && aiFeaturesEnabled) setImportModalOpen(true);
     if (trigger?.type === 'export') setExportModalOpen(true);
-    if (trigger?.type && onTriggerComplete) onTriggerComplete();
-  }, [trigger, onTriggerComplete]);
+    // Logic: Do not call onTriggerComplete immediately if a modal is about to open, 
+    // instead wait for the modal to close to avoid view jumping.
+  }, [trigger, aiFeaturesEnabled]);
 
   const projectMembers = useMemo(() => project.members.map(id => users.find(u => u.id === id)).filter((u): u is User => !!u), [project.members, users]);
   const columnTitles = useMemo(() => project.board.columnOrder.map(id => project.board.columns[id].title), [project.board]);
@@ -339,6 +342,8 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
     });
     return Array.from(unique.values());
   }, [project.bugs]);
+
+  const totalBugsInProject = useMemo(() => Object.keys(project.bugs || {}).length, [project.bugs]);
 
   const filteredBugs = useMemo(() => {
     let bugsToFilter = (project.bugOrder || []).map(id => project.bugs[id]).filter(Boolean);
@@ -453,6 +458,15 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
     });
   };
 
+  const handleModalClose = () => {
+    setCreateModalOpen(false);
+    setImportModalOpen(false);
+    setExportModalOpen(false);
+    if (onTriggerComplete) {
+        onTriggerComplete();
+    }
+  };
+
   const hasActiveFilters = searchTerm || statusFilter || priorityFilter || assigneeFilter || startDate || endDate;
   const bugsExist = Object.keys(project.bugs || {}).length > 0;
   
@@ -469,6 +483,10 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
     <div className="space-y-4">
       <div className="p-3 bg-[#1C2326] rounded-xl flex items-center justify-between gap-4 flex-wrap border border-white/5">
         <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-black/20 rounded-lg border border-white/5 mr-2">
+            <span className="text-[10px] font-black text-gray-500 uppercase">Records:</span>
+            <span className="text-[11px] font-bold text-white">{filteredBugs.length} / {totalBugsInProject}</span>
+          </div>
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
@@ -583,11 +601,11 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
           totalItems={filteredBugs.length}
       />
 
-      {isCreateModalOpen && <CreateBugModal onClose={() => { setCreateModalOpen(false); if(onTriggerComplete) onTriggerComplete(); }} onAddBug={onAddBug} />}
-      {isImportModalOpen && <ImportBugsModal onClose={() => { setImportModalOpen(false); if(onTriggerComplete) onTriggerComplete(); }} onImport={onAddBugsBatch} />}
+      {isCreateModalOpen && <CreateBugModal onClose={handleModalClose} onAddBug={onAddBug} />}
+      {isImportModalOpen && <ImportBugsModal onClose={handleModalClose} onImport={onAddBugsBatch} />}
       {isExportModalOpen && <ExportBugsModal
           isOpen={isExportModalOpen}
-          onClose={() => { setExportModalOpen(false); if(onTriggerComplete) onTriggerComplete(); }}
+          onClose={handleModalClose}
           bugs={(Object.values(project.bugs || {}) as Bug[])}
           projectName={project.name}
           users={users}
