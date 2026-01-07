@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
+import React, { useState, useEffect, createContext, useContext, useCallback, useMemo } from 'react';
 import { AppState, User, Project, Task, NewTaskData, Subtask, ChatMessage, TaskPriority, Bug, BugResponse, AiGeneratedTaskFromFile, Sprint, FilterSegment, FeedbackType } from './types';
 import { useAppState } from './hooks/useAppState';
 import { api } from './services/api';
@@ -47,19 +46,19 @@ const App: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isJoiningProject, setIsJoiningProject] = useState(false);
   
-  // BYOK & Feature Flags
+  // AI features strictly depend on user provided key
   const [featureFlags, setFeatureFlags] = useState({
-    ai: localStorage.getItem('aiFeaturesEnabled') === 'true' && !!localStorage.getItem('user_gemini_api_key'),
-    voice: localStorage.getItem('voiceAssistantEnabled') === 'true' && !!localStorage.getItem('user_gemini_api_key'),
+    ai: !!localStorage.getItem('user_gemini_api_key'),
+    voice: !!localStorage.getItem('user_gemini_api_key'),
   });
 
-  const { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, addComment, addAiTask, addTask, addTasksBatch, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch, addSprint, updateSprint, deleteSprint, bulkUpdateTaskSprint, completeSprint, addFilterSegment, updateFilterSegment, deleteFilterSegment } = useAppState(session, currentUser, activeProjectId);
+  const { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, updateSubtask, deleteSubtask, addComment, addAiTask, addTask, addTasksBatch, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch, addSprint, updateSprint, deleteSprint, bulkUpdateTaskSprint, completeSprint, addFilterSegment, updateFilterSegment, deleteFilterSegment } = useAppState(session, currentUser, activeProjectId);
 
   // Modals
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
   const [memberProjectId, setMemberProjectId] = useState<string | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -68,6 +67,32 @@ const App: React.FC = () => {
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; confirmText: string } | null>(null);
+
+  const taskProject = useMemo(() => {
+    if (!selectedTaskId) return null;
+    return (Object.values(state.projects) as Project[]).find(p => p.board?.tasks?.[selectedTaskId]);
+  }, [selectedTaskId, state.projects]);
+
+  const selectedTask = useMemo(() => {
+    if (!selectedTaskId || !taskProject) return null;
+    return taskProject.board.tasks[selectedTaskId];
+  }, [selectedTaskId, taskProject]);
+
+  const taskProjectMembers = useMemo(() => {
+    if (!taskProject) return [];
+    return (taskProject.members || [])
+      .map(id => state.users[id])
+      .filter((u): u is User => !!u);
+  }, [taskProject, state.users]);
+
+  const taskProjectSprints = useMemo(() => taskProject?.sprints || [], [taskProject]);
+  
+  const taskProjectTags = useMemo(() => {
+    if (!taskProject?.board?.tasks) return [];
+    const tags = new Set<string>();
+    (Object.values(taskProject.board.tasks) as Task[]).forEach(t => t.tags?.forEach(tag => tags.add(tag)));
+    return Array.from(tags).sort();
+  }, [taskProject]);
 
   useEffect(() => {
     api.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -86,7 +111,6 @@ const App: React.FC = () => {
     }
   }, [session]);
 
-  // Invite Logic Effect
   useEffect(() => {
     const processInvite = async () => {
         if (currentUser && !isJoiningProject) {
@@ -94,12 +118,10 @@ const App: React.FC = () => {
             if (token) {
                 setIsJoiningProject(true);
                 try {
-                    console.log("Mesh: Accepting stored invite token...");
                     await api.data.acceptInvite(token);
                     localStorage.removeItem('project_invite_token');
-                    await fetchData(true); // Re-sync entire mesh to show new project
+                    await fetchData(true);
                 } catch (e) {
-                    console.error("Mesh Error: Failed to join project node.", e);
                     localStorage.removeItem('project_invite_token');
                 } finally {
                     setIsJoiningProject(false);
@@ -110,19 +132,9 @@ const App: React.FC = () => {
     processInvite();
   }, [currentUser, fetchData]);
 
-  // Listen for link failure
-  useEffect(() => {
-    const handleLost = () => {
-      setFeatureFlags({ ai: false, voice: false });
-      localStorage.setItem('aiFeaturesEnabled', 'false');
-    };
-    window.addEventListener('neural-link-lost', handleLost);
-    return () => window.removeEventListener('neural-link-lost', handleLost);
-  }, []);
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchData(false); // Silent fetch
+    await fetchData(false);
     setIsRefreshing(false);
   };
 
@@ -133,7 +145,7 @@ const App: React.FC = () => {
   const handleLogoutClick = () => {
     confirm({
       title: 'Terminate Session',
-      message: 'Are you sure you want to disconnect from the neural mesh? You will need to re-authenticate to access your node clusters.',
+      message: 'Are you sure you want to disconnect from the neural mesh?',
       confirmText: 'Logout',
       onConfirm: () => api.auth.signOut()
     });
@@ -150,7 +162,6 @@ const App: React.FC = () => {
 
   if (!session || !currentUser) return <LandingPage onShowPrivacy={() => {}} />;
   
-  // Only show full screen loader if we have NO data at all or are currently reconfiguring mesh
   if (isJoiningProject || (loading && Object.keys(state.projects).length === 0)) {
       return (
           <div className="min-h-screen bg-[#1C2326] flex flex-col items-center justify-center font-mono text-emerald-500 uppercase tracking-[0.3em] text-[10px]">
@@ -166,9 +177,7 @@ const App: React.FC = () => {
     <ConfirmationContext.Provider value={{ confirm }}>
       <div className="min-h-screen bg-[#1C2326] text-gray-100 flex flex-col font-sans selection:bg-emerald-500/30">
         
-        {/* TOP NAVIGATION */}
         <nav className="h-16 border-b border-white/5 bg-[#131C1B]/80 backdrop-blur-xl sticky top-0 z-30 px-6 grid grid-cols-3 items-center">
-          {/* LEFT: Branding & Active Project */}
           <div className="flex items-center gap-4">
             <button onClick={() => {setActiveProjectId(null); setCurrentView('dashboard');}} className="flex items-center gap-2.5 group flex-shrink-0">
               <AppLogo className="w-8 h-8 group-hover:scale-110 transition-transform" />
@@ -196,7 +205,6 @@ const App: React.FC = () => {
             )}
           </div>
 
-          {/* CENTER: Navigation Tabs */}
           <div className="flex justify-center">
             <div className="flex items-center gap-1 p-1 bg-black/20 rounded-xl border border-white/5">
               <button onClick={() => {setActiveProjectId(null); setCurrentView('dashboard');}} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${currentView === 'dashboard' && !activeProjectId ? 'bg-white text-black shadow-lg' : 'text-gray-500 hover:text-white'}`}>Nodes</button>
@@ -205,7 +213,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* RIGHT: Actions */}
           <div className="flex items-center justify-end gap-3">
             <button 
               onClick={handleRefresh}
@@ -240,7 +247,6 @@ const App: React.FC = () => {
           </div>
         </nav>
 
-        {/* MAIN CONTENT */}
         <main className="flex-grow p-6 overflow-x-hidden custom-scrollbar">
           {activeProjectId && project ? (
             <KanbanBoard 
@@ -249,7 +255,7 @@ const App: React.FC = () => {
               addComment={(tid, text) => addComment(project.id, tid, text, currentUser)} addAiTask={(p) => addAiTask(project.id, p)}
               addTask={(td) => addTask(project.id, td, currentUser.id)} deleteTask={(tid, cid) => deleteTask(project.id, tid, cid)}
               addColumn={(t) => addColumn(project.id, t)} deleteColumn={(cid) => deleteColumn(project.id, cid)} isChatOpen={isChatOpen} onCloseChat={() => setIsChatOpen(false)} chatMessages={project.chatMessages}
-              onSendMessage={(txt) => sendChatMessage(project.id, txt, currentUser)} onTaskClick={setSelectedTask} addProjectLink={(t, u) => addProjectLink(project.id, t, u, currentUser.id)}
+              onSendMessage={(txt) => sendChatMessage(project.id, txt, currentUser)} onTaskClick={(t) => setSelectedTaskId(t.id)} addProjectLink={(t, u) => addProjectLink(project.id, t, u, currentUser.id)}
               deleteProjectLink={deleteProjectLink} addBug={addBug} updateBug={updateBug} deleteBug={deleteBug} 
               addBugsBatch={(bugs) => addBugsBatch(project.id, bugs)} 
               deleteBugsBatch={deleteBugsBatch}
@@ -260,24 +266,39 @@ const App: React.FC = () => {
           ) : currentView === 'dashboard' ? (
             <DashboardPage projects={Object.values(state.projects)} users={state.users} currentUser={currentUser} onlineUsers={onlineUsers} onSelectProject={setActiveProjectId} onCreateProject={() => setIsCreateProjectOpen(true)} onManageMembers={(id) => {setMemberProjectId(id); setIsManageMembersOpen(true);}} onShareProject={(p) => {setShareProject(p); setIsShareModalOpen(true);}} addProjectFromPlan={addProjectFromPlan} />
           ) : currentView === 'tasks' ? (
-            <TasksPage projects={state.projects} users={state.users} currentUser={currentUser} onTaskClick={setSelectedTask} />
+            <TasksPage projects={state.projects} users={state.users} currentUser={currentUser} onTaskClick={(t) => setSelectedTaskId(t.id)} />
           ) : (
-            <ResourceManagementPage projects={state.projects} users={state.users} onlineUsers={onlineUsers} onTaskClick={setSelectedTask} />
+            <ResourceManagementPage projects={state.projects} users={state.users} onlineUsers={onlineUsers} onTaskClick={(t) => setSelectedTaskId(t.id)} />
           )}
         </main>
 
-        {/* MODALS & OVERLAYS */}
         <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} currentUser={currentUser} onUpdateUser={updateUserProfile} featureFlags={featureFlags} onFlagsChange={setFeatureFlags} projects={Object.values(state.projects)} onDeleteProject={deleteProject} onShowPrivacy={() => {}} />
         {isCreateProjectOpen && <CreateProjectModal onClose={() => setIsCreateProjectOpen(false)} onAddProject={(n, d) => addProject(n, d, currentUser.id)} />}
-        {selectedTask && <TaskDetailsModal task={selectedTask} currentUser={currentUser} users={Object.values(state.users)} projectMembers={Object.values(state.users)} allProjectTags={[]} sprints={[]} onlineUsers={onlineUsers} onClose={() => setSelectedTask(null)} onUpdateTask={(t) => updateTask(activeProjectId!, t)} onAddSubtasks={(tid, sts) => addSubtasks(activeProjectId!, tid, sts, currentUser.id)} onAddComment={(tid, text) => addComment(activeProjectId!, tid, text, currentUser)} />}
+        {selectedTask && (
+          <TaskDetailsModal 
+            task={selectedTask} 
+            currentUser={currentUser} 
+            users={Object.values(state.users)} 
+            projectMembers={taskProjectMembers} 
+            allProjectTags={taskProjectTags} 
+            sprints={taskProjectSprints} 
+            onlineUsers={onlineUsers} 
+            onClose={() => setSelectedTaskId(null)} 
+            onUpdateTask={(t) => updateTask(taskProject?.id || '', t)} 
+            onUpdateSubtask={(tid, sid, up) => updateSubtask(taskProject?.id || '', tid, sid, up)}
+            onDeleteSubtask={(tid, sid) => deleteSubtask(taskProject?.id || '', tid, sid)}
+            onAddSubtasks={(tid, sts) => addSubtasks(taskProject?.id || '', tid, sts, currentUser.id)} 
+            onAddComment={(tid, text) => addComment(taskProject?.id || '', tid, text, currentUser)} 
+            aiFeaturesEnabled={featureFlags.ai}
+          />
+        )}
         {isManageMembersOpen && memberProjectId && <ManageMembersModal project={state.projects[memberProjectId]} allUsers={Object.values(state.users)} onlineUsers={onlineUsers} onClose={() => setIsManageMembersOpen(false)} onSave={(mids) => updateProjectMembers(memberProjectId, mids)} />}
         {isShareModalOpen && shareProject && <ManageInviteLinksModal project={shareProject} currentUser={currentUser} onClose={() => setIsShareModalOpen(false)} />}
-        <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} projects={state.projects} users={state.users} onSelectProject={setActiveProjectId} onSelectTask={setSelectedTask} />
+        <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} projects={state.projects} users={state.users} onSelectProject={setActiveProjectId} onSelectTask={(t) => setSelectedTaskId(t.id)} />
         <VoiceAssistantModal isOpen={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} onCommand={handleVoiceCommand} />
         <FeedbackFab onClick={() => setIsFeedbackOpen(true)} />
         <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} onSubmit={async () => {}} />
 
-        {/* CONFIRMATION OVERLAY */}
         {confirmation && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
             <div className="bg-[#131C1B] border border-gray-800 rounded-xl p-6 max-w-sm w-full shadow-2xl">

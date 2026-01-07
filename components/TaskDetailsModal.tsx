@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, FormEvent, useMemo, useRef } from 'react';
-import { Task, Subtask, User, TaskPriority, Sprint } from '../types';
+import { Task, Subtask, User, TaskPriority, Sprint, TaskHistory } from '../types';
 import { generateSubtasks as generateSubtasksFromApi } from '../services/geminiService';
 import { XIcon, BotMessageSquareIcon, LoaderCircleIcon, SparklesIcon, CheckSquareIcon, MessageSquareIcon, PlusIcon, UserIcon, TagIcon, TrashIcon, HistoryIcon, CopyIcon, CheckIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 import { useConfirmation } from '../App';
 import { JsonSyntaxHighlighter } from './JsonSyntaxHighlighter';
+import { api } from '../services/api';
 
 interface TaskDetailsModalProps {
   task: Task;
@@ -16,8 +17,11 @@ interface TaskDetailsModalProps {
   onlineUsers: Set<string>;
   onClose: () => void;
   onUpdateTask: (task: Task) => Promise<void>;
+  onUpdateSubtask: (taskId: string, subtaskId: string, updates: Partial<Subtask>) => Promise<void>;
+  onDeleteSubtask: (taskId: string, subtaskId: string) => Promise<void>;
   onAddSubtasks: (taskId: string, subtasks: Partial<Subtask>[]) => Promise<void>;
   onAddComment: (taskId: string, commentText: string) => Promise<void>;
+  aiFeaturesEnabled: boolean;
 }
 
 type AIGenerationState = 'idle' | 'loading' | 'success' | 'error';
@@ -99,7 +103,6 @@ const EditableField: React.FC<{value: string, onSave: (value: string) => void, i
         : <input type={type} {...commonProps} />;
   }
   
-  // Custom rendering for read-only view if content is JSON
   if (isJsonContent(value)) {
       return (
           <div onClick={() => setIsEditing(true)} className="cursor-pointer group relative">
@@ -127,6 +130,25 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
     const [mentionSearch, setMentionSearch] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [fetchedHistory, setFetchedHistory] = useState<TaskHistory[]>([]);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+    // Load full history from the server immediately to ensure transparency
+    const loadHistory = useCallback(async () => {
+        setIsHistoryLoading(true);
+        try {
+            const history = await api.data.fetchTaskHistory(task.id);
+            setFetchedHistory(history);
+        } catch (e) {
+            console.error("Neural history sync failed:", e);
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    }, [task.id]);
+
+    useEffect(() => {
+        loadHistory();
+    }, [loadHistory]);
 
     const filteredMembers = useMemo(() => {
         if (!mentionSearch) return projectMembers;
@@ -188,16 +210,27 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
         if(newComment.trim()){
             await onAddComment(task.id, newComment.trim());
             setNewComment("");
+            loadHistory(); // Reload history after commenting
         }
     };
 
     const combinedFeed = useMemo(() => {
-      const comments = task.comments.map(c => ({ ...c, type: 'comment' as const }));
-      const history = task.history.map(h => ({ ...h, type: 'history' as const }));
+      const comments = (task.comments || []).map(c => ({ ...c, type: 'comment' as const }));
+      
+      // Use the fetched history as primary source of truth for full audit trails
+      const combinedHistoryMap = new Map();
+      (task.history || []).forEach(h => combinedHistoryMap.set(h.id, h));
+      fetchedHistory.forEach(h => combinedHistoryMap.set(h.id, h));
+      
+      const history = Array.from(combinedHistoryMap.values()).map(h => ({ ...h, type: 'history' as const }));
+      
       const feed = [...comments, ...history];
-      feed.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      return feed;
-    }, [task.comments, task.history]);
+      return feed.sort((a, b) => {
+          const dateA = new Date(a.createdAt || (a as any).created_at).getTime();
+          const dateB = new Date(b.createdAt || (b as any).created_at).getTime();
+          return dateB - dateA;
+      });
+    }, [task.comments, task.history, fetchedHistory]);
 
     const renderWithMentions = (text: string) => {
         const escapeRegex = (str: string) => str.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -226,8 +259,22 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
 
     return (
         <div>
-            <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white"><MessageSquareIcon className="w-5 h-5" /> Activity</h3>
-            <div className="flex items-start gap-3 mb-4">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="text-base font-semibold flex items-center gap-2 text-white">
+                    <MessageSquareIcon className="w-5 h-5 text-emerald-400" /> 
+                    Activity & Node Audit Trail
+                </h3>
+                <button 
+                    onClick={loadHistory}
+                    disabled={isHistoryLoading}
+                    className="p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-emerald-400 transition-colors"
+                    title="Refresh Audit Trail"
+                >
+                    <LoaderCircleIcon className={`w-4 h-4 ${isHistoryLoading ? 'animate-spin text-emerald-500' : ''}`} />
+                </button>
+            </div>
+            
+            <div className="flex items-start gap-3 mb-8">
                 <UserAvatar user={currentUser} className="w-9 h-9 flex-shrink-0" isOnline={onlineUsers.has(currentUser.id)}/>
                 <form onSubmit={handleSubmit} className="flex-grow">
                     <div className="relative">
@@ -236,55 +283,62 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
                             value={newComment}
                             onChange={handleCommentChange}
                             onKeyDown={handleKeyDown}
-                            placeholder="Add a comment... Type @ to mention a user."
-                            className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 bg-[#1C2326] text-white text-sm"
+                            placeholder="Add a comment... Use @ to mention"
+                            className="w-full px-4 py-3 border border-white/5 rounded-2xl shadow-inner focus:outline-none focus:ring-2 focus:ring-emerald-500/50 bg-[#1C2326] text-white text-xs leading-relaxed"
                             rows={2}
                         />
                         {showMentions && filteredMembers.length > 0 && (
-                            <div className="absolute z-10 w-full bg-[#1C2326] border border-gray-700 rounded-md shadow-lg mt-1 max-h-48 overflow-y-auto custom-scrollbar">
+                            <div className="absolute z-10 w-full bg-[#1C2326] border border-gray-700 rounded-xl shadow-2xl mt-2 max-h-48 overflow-y-auto custom-scrollbar">
                                 <ul>
                                     {filteredMembers.map((user, index) => (
                                         <li 
                                             key={user.id}
                                             onClick={() => handleMentionSelect(user)}
                                             onMouseEnter={() => setActiveIndex(index)}
-                                            className={`px-3 py-2 cursor-pointer flex items-center gap-2 ${index === activeIndex ? 'bg-gray-700' : 'hover:bg-gray-800/50'}`}
+                                            className={`px-4 py-2.5 cursor-pointer flex items-center gap-3 ${index === activeIndex ? 'bg-white/10' : 'hover:bg-white/5'}`}
                                         >
-                                            <UserAvatar user={user} className="w-6 h-6 text-xs flex-shrink-0" isOnline={onlineUsers.has(user.id)} />
-                                            <span className="text-sm text-white">{user.name}</span>
+                                            <UserAvatar user={user} className="w-6 h-6 text-[8px] flex-shrink-0" isOnline={onlineUsers.has(user.id)} />
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-white">{user.name}</span>
                                         </li>
                                     ))}
                                 </ul>
                             </div>
                         )}
                     </div>
-                    {newComment && !showMentions && (
-                        <button type="submit" className="mt-2 px-4 py-1.5 bg-gray-300 text-black font-semibold rounded-md text-sm hover:bg-gray-400">
-                            Comment
-                        </button>
+                    {newComment.trim() && !showMentions && (
+                        <div className="flex justify-end mt-3">
+                            <button type="submit" className="px-6 py-2 bg-emerald-500 text-black font-black uppercase tracking-widest rounded-xl text-[10px] hover:bg-emerald-400 transition-all shadow-xl shadow-emerald-500/10">
+                                Broadcast Update
+                            </button>
+                        </div>
                     )}
                 </form>
             </div>
-            <div className="space-y-4">
-                {combinedFeed.map(item => {
+
+            <div className="space-y-6">
+                {combinedFeed.length > 0 ? combinedFeed.map(item => {
                   const author = item.type === 'comment' ? item.author : item.user;
+                  const authorName = author?.name || (typeof (item as any).user_id === 'string' ? users.find(u => u.id === (item as any).user_id)?.name : 'System') || 'Neural Entity';
                   const isJson = item.type === 'comment' ? isJsonContent(item.text) : false;
+                  const createdAt = item.createdAt || (item as any).created_at;
 
                   return (
-                    <div key={`${item.type}-${item.id}`} className="flex items-start gap-3 group">
-                         {item.type === 'comment' ? (
-                            <UserAvatar user={author} className="w-9 h-9 flex-shrink-0" isOnline={onlineUsers.has(author.id)}/>
-                         ) : (
-                            <div className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-[#1C2326] rounded-full">
-                                <HistoryIcon className="w-5 h-5 text-gray-400" />
-                            </div>
-                         )}
-                         <div className="flex-grow pt-1.5 relative w-full min-w-0">
+                    <div key={`${item.type}-${item.id}`} className="flex items-start gap-4 group animate-in fade-in slide-in-from-left-2 duration-300">
+                         <div className="flex-shrink-0 mt-1">
+                            {item.type === 'comment' ? (
+                                <UserAvatar user={author} className="w-9 h-9 ring-2 ring-white/5" isOnline={author ? onlineUsers.has(author.id) : false}/>
+                            ) : (
+                                <div className="w-9 h-9 flex items-center justify-center bg-white/5 rounded-full border border-white/5 text-gray-500 group-hover:text-emerald-500 group-hover:bg-emerald-500/10 transition-colors">
+                                    <HistoryIcon className="w-4 h-4" />
+                                </div>
+                            )}
+                         </div>
+                         <div className="flex-grow min-w-0">
                             {item.type === 'comment' ? (
                                 <>
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-semibold text-sm text-white">{author.name}</span>
-                                        <span className="text-xs text-gray-500">{new Date(item.createdAt).toLocaleString()}</span>
+                                    <div className="flex items-baseline gap-3 mb-1.5">
+                                        <span className="font-bold text-sm text-white tracking-tight">{authorName}</span>
+                                        <span className="text-[9px] font-mono text-gray-600 uppercase tracking-widest">{new Date(createdAt).toLocaleString()}</span>
                                     </div>
                                     <div className="relative">
                                         {isJson ? (
@@ -292,34 +346,50 @@ const ActivitySection: React.FC<ActivitySectionProps> = ({ task, onAddComment, c
                                                 <JsonSyntaxHighlighter data={item.text} />
                                             </div>
                                         ) : (
-                                            <>
-                                                <p className="bg-[#1C2326] p-3 rounded-lg mt-1 whitespace-pre-wrap text-sm text-white">{renderWithMentions(item.text)}</p>
-                                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                                                    <CopyButton text={item.text} className="bg-gray-800 hover:bg-gray-700 p-1" />
+                                            <div className="bg-[#1C2326] p-4 rounded-2xl border border-white/5 relative overflow-hidden group/comment">
+                                                <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/20" />
+                                                <p className="text-xs text-gray-300 leading-relaxed whitespace-pre-wrap">{renderWithMentions(item.text)}</p>
+                                                <div className="absolute top-2 right-2 opacity-0 group-hover/comment:opacity-100 transition-opacity">
+                                                    <CopyButton text={item.text} className="bg-black/40 hover:bg-black/60 p-1.5 rounded-lg" />
                                                 </div>
-                                            </>
+                                            </div>
                                         )}
                                     </div>
                                 </>
                             ) : (
-                                <p className="text-sm text-gray-400">
-                                    <span className="font-semibold text-white">{author.name}</span>
-                                    {' '}
-                                    {item.changeDescription}
-                                    <span className="block text-xs mt-0.5">{new Date(item.createdAt).toLocaleString()}</span>
-                                </p>
+                                <div className="py-1">
+                                    <p className="text-xs text-gray-400 leading-relaxed">
+                                        <span className="font-bold text-gray-300">{authorName}</span>
+                                        {' '}
+                                        <span className="text-gray-500 italic">{(item as any).changeDescription || (item as any).change_description}</span>
+                                    </p>
+                                    <span className="text-[9px] font-mono text-gray-700 uppercase tracking-widest block mt-1.5">
+                                        {new Date(createdAt).toLocaleString()}
+                                    </span>
+                                </div>
                             )}
                          </div>
                     </div>
                   )
-                })}
+                }) : (
+                    <div className="text-center py-16 opacity-30">
+                         {isHistoryLoading ? (
+                             <LoaderCircleIcon className="w-10 h-10 mx-auto mb-3 animate-spin text-gray-600" />
+                         ) : (
+                             <HistoryIcon className="w-10 h-10 mx-auto mb-3 text-gray-600" />
+                         )}
+                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-500">
+                             {isHistoryLoading ? 'Synchronizing records...' : 'No activity logged in this node cluster.'}
+                         </p>
+                    </div>
+                )}
             </div>
         </div>
     )
 }
 
 
-export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, currentUser, users, projectMembers, allProjectTags, sprints, onlineUsers, onClose, onUpdateTask, onAddSubtasks, onAddComment }) => {
+export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, currentUser, users, projectMembers, allProjectTags, sprints, onlineUsers, onClose, onUpdateTask, onUpdateSubtask, onDeleteSubtask, onAddSubtasks, onAddComment, aiFeaturesEnabled }) => {
   const [editedTask, setEditedTask] = useState<Task>(task);
   const [aiState, setAiState] = useState<AIGenerationState>('idle');
   const [aiError, setAiError] = useState<string | null>(null);
@@ -334,19 +404,13 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
   const taskCreator = users.find(u => u.id === task.creatorId);
 
   useEffect(() => {
-    setEditedTask(task); // Sync with external updates
+    setEditedTask(task);
   }, [task]);
 
   useEffect(() => {
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
+    const handleEsc = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handleEsc);
-    return () => {
-      window.removeEventListener('keydown', handleEsc);
-    };
+    return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
   
   const handleUpdateField = (field: keyof Task, value: any) => {
@@ -372,17 +436,14 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
   };
 
   const handleSubtaskToggle = (subtaskId: string) => {
-    const updatedSubtasks = editedTask.subtasks.map(subtask => 
-      subtask.id === subtaskId ? { ...subtask, completed: !subtask.completed } : subtask
-    );
-    handleUpdateField('subtasks', updatedSubtasks);
+    const subtask = editedTask.subtasks.find(s => s.id === subtaskId);
+    if (subtask) {
+        onUpdateSubtask(editedTask.id, subtaskId, { completed: !subtask.completed });
+    }
   };
   
   const handleSubtaskTitleChange = (subtaskId: string, newTitle: string) => {
-    const updatedSubtasks = editedTask.subtasks.map(subtask => 
-      subtask.id === subtaskId ? { ...subtask, title: newTitle } : subtask
-    );
-    handleUpdateField('subtasks', updatedSubtasks);
+    onUpdateSubtask(editedTask.id, subtaskId, { title: newTitle });
   };
 
   const handleGenerateSubtasks = useCallback(async () => {
@@ -396,8 +457,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
         setAiState('success');
     } catch(err) {
         setAiState('error');
-        setAiError(err instanceof Error ? err.message : 'An unknown error occurred.');
-        console.error("Error generating subtasks:", err);
+        setAiError(err instanceof Error ? err.message : 'Neural link failure.');
     }
   }, [editedTask, onAddSubtasks]);
 
@@ -415,20 +475,7 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
   }
 
   const handleSubtaskAssigneeChange = (subtaskId: string, assigneeId: string) => {
-    const newAssignee = projectMembers.find(u => u.id === assigneeId);
-
-    const updatedSubtasks = editedTask.subtasks.map(subtask => {
-        if (subtask.id === subtaskId) {
-            return { 
-                ...subtask, 
-                assigneeId: newAssignee ? newAssignee.id : undefined,
-                assignee: newAssignee || undefined,
-            };
-        }
-        return subtask;
-    });
-
-    handleUpdateField('subtasks', updatedSubtasks);
+    onUpdateSubtask(editedTask.id, subtaskId, { assigneeId: assigneeId || null });
   };
 
   const handleNewTagChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -456,18 +503,9 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
 
   const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (isTagInputFocused && tagSuggestions.length > 0) {
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setActiveSuggestionIndex(prev => (prev + 1) % tagSuggestions.length);
-            return;
-        }
-        if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setActiveSuggestionIndex(prev => (prev - 1 + tagSuggestions.length) % tagSuggestions.length);
-            return;
-        }
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActiveSuggestionIndex(prev => (prev + 1) % tagSuggestions.length); return; }
+        if (e.key === 'ArrowUp') { e.preventDefault(); setActiveSuggestionIndex(prev => (prev - 1 + tagSuggestions.length) % tagSuggestions.length); return; }
     }
-
     if (e.key === 'Enter') {
         e.preventDefault();
         let tagToAdd = newTag.trim();
@@ -488,134 +526,153 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
     if (subtaskToDelete) {
       requestConfirmation({
         title: 'Delete Subtask',
-        message: (
-          <>
-            Are you sure you want to delete the subtask <strong>"{subtaskToDelete.title}"</strong>?
-          </>
-        ),
+        message: <>Remove subtask <strong>"{subtaskToDelete.title}"</strong>?</>,
         onConfirm: () => {
-          const updatedSubtasks = editedTask.subtasks.filter(subtask => subtask.id !== subtaskId);
-          handleUpdateField('subtasks', updatedSubtasks);
+          onDeleteSubtask(editedTask.id, subtaskId);
         },
         confirmText: 'Delete',
       });
     }
   };
 
-  const completedSubtasks = editedTask.subtasks.filter(st => st.completed).length;
-  const totalSubtasks = editedTask.subtasks.length;
+  const completedSubtasks = (editedTask.subtasks || []).filter(st => st.completed).length;
+  const totalSubtasks = (editedTask.subtasks || []).length;
   const progress = totalSubtasks > 0 ? (completedSubtasks / totalSubtasks) * 100 : 0;
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#131C1B] rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <header className="p-4 border-b border-gray-800 flex justify-between items-center flex-shrink-0">
-            <div className="flex-grow mr-4 group flex items-center gap-2">
-                <EditableField 
-                    value={editedTask.title}
-                    onSave={(newTitle) => handleUpdateField('title', newTitle)}
-                    textClassName="text-lg font-bold w-full cursor-pointer hover:bg-gray-800/50 rounded p-1 -m-1 text-white"
-                    inputClassName="text-lg font-bold p-1 rounded border-2 border-gray-500 bg-[#1C2326] focus:outline-none text-white"
-                    placeholder="Enter a task title..."
-                />
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-40 flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={onClose}>
+      <div className="bg-[#131C1B] rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col border border-white/5 relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent" />
+        
+        <header className="px-6 py-5 border-b border-white/5 flex justify-between items-center flex-shrink-0 bg-white/[0.02]">
+            <div className="flex-grow mr-4 group flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-white/5 text-gray-500">
+                    <CheckSquareIcon className="w-5 h-5" />
+                </div>
+                <div className="flex-grow">
+                    <EditableField 
+                        value={editedTask.title}
+                        onSave={(newTitle) => handleUpdateField('title', newTitle)}
+                        textClassName="text-xl font-black w-full cursor-pointer hover:text-emerald-400 rounded transition-colors text-white tracking-tight"
+                        inputClassName="text-xl font-black p-1 rounded border-2 border-emerald-500/20 bg-black/40 focus:outline-none text-white w-full"
+                        placeholder="Task Title"
+                    />
+                </div>
                 <CopyButton text={editedTask.title} className="opacity-0 group-hover:opacity-100 flex-shrink-0" />
             </div>
-            <div className="flex items-center gap-2">
-                <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
-                    <XIcon className="w-6 h-6" />
-                </button>
-            </div>
+            <button onClick={onClose} className="p-2.5 rounded-xl text-gray-500 hover:text-white hover:bg-white/5 transition-all">
+                <XIcon className="w-6 h-6" />
+            </button>
         </header>
         
-        <div className="p-6 overflow-y-auto custom-scrollbar space-y-8">
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-                <UserIcon className="w-4 h-4" />
-                <span>Created by</span>
-                {taskCreator ? (
-                    <>
-                        <UserAvatar user={taskCreator} className="w-6 h-6 text-xs" isOnline={onlineUsers.has(taskCreator.id)} />
-                        <span className="font-semibold text-white">{taskCreator.name}</span>
-                    </>
-                ) : (
-                    <span className="font-semibold text-white">Unknown User</span>
-                )}
-                <span>on {new Date(task.createdAt).toLocaleDateString()}</span>
-            </div>
-
-            <div className="group relative">
-                <EditableField 
-                    value={editedTask.description}
-                    onSave={(newDesc) => handleUpdateField('description', newDesc)}
-                    isTextArea
-                    textClassName="text-sm text-white w-full cursor-pointer hover:bg-gray-800/50 rounded p-2 -m-2 min-h-[50px]"
-                    inputClassName="text-sm p-2 rounded border-2 border-gray-500 bg-[#1C2326] focus:outline-none text-white"
-                    placeholder="Add a more detailed description..."
-                />
-                {!isJsonContent(editedTask.description) && (
-                    <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <CopyButton text={editedTask.description} className="bg-[#1C2326]/80 p-1" />
-                    </div>
-                )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                    <label htmlFor="modal-assignee" className="block text-sm font-medium text-white mb-1">Assignee</label>
-                    <select
-                      id="modal-assignee"
-                      value={editedTask.assignee?.id || ''}
-                      onChange={handleAssigneeChange}
-                      className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
-                    >
-                      <option value="">Unassigned</option>
-                      {projectMembers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
+        <div className="p-8 overflow-y-auto custom-scrollbar flex-grow space-y-10">
+            <div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 bg-white/5 p-4 rounded-2xl border border-white/5">
+                <div className="flex items-center gap-2.5">
+                    <UserIcon className="w-3 h-3 text-emerald-500" />
+                    <span>Origin:</span>
+                    {taskCreator ? (
+                        <div className="flex items-center gap-2 bg-black/20 px-2 py-1 rounded-lg">
+                            <UserAvatar user={taskCreator} className="w-5 h-5 text-[8px]" isOnline={onlineUsers.has(taskCreator.id)} />
+                            <span className="text-white">{taskCreator.name}</span>
+                        </div>
+                    ) : (
+                        <span className="text-white">External Node</span>
+                    )}
                 </div>
-                <div>
-                    <label htmlFor="modal-priority" className="block text-sm font-medium text-white mb-1">Priority</label>
+                <div className="flex items-center gap-2.5">
+                    <HistoryIcon className="w-3 h-3 text-emerald-500" />
+                    <span>Injected:</span>
+                    <span className="text-white font-mono">{new Date(task.createdAt).toLocaleDateString()}</span>
+                </div>
+            </div>
+
+            <section>
+                <div className="flex items-center gap-2 mb-4">
+                    <MessageSquareIcon className="w-4 h-4 text-emerald-500" />
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Contextual Data</h4>
+                </div>
+                <div className="group relative">
+                    <EditableField 
+                        value={editedTask.description}
+                        onSave={(newDesc) => handleUpdateField('description', newDesc)}
+                        isTextArea
+                        textClassName="text-sm text-gray-300 w-full cursor-pointer hover:bg-white/5 rounded-xl p-4 -m-4 min-h-[80px] leading-relaxed border border-transparent hover:border-white/10"
+                        inputClassName="text-sm p-4 rounded-xl border-2 border-emerald-500/20 bg-black/40 focus:outline-none text-white w-full shadow-inner"
+                        placeholder="No context provided. Click to synthesize description..."
+                    />
+                    {!isJsonContent(editedTask.description) && (
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CopyButton text={editedTask.description} className="bg-black/60 p-1.5 rounded-lg" />
+                        </div>
+                    )}
+                </div>
+            </section>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Assignee</label>
+                    <div className="relative">
+                        <select
+                          value={editedTask.assignee?.id || ''}
+                          onChange={handleAssigneeChange}
+                          className="w-full pl-3 pr-10 py-2.5 border border-white/5 rounded-xl bg-white/5 text-white text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500/50 appearance-none font-bold"
+                        >
+                          <option value="">Unassigned</option>
+                          {projectMembers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-600">
+                             <UserIcon className="w-4 h-4" />
+                        </div>
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Priority</label>
                     <select
-                      id="modal-priority"
                       value={editedTask.priority}
                       onChange={handlePriorityChange}
-                      className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
+                      className="w-full px-3 py-2.5 border border-white/5 rounded-xl bg-white/5 text-white text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500/50 font-bold uppercase tracking-widest"
                     >
                       {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
                     </select>
                 </div>
-                 <div>
-                    <label htmlFor="modal-sprint" className="block text-sm font-medium text-white mb-1">Sprint</label>
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Active Sprint</label>
                     <select
-                      id="modal-sprint"
                       value={editedTask.sprintId || ''}
                       onChange={handleSprintChange}
-                      className="w-full px-3 py-2 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-gray-500 focus:border-gray-500 bg-[#1C2326] text-white text-sm"
+                      className="w-full px-3 py-2 border border-white/5 rounded-xl bg-white/5 text-white text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500/50 font-bold"
                     >
-                      <option value="">No Sprint</option>
+                      <option value="">Backlog</option>
                       {(sprints || []).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                 </div>
-                <div>
-                    <label className="block text-sm font-medium text-white mb-1">Due Date</label>
-                    <EditableField
-                        value={editedTask.dueDate || ''}
-                        onSave={(newDate) => handleUpdateField('dueDate', newDate)}
-                        type="date"
-                        textClassName="text-sm text-white w-full cursor-pointer hover:bg-gray-800/50 rounded p-2 -m-2"
-                        inputClassName="text-sm p-1.5 rounded border-2 border-gray-500 bg-[#1C2326] focus:outline-none text-white"
-                        placeholder="No due date"
-                    />
+                <div className="space-y-2">
+                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest ml-1">Due Cycle</label>
+                    <div className="bg-white/5 border border-white/5 rounded-xl p-0.5">
+                        <EditableField
+                            value={editedTask.dueDate || ''}
+                            onSave={(newDate) => handleUpdateField('dueDate', newDate)}
+                            type="date"
+                            textClassName="text-xs text-white font-bold text-center px-2 py-2 cursor-pointer hover:bg-white/5 rounded-lg"
+                            inputClassName="text-xs p-1.5 rounded bg-black/40 border-emerald-500/20 focus:outline-none text-white text-center"
+                            placeholder="Set Due Date"
+                        />
+                    </div>
                 </div>
             </div>
 
-             <div>
-                <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white"><TagIcon className="w-5 h-5" /> Tags</h3>
-                <div className="relative">
+             <section>
+                <div className="flex items-center gap-2 mb-4">
+                    <TagIcon className="w-4 h-4 text-emerald-500" />
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Node Tags</h4>
+                </div>
+                <div className="relative bg-white/5 p-4 rounded-2xl border border-white/5">
                     <div className="flex flex-wrap gap-2 items-center">
                         {editedTask.tags.map(tag => (
-                            <span key={tag} className="flex items-center gap-1.5 text-xs font-medium bg-gray-800 text-gray-400 px-2.5 py-1 rounded-full">
+                            <span key={tag} className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-lg border border-emerald-500/20 transition-all hover:bg-emerald-500/20">
                                 {tag}
-                                <button onClick={() => handleRemoveTag(tag)} className="text-gray-400 hover:text-white">
-                                    <XIcon className="w-3 h-3"/>
+                                <button onClick={() => handleRemoveTag(tag)} className="text-emerald-500/50 hover:text-emerald-400">
+                                    <XIcon className="w-3.5 h-3.5"/>
                                 </button>
                             </span>
                         ))}
@@ -625,93 +682,84 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
                             onChange={handleNewTagChange}
                             onKeyDown={handleTagInputKeyDown}
                             onFocus={() => setIsTagInputFocused(true)}
-                            onBlur={() => setTimeout(() => setIsTagInputFocused(false), 150)} // Delay to allow click on suggestion
-                            placeholder="Add tag..."
-                            className="flex-grow px-2 py-1 text-sm border-b-2 border-transparent focus:border-gray-500 bg-transparent focus:outline-none text-white"
+                            onBlur={() => setTimeout(() => setIsTagInputFocused(false), 200)}
+                            placeholder="+ Add Label..."
+                            className="flex-grow px-2 py-1 text-xs font-bold uppercase tracking-widest bg-transparent focus:outline-none text-white placeholder-gray-600"
                         />
                     </div>
                      {isTagInputFocused && tagSuggestions.length > 0 && (
-                      <div className="absolute z-10 w-full bg-[#1C2326] border border-gray-700 rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto custom-scrollbar">
-                          <ul>
-                              {tagSuggestions.map((tag, index) => (
-                                  <li 
-                                      key={tag}
-                                      onClick={() => addTag(tag)}
-                                      onMouseEnter={() => setActiveSuggestionIndex(index)}
-                                      className={`px-3 py-2 cursor-pointer text-sm text-white ${index === activeSuggestionIndex ? 'bg-gray-700' : 'hover:bg-gray-800/50'}`}
-                                  >
-                                      {tag}
-                                  </li>
-                              ))}
-                          </ul>
+                      <div className="absolute z-20 left-0 right-0 top-full mt-2 bg-[#1C2326] border border-white/10 rounded-xl shadow-2xl max-h-40 overflow-y-auto custom-scrollbar overflow-hidden">
+                          {tagSuggestions.map((tag, index) => (
+                              <button 
+                                  key={tag}
+                                  onClick={() => addTag(tag)}
+                                  onMouseEnter={() => setActiveSuggestionIndex(index)}
+                                  className={`w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest ${index === activeSuggestionIndex ? 'bg-emerald-500 text-black' : 'text-white hover:bg-white/5'}`}
+                              >
+                                  {tag}
+                              </button>
+                          ))}
                       </div>
                     )}
                 </div>
-            </div>
+            </section>
           
-          <div>
-            <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white"><CheckSquareIcon className="w-5 h-5" /> Subtasks</h3>
-            {totalSubtasks > 0 && (
-                <div className="mb-3">
-                    <div className="flex justify-between items-center text-xs mb-1.5">
-                        <span className="font-medium text-white">Progress</span>
-                        <span className="font-semibold text-white">{completedSubtasks} / {totalSubtasks}</span>
-                    </div>
-                    <div className="w-full bg-[#1C2326] rounded-full h-2">
-                        <div className="bg-gray-500 h-2 rounded-full transition-all duration-300 ease-in-out" style={{ width: `${progress}%` }}></div>
-                    </div>
+          <section>
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <CheckSquareIcon className="w-4 h-4 text-emerald-500" />
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Sub-Nodes</h4>
                 </div>
-            )}
-            <div className="space-y-2 mb-3">
-              {editedTask.subtasks.map(subtask => {
-                const subtaskCreator = users.find(u => u.id === subtask.creatorId);
+                {totalSubtasks > 0 && (
+                    <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-mono text-emerald-500/70">{Math.round(progress)}% Complete</span>
+                        <div className="w-32 bg-white/5 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className="space-y-3 mb-6">
+              {(editedTask.subtasks || []).map(subtask => {
                 return (
-                    <div key={subtask.id} className="flex items-center gap-3 bg-[#1C2326] p-2 rounded-md group">
+                    <div key={subtask.id} className="flex items-center gap-4 bg-white/5 p-3 rounded-2xl group border border-white/5 hover:border-white/10 transition-all">
                         <input
                             type="checkbox"
-                            id={subtask.id}
                             checked={subtask.completed}
                             onChange={() => handleSubtaskToggle(subtask.id)}
-                            className="w-4 h-4 rounded text-gray-500 bg-gray-700 border-gray-600 focus:ring-gray-500 flex-shrink-0"
+                            className="w-5 h-5 rounded-lg border-2 border-white/10 bg-black/40 text-emerald-500 focus:ring-emerald-500/50 flex-shrink-0 cursor-pointer"
                         />
-                        <div className="flex-grow">
+                        <div className="flex-grow min-w-0">
                              <EditableField
                                 value={subtask.title}
                                 onSave={(newTitle) => handleSubtaskTitleChange(subtask.id, newTitle)}
-                                textClassName={`text-sm ${subtask.completed ? 'line-through text-gray-500' : 'text-white'} w-full cursor-pointer hover:bg-gray-800/50 rounded p-1 -m-1`}
-                                inputClassName="text-sm p-1 rounded border-2 border-gray-500 bg-gray-800/50 focus:outline-none text-white"
-                                placeholder="Enter a subtask title..."
+                                textClassName={`text-sm font-medium ${subtask.completed ? 'line-through text-gray-600' : 'text-gray-200'} truncate`}
+                                inputClassName="text-sm p-1 rounded bg-black/40 border-emerald-500/20 focus:outline-none text-white w-full"
+                                placeholder="Edit sub-node..."
                             />
                         </div>
-                        <div className="ml-auto flex items-center gap-2">
+                        <div className="ml-auto flex items-center gap-2.5 opacity-40 group-hover:opacity-100 transition-opacity">
                             <select
                                 value={subtask.assigneeId || ''}
                                 onChange={(e) => handleSubtaskAssigneeChange(subtask.id, e.target.value)}
-                                className="text-xs bg-gray-700 border border-transparent hover:border-gray-600 text-white rounded py-1 px-2 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                                title="Assign subtask"
+                                className="text-[9px] font-black uppercase tracking-widest bg-black/40 border border-white/5 text-white rounded-lg py-1 px-2 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
                             >
-                                <option value="" className="bg-gray-800 text-gray-400">Unassigned</option>
-                                {projectMembers.map(u => <option key={u.id} value={u.id} className="bg-gray-800">{u.name}</option>)}
+                                <option value="">Auto</option>
+                                {projectMembers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                             </select>
                             
                             <UserAvatar 
                                 user={subtask.assignee}
-                                className="w-6 h-6 text-xs flex-shrink-0" 
+                                className="w-6 h-6 text-[8px] flex-shrink-0" 
                                 isOnline={subtask.assignee ? onlineUsers.has(subtask.assignee.id) : false}
                             />
                             
-                            <UserAvatar 
-                                user={subtaskCreator} 
-                                className="w-6 h-6 text-xs flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" 
-                                title={`Added by ${subtaskCreator?.name || 'Unknown'}`}
-                                isOnline={subtaskCreator ? onlineUsers.has(subtaskCreator.id) : false}
-                            />
                             <button 
                                 onClick={() => handleDeleteSubtask(subtask.id)}
-                                className="p-1 rounded-full text-gray-400 hover:bg-red-900/50 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                aria-label="Delete subtask"
+                                className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition-all"
                             >
-                                <TrashIcon className="w-4 h-4" />
+                                <TrashIcon className="w-3.5 h-3.5" />
                             </button>
                         </div>
                     </div>
@@ -719,59 +767,64 @@ export const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, curren
               })}
             </div>
 
-            <form onSubmit={handleAddManualSubtask} className="flex items-center gap-2">
+            <form onSubmit={handleAddManualSubtask} className="flex flex-wrap items-center gap-3 bg-black/20 p-2 rounded-2xl border border-white/5">
                 <input 
                     type="text"
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                    placeholder="Add a new subtask..."
-                    className="flex-grow px-3 py-1.5 border border-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-500 bg-[#1C2326] text-white text-sm"
+                    placeholder="New Sub-Node Objective..."
+                    className="flex-grow px-4 py-2 bg-transparent text-sm text-white focus:outline-none"
                 />
-                <select
-                    value={newSubtaskAssigneeId}
-                    onChange={(e) => setNewSubtaskAssigneeId(e.target.value)}
-                    className="px-3 py-1.5 border border-gray-800 rounded-md bg-[#1C2326] text-white text-sm"
-                >
-                    <option value="">Assign to...</option>
-                    {projectMembers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
-                <button type="submit" className="p-2 bg-gray-600 text-white rounded-md hover:bg-gray-500" aria-label="Add subtask">
-                    <PlusIcon className="w-5 h-5"/>
-                </button>
+                <div className="flex items-center gap-2">
+                    <select
+                        value={newSubtaskAssigneeId}
+                        onChange={(e) => setNewSubtaskAssigneeId(e.target.value)}
+                        className="px-3 py-1.5 bg-white/5 border border-white/5 rounded-xl text-[10px] font-bold uppercase text-gray-400 focus:text-white transition-colors"
+                    >
+                        <option value="">Unassigned</option>
+                        {projectMembers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                    <button type="submit" disabled={!newSubtaskTitle.trim()} className="p-2.5 bg-white text-black rounded-xl hover:bg-gray-200 transition-all disabled:opacity-30">
+                        <PlusIcon className="w-4 h-4"/>
+                    </button>
+                </div>
             </form>
 
-            <div className="bg-[#1C2326]/50 p-4 rounded-lg mt-6">
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2 text-white">
-                <SparklesIcon className="w-5 h-5"/>
-                AI Assistant
-                </h4>
-                <p className="text-xs text-gray-400 mb-4">
-                Let Gemini help you break this task into smaller, actionable subtasks.
-                </p>
-                <button
-                onClick={handleGenerateSubtasks}
-                disabled={aiState === 'loading'}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-600 text-white font-semibold rounded-lg shadow-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#1C2326] disabled:bg-gray-500 disabled:cursor-not-allowed transition-all text-sm"
-                >
-                {aiState === 'loading' ? (
-                    <>
-                    <LoaderCircleIcon className="w-5 h-5 animate-spin" />
-                    Generating...
-                    </>
-                ) : (
-                    <>
-                    <BotMessageSquareIcon className="w-5 h-5" />
-                    Generate Subtasks with AI
-                    </>
-                )}
-                </button>
-                {aiState === 'error' && <p className="text-sm text-red-500 mt-2">{aiError}</p>}
-            </div>
-          </div>
+            {aiFeaturesEnabled && (
+                <div className="bg-emerald-500/5 border border-emerald-500/10 p-6 rounded-2xl mt-8 relative overflow-hidden group/ai">
+                    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover/ai:opacity-10 transition-opacity">
+                        <SparklesIcon className="w-16 h-16 text-emerald-400" />
+                    </div>
+                    <div className="flex items-center gap-2 mb-2">
+                        <SparklesIcon className="w-4 h-4 text-emerald-400 animate-pulse"/>
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Neural Decomposition</h4>
+                    </div>
+                    <p className="text-xs text-emerald-400/60 mb-6 leading-relaxed">
+                        AI will analyze task complexity and synthesize a hierarchy of granular sub-nodes.
+                    </p>
+                    <button
+                        onClick={handleGenerateSubtasks}
+                        disabled={aiState === 'loading'}
+                        className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-emerald-500 text-black font-black uppercase tracking-[0.2em] rounded-xl shadow-xl shadow-emerald-500/10 hover:bg-emerald-400 transition-all text-[10px] disabled:opacity-50"
+                    >
+                    {aiState === 'loading' ? (
+                        <>
+                            <LoaderCircleIcon className="w-4 h-4 animate-spin" />
+                            Generating Mesh...
+                        </>
+                    ) : (
+                        <>
+                            <BotMessageSquareIcon className="w-4 h-4" />
+                            Synthesize Sub-Nodes
+                        </>
+                    )}
+                    </button>
+                    {aiState === 'error' && <p className="text-[10px] text-red-400 font-bold uppercase mt-3 tracking-widest text-center">{aiError}</p>}
+                </div>
+            )}
+          </section>
 
-          <hr className="border-gray-800" />
-          
-          <div className="p-6">
+          <div className="pt-10 border-t border-white/5">
             <ActivitySection 
                 task={editedTask} 
                 onAddComment={onAddComment} 

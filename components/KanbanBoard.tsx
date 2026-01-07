@@ -229,6 +229,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const boardData = project.board;
   const requestConfirmation = useConfirmation();
+
+  // FIX: Explicitly filter users to only those who are members of this project
+  const projectMembers = useMemo(() => {
+    return (project.members || []).map(id => users.find(u => u.id === id)).filter((u): u is User => !!u);
+  }, [project.members, users]);
   
   const handleNavigateToBug = (bugNumber: string) => {
     setProjectView('bugs');
@@ -933,7 +938,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       {isCreateTaskOpen && (
         <CreateTaskModal 
           columns={Object.values(project.board.columns)} 
-          users={users} 
+          users={projectMembers} 
           sprints={project.sprints} 
           onClose={() => setIsCreateTaskOpen(false)} 
           onAddTask={addTask} 

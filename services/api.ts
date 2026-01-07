@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { User, Project, NewTaskData, Task, AppState, ChatMessage, ProjectInviteLink, UserRole, Subtask, Sprint, FilterSegment, BugResponse, Column } from '../types';
+import { User, Project, NewTaskData, Task, AppState, ChatMessage, ProjectInviteLink, UserRole, Subtask, Sprint, FilterSegment, BugResponse, Column, TaskHistory } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
 
 /**
@@ -137,6 +137,39 @@ const removeChannel = (channel: RealtimeChannel) => {
 
 // --- DATA FUNCTIONS ---
 
+const logTaskHistory = async (taskId: string, userId: string, description: string) => {
+    try {
+        await supabase.from('task_history').insert({
+            task_id: taskId,
+            user_id: userId,
+            change_description: description
+        });
+    } catch (e) {
+        console.warn("Failed to log history:", e);
+    }
+};
+
+const fetchTaskHistory = async (taskId: string): Promise<TaskHistory[]> => {
+    const { data, error } = await supabase.rpc('get_task_history_v2', {
+        task_id_param: taskId
+    });
+    if (error) {
+        console.error("Error fetching task history:", error);
+        return [];
+    }
+    return (data || []).map((row: any) => ({
+        id: row.id,
+        changeDescription: row.change_description,
+        createdAt: row.created_at,
+        user: {
+            id: row.user_id,
+            name: row.user_name || 'System',
+            avatarUrl: row.user_avatar_url,
+            role: UserRole.MEMBER
+        }
+    }));
+};
+
 const fetchInitialData = async (userId: string): Promise<AppState> => {
     const { data: rpcData, error } = await supabase.rpc('get_initial_data_for_user', {
         user_id_param: userId
@@ -157,13 +190,14 @@ const fetchInitialData = async (userId: string): Promise<AppState> => {
     const processedProjects = rawProjects.map((p: any) => {
         let board = p.board;
         
-        // --- DATA SANITY CHECK: Ensure tasks have valid arrays for tags ---
+        // --- DATA SANITY CHECK ---
         if (board && board.tasks) {
             Object.keys(board.tasks).forEach(taskId => {
                 const task = board.tasks[taskId];
                 if (!task.tags || !Array.isArray(task.tags)) {
                     task.tags = [];
                 }
+                if (!task.history) task.history = [];
             });
         }
 
@@ -217,7 +251,8 @@ const moveTask = async (taskId: string, newColumnId: string, newPosition: number
     const { error } = await supabase.rpc('move_task', {
         task_id: taskId,
         new_column_id: newColumnId,
-        new_position: newPosition
+        new_position: newPosition,
+        actor_id: actorId
     });
 
     if (error) {
@@ -238,7 +273,7 @@ const updateColumnOrder = async (projectId: string, newOrder: string[]) => {
 };
 
 const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) => {
-    // Note: We use RPC to handle text array tags safely
+    // Note: Use RPC with explicit casting handled on server
     const { error } = await supabase.rpc('update_task_v2', {
         task_id_param: updatedTask.id,
         title_param: updatedTask.title,
@@ -247,24 +282,13 @@ const updateTask = async (updatedTask: Task, actorId: string, allUsers: User[]) 
         assignee_id_param: updatedTask.assignee?.id || null,
         due_date_param: updatedTask.dueDate || null,
         sprint_id_param: updatedTask.sprintId || null,
-        tags_param: updatedTask.tags || []
+        tags_param: updatedTask.tags || [],
+        actor_id_param: actorId
     });
 
     if (error) {
         console.error("Supabase RPC error updating task:", error.message, error.code);
-        // Fallback for older schemas that don't have the RPC updated yet
-        if (error.code === 'P0001' || error.message.includes('tags')) {
-             await supabase.from('tasks').update({
-                title: updatedTask.title,
-                description: updatedTask.description,
-                priority: updatedTask.priority,
-                assignee_id: updatedTask.assignee?.id || null,
-                due_date: updatedTask.dueDate || null,
-                sprint_id: updatedTask.sprintId || null
-            }).eq('id', updatedTask.id);
-        } else {
-            throw error;
-        }
+        throw error;
     }
 };
 
@@ -276,11 +300,32 @@ const addSubtasks = async (taskId: string, subtasks: Partial<Subtask>[], creator
         assignee_id: s.assigneeId || null,
         completed: !!s.completed
     }));
-    await supabase.from('subtasks').insert(rows);
+    const { data, error } = await supabase.from('subtasks').insert(rows).select();
+    if (error) throw error;
+    await logTaskHistory(taskId, creatorId, `added ${subtasks.length} sub-nodes`);
+    return data;
+};
+
+const updateSubtask = async (subtaskId: string, updates: Partial<Subtask>) => {
+    const { error } = await supabase
+        .from('subtasks')
+        .update({
+            title: updates.title,
+            completed: updates.completed,
+            assignee_id: updates.assigneeId === undefined ? undefined : (updates.assigneeId || null)
+        })
+        .eq('id', subtaskId);
+    if (error) throw error;
+};
+
+const deleteSubtask = async (subtaskId: string) => {
+    const { error } = await supabase.from('subtasks').delete().eq('id', subtaskId);
+    if (error) throw error;
 };
 
 const addComment = async (taskId: string, text: string, authorId: string) => {
     await supabase.from('comments').insert({ task_id: taskId, author_id: authorId, text });
+    await logTaskHistory(taskId, authorId, `added a comment: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
 };
 
 const addTask = async (taskData: NewTaskData, creatorId: string) => {
@@ -296,12 +341,21 @@ const addTask = async (taskData: NewTaskData, creatorId: string) => {
         tags: [] 
     }).select().single();
     if (error) throw error;
+    
+    await logTaskHistory(data.id, creatorId, 'created the task node');
     return data;
 };
 
 const addTasksBatch = async (tasks: any[]) => {
     const { data, error } = await supabase.from('tasks').insert(tasks).select();
     if (error) throw error;
+    
+    if (data) {
+        for (const task of data) {
+            await logTaskHistory(task.id, task.creator_id, 'imported node via data stream');
+        }
+    }
+    
     return data;
 };
 
@@ -526,6 +580,8 @@ export const api = {
         updateColumnOrder,
         updateTask,
         addSubtasks,
+        updateSubtask,
+        deleteSubtask,
         addComment,
         addTask,
         addTasksBatch,
@@ -556,6 +612,7 @@ export const api = {
         submitFeedback,
         getInviteLinksForProject,
         createInviteLink,
-        updateInviteLink
+        updateInviteLink,
+        fetchTaskHistory
     }
 };
