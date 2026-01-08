@@ -93,8 +93,10 @@ const signUp = async ({ email, password, name }: { email: string, password: stri
 };
 
 const sendPasswordResetEmail = async (email: string) => {
+    // Explicitly define origin to ensure Supabase dashboard whitelist matches
+    const redirectUrl = window.location.origin;
     return await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
+        redirectTo: redirectUrl,
     });
 };
 

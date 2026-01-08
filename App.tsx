@@ -22,6 +22,7 @@ import { NotificationToast } from './components/NotificationToast';
 import { AppLogo, SearchIcon, BotMessageSquareIcon, LogOutIcon, SettingsIcon, MessageSquareIcon, RotateCwIcon, ArrowLeftIcon } from './components/Icons';
 import { Session } from '@supabase/supabase-js';
 import { interpretVoiceCommand } from './services/geminiService';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 
 // --- CONTEXT ---
 interface ConfirmationContextType {
@@ -45,6 +46,7 @@ const App: React.FC = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isJoiningProject, setIsJoiningProject] = useState(false);
+  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
   
   // AI features strictly depend on user provided key
   const [featureFlags, setFeatureFlags] = useState({
@@ -95,8 +97,32 @@ const App: React.FC = () => {
   }, [taskProject]);
 
   useEffect(() => {
-    api.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: { subscription } } = api.auth.onAuthStateChange((_event, session) => setSession(session));
+    // Immediate check for recovery flow in URL fragment
+    const hash = window.location.hash;
+    if (hash && hash.includes('type=recovery')) {
+      setIsRecoveringPassword(true);
+    }
+
+    api.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      // Double check if recovery mode is persistent in session metadata
+      if (session?.user?.app_metadata?.recovery) {
+        setIsRecoveringPassword(true);
+      }
+    });
+
+    const { data: { subscription } } = api.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecoveringPassword(true);
+      }
+      if (event === 'SIGNED_OUT') {
+        setIsRecoveringPassword(false);
+        setCurrentUser(null);
+        setActiveProjectId(null);
+      }
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -159,6 +185,15 @@ const App: React.FC = () => {
       return "Neural link failed to interpret command.";
     }
   };
+
+  // Recovery flow takes absolute priority
+  if (isRecoveringPassword) {
+    return <ResetPasswordPage onResetSuccess={() => {
+        setIsRecoveringPassword(false);
+        // Refresh session to clear recovery metadata
+        api.auth.getSession().then(({ data: { session } }) => setSession(session));
+    }} />;
+  }
 
   if (!session || !currentUser) return <LandingPage onShowPrivacy={() => {}} />;
   
