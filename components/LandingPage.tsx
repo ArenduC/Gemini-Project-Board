@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AppLogo, BotMessageSquareIcon, SparklesIcon, UsersIcon, LayoutDashboardIcon, ArrowLeftIcon, RocketIcon, ZapIcon, ShieldCheckIcon, ChevronRightIcon, CheckSquareIcon, TrendingUpIcon } from './Icons';
 import { LoginPage } from '../pages/LoginPage';
+import { InfoHubModal } from './InfoHubModal';
 
 const ParallaxBackground: React.FC = () => {
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -42,6 +43,13 @@ const ParallaxBackground: React.FC = () => {
 export const LandingPage: React.FC<{ onShowPrivacy: () => void }> = ({ onShowPrivacy }) => {
     const loginSectionRef = useRef<HTMLDivElement>(null);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [infoHubOpen, setInfoHubOpen] = useState(false);
+    const [infoHubTab, setInfoHubTab] = useState<'guide' | 'faq' | 'privacy' | 'terms' | 'contact'>('guide');
+
+    const openInfo = (tab: typeof infoHubTab) => {
+        setInfoHubTab(tab);
+        setInfoHubOpen(true);
+    };
 
     // Handle invite tokens in the URL
     useEffect(() => {
@@ -98,12 +106,20 @@ export const LandingPage: React.FC<{ onShowPrivacy: () => void }> = ({ onShowPri
                     <AppLogo className="w-10 h-10" />
                     <span className="text-xl font-bold tracking-tighter text-white">Graphynovus</span>
                 </div>
-                <button 
-                    onClick={scrollToLogin}
-                    className="px-5 py-2 text-sm font-semibold bg-white text-black rounded-full hover:bg-gray-200 transition-all shadow-xl shadow-white/5"
-                >
-                    Sign In
-                </button>
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={() => openInfo('guide')}
+                        className="hidden md:block text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-white transition-colors"
+                    >
+                        How it works
+                    </button>
+                    <button 
+                        onClick={scrollToLogin}
+                        className="px-5 py-2 text-sm font-semibold bg-white text-black rounded-full hover:bg-gray-200 transition-all shadow-xl shadow-white/5"
+                    >
+                        Sign In
+                    </button>
+                </div>
             </nav>
 
             {/* Hero Section */}
@@ -266,15 +282,39 @@ export const LandingPage: React.FC<{ onShowPrivacy: () => void }> = ({ onShowPri
                 </div>
             </section>
 
-            <footer className="py-12 border-t border-white/5 text-center px-6 bg-[#131C1B]/40 backdrop-blur-md">
-                <div className="flex items-center justify-center gap-3 mb-4 opacity-50 grayscale hover:grayscale-0 transition-all">
-                    <AppLogo className="w-6 h-6" />
-                    <span className="font-bold text-white tracking-tighter">Graphynovus</span>
+            <footer className="py-12 border-t border-white/5 px-6 bg-[#131C1B]/40 backdrop-blur-md">
+                <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+                    <div className="flex flex-col items-center md:items-start gap-4">
+                        <div className="flex items-center gap-3 opacity-50 grayscale hover:grayscale-0 transition-all">
+                            <AppLogo className="w-6 h-6" />
+                            <span className="font-bold text-white tracking-tighter">Graphynovus</span>
+                        </div>
+                        <p className="text-[10px] text-gray-600 font-mono">
+                            &copy; {new Date().getFullYear()} Graphynovus Labs. Neural Workflow Systems.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap justify-center gap-x-12 gap-y-4">
+                        <div className="flex flex-col gap-2">
+                            <h5 className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-500/50">Information Hub</h5>
+                            <button onClick={() => openInfo('guide')} className="text-[11px] font-medium text-gray-500 hover:text-white transition-colors text-left">How it works</button>
+                            <button onClick={() => openInfo('faq')} className="text-[11px] font-medium text-gray-500 hover:text-white transition-colors text-left">FAQ</button>
+                            <button onClick={() => openInfo('contact')} className="text-[11px] font-medium text-gray-500 hover:text-white transition-colors text-left">Support & Contact</button>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                            <h5 className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-500/50">Neural Protocol</h5>
+                            <button onClick={() => openInfo('privacy')} className="text-[11px] font-medium text-gray-500 hover:text-white transition-colors text-left">Privacy Policy</button>
+                            <button onClick={() => openInfo('terms')} className="text-[11px] font-medium text-gray-500 hover:text-white transition-colors text-left">Terms & Conditions</button>
+                        </div>
+                    </div>
                 </div>
-                <p className="text-[10px] text-gray-600 font-mono">
-                    &copy; {new Date().getFullYear()} Graphynovus Labs. Neural Workflow Systems.
-                </p>
             </footer>
+
+            <InfoHubModal 
+                isOpen={infoHubOpen} 
+                onClose={() => setInfoHubOpen(false)} 
+                initialTab={infoHubTab} 
+            />
         </div>
     );
 };

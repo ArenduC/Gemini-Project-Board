@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext, useCallback, useMemo } from 'react';
 import { AppState, User, Project, Task, NewTaskData, Subtask, ChatMessage, TaskPriority, Bug, BugResponse, AiGeneratedTaskFromFile, Sprint, FilterSegment, FeedbackType } from './types';
 import { useAppState } from './hooks/useAppState';
@@ -18,8 +19,9 @@ import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { VoiceAssistantModal } from './components/VoiceAssistantModal';
 import { FeedbackFab } from './components/FeedbackFab';
 import { FeedbackModal } from './components/FeedbackModal';
+import { InfoHubModal } from './components/InfoHubModal';
 import { NotificationToast } from './components/NotificationToast';
-import { AppLogo, SearchIcon, BotMessageSquareIcon, LogOutIcon, SettingsIcon, MessageSquareIcon, RotateCwIcon, ArrowLeftIcon } from './components/Icons';
+import { AppLogo, SearchIcon, BotMessageSquareIcon, LogOutIcon, SettingsIcon, MessageSquareIcon, RotateCwIcon, ArrowLeftIcon, HelpCircleIcon } from './components/Icons';
 import { Session } from '@supabase/supabase-js';
 import { interpretVoiceCommand } from './services/geminiService';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
@@ -68,6 +70,7 @@ const App: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isInfoHubOpen, setIsInfoHubOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; confirmText: string } | null>(null);
 
   const taskProject = useMemo(() => {
@@ -273,6 +276,9 @@ const App: React.FC = () => {
             <button onClick={() => setIsSearchOpen(true)} className="p-2 text-gray-500 hover:text-white transition-colors">
               <SearchIcon className="w-5 h-5" />
             </button>
+            <button onClick={() => setIsInfoHubOpen(true)} className="p-2 text-gray-500 hover:text-white transition-colors">
+              <HelpCircleIcon className="w-5 h-5" />
+            </button>
             <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-gray-500 hover:text-white transition-colors">
               <SettingsIcon className="w-5 h-5" />
             </button>
@@ -333,6 +339,7 @@ const App: React.FC = () => {
         <VoiceAssistantModal isOpen={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} onCommand={handleVoiceCommand} />
         <FeedbackFab onClick={() => setIsFeedbackOpen(true)} />
         <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} onSubmit={async () => {}} />
+        <InfoHubModal isOpen={isInfoHubOpen} onClose={() => setIsInfoHubOpen(false)} />
 
         {confirmation && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
