@@ -189,6 +189,20 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSelectProject = (projectId: string) => {
+    if (currentUser) {
+        const affinityKey = `neural-affinity-${currentUser.id}`;
+        try {
+            const affinityMap = JSON.parse(localStorage.getItem(affinityKey) || '{}');
+            affinityMap[projectId] = Date.now();
+            localStorage.setItem(affinityKey, JSON.stringify(affinityMap));
+        } catch (e) {
+            console.warn("Affinity sync failed", e);
+        }
+    }
+    setActiveProjectId(projectId);
+  };
+
   // Recovery flow takes absolute priority
   if (isRecoveringPassword) {
     return <ResetPasswordPage onResetSuccess={() => {
@@ -305,7 +319,7 @@ const App: React.FC = () => {
               addFilterSegment={(n, f) => addFilterSegment(project.id, n, f, currentUser.id)} updateFilterSegment={updateFilterSegment} deleteFilterSegment={deleteFilterSegment}
             />
           ) : currentView === 'dashboard' ? (
-            <DashboardPage projects={Object.values(state.projects)} users={state.users} currentUser={currentUser} onlineUsers={onlineUsers} onSelectProject={setActiveProjectId} onCreateProject={() => setIsCreateProjectOpen(true)} onManageMembers={(id) => {setMemberProjectId(id); setIsManageMembersOpen(true);}} onShareProject={(p) => {setShareProject(p); setIsShareModalOpen(true);}} addProjectFromPlan={addProjectFromPlan} />
+            <DashboardPage projects={Object.values(state.projects)} users={state.users} currentUser={currentUser} onlineUsers={onlineUsers} onSelectProject={handleSelectProject} onCreateProject={() => setIsCreateProjectOpen(true)} onManageMembers={(id) => {setMemberProjectId(id); setIsManageMembersOpen(true);}} onShareProject={(p) => {setShareProject(p); setIsShareModalOpen(true);}} addProjectFromPlan={addProjectFromPlan} aiFeaturesEnabled={featureFlags.ai} />
           ) : currentView === 'tasks' ? (
             <TasksPage projects={state.projects} users={state.users} currentUser={currentUser} onTaskClick={(t) => setSelectedTaskId(t.id)} />
           ) : (
@@ -335,7 +349,7 @@ const App: React.FC = () => {
         )}
         {isManageMembersOpen && memberProjectId && <ManageMembersModal project={state.projects[memberProjectId]} allUsers={Object.values(state.users)} onlineUsers={onlineUsers} onClose={() => setIsManageMembersOpen(false)} onSave={(mids) => updateProjectMembers(memberProjectId, mids)} />}
         {isShareModalOpen && shareProject && <ManageInviteLinksModal project={shareProject} currentUser={currentUser} onClose={() => setIsShareModalOpen(false)} />}
-        <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} projects={state.projects} users={state.users} onSelectProject={setActiveProjectId} onSelectTask={(t) => setSelectedTaskId(t.id)} />
+        <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} projects={state.projects} users={state.users} onSelectProject={handleSelectProject} onSelectTask={(t) => setSelectedTaskId(t.id)} />
         <VoiceAssistantModal isOpen={isVoiceOpen} onClose={() => setIsVoiceOpen(false)} onCommand={handleVoiceCommand} />
         <FeedbackFab onClick={() => setIsFeedbackOpen(true)} />
         <FeedbackModal isOpen={isFeedbackOpen} onClose={() => setIsFeedbackOpen(false)} onSubmit={async () => {}} />

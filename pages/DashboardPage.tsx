@@ -1,14 +1,14 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, User, AiGeneratedProjectPlan, Task, Column } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
 import { ProjectListRow } from '../components/ProjectListRow';
-import { PlusIcon, DownloadIcon, GridIcon, ListIcon, LayoutDashboardIcon, CalendarIcon, TrendingUpIcon, ClockIcon, SparklesIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/Icons';
+import { PlusIcon, DownloadIcon, GridIcon, ListIcon, LayoutDashboardIcon, CalendarIcon, TrendingUpIcon, ClockIcon, SparklesIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, XIcon, UserIcon, ZapIcon } from '../components/Icons';
 import { exportTasksToCsv } from '../utils/export';
 import { ProjectDropzone } from '../components/ProjectDropzone';
 import { ProjectConfirmationModal } from '../components/ProjectConfirmationModal';
 import { generateProjectFromCsv } from '../services/geminiService';
 import { Pagination } from '../components/Pagination';
+import { UserAvatar } from '../components/UserAvatar';
 
 interface DashboardPageProps {
   projects: Project[];
@@ -20,6 +20,7 @@ interface DashboardPageProps {
   onManageMembers: (projectId: string) => void;
   onShareProject: (project: Project) => void;
   addProjectFromPlan: (plan: AiGeneratedProjectPlan) => Promise<void>;
+  aiFeaturesEnabled: boolean;
 }
 
 const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string | number, trend?: string }> = ({ icon, label, value, trend }) => (
@@ -35,7 +36,151 @@ const StatCard: React.FC<{ icon: React.ReactNode, label: string, value: string |
     </div>
 );
 
-const MiniCalendar: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
+const DayActivityModal: React.FC<{ 
+    isOpen: boolean; 
+    onClose: () => void; 
+    date: Date; 
+    tasks: Task[]; 
+    projects: Project[];
+    users: Record<string, User>;
+    onlineUsers: Set<string>;
+    onSelectProject: (id: string) => void;
+}> = ({ isOpen, onClose, date, tasks, projects, users, onlineUsers, onSelectProject }) => {
+    if (!isOpen) return null;
+
+    const groupedByProject = useMemo(() => {
+        const groups: Record<string, { project: Project; tasks: Task[] }> = {};
+        tasks.forEach(task => {
+            const project = projects.find(p => p.board?.tasks?.[task.id]);
+            if (project) {
+                if (!groups[project.id]) groups[project.id] = { project, tasks: [] };
+                groups[project.id].tasks.push(task);
+            }
+        });
+        return Object.values(groups);
+    }, [tasks, projects]);
+
+    const groupedByResource = useMemo(() => {
+        const groups: Record<string, { user: User | null; tasks: Task[] }> = {};
+        tasks.forEach(task => {
+            const userId = task.assignee?.id || 'unassigned';
+            if (!groups[userId]) {
+                groups[userId] = { 
+                    user: task.assignee ? users[task.assignee.id] : null, 
+                    tasks: [] 
+                };
+            }
+            groups[userId].tasks.push(task);
+        });
+        return Object.values(groups);
+    }, [tasks, users]);
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative w-full max-w-4xl bg-[#131C1B] rounded-2xl border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                <header className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+                            <ZapIcon className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white">Activity Nexus</h2>
+                            <p className="text-[10px] font-mono text-emerald-500/70 uppercase tracking-widest">{date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-xl text-gray-500 hover:text-white hover:bg-white/5 transition-all">
+                        <XIcon className="w-6 h-6" />
+                    </button>
+                </header>
+
+                <div className="flex-grow overflow-y-auto custom-scrollbar p-6 space-y-8">
+                    {tasks.length === 0 ? (
+                        <div className="py-20 text-center text-gray-600 font-mono text-[10px] uppercase tracking-[0.3em]">
+                            NO NEURAL ACTIVITY DETECTED FOR THIS CYCLE
+                        </div>
+                    ) : (
+                        <>
+                            {/* Project-wise Breakdown */}
+                            <section>
+                                <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                    <LayoutDashboardIcon className="w-3 h-3" /> Project Clusters
+                                </h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {groupedByProject.map(({ project, tasks }) => (
+                                        <div key={project.id} onClick={() => { onSelectProject(project.id); onClose(); }} className="p-4 rounded-xl bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all cursor-pointer group">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <h4 className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors">{project.name}</h4>
+                                                <span className="text-[9px] font-mono text-gray-500">{tasks.length} Nodes</span>
+                                            </div>
+                                            <div className="flex -space-x-2">
+                                                {tasks.slice(0, 5).map(t => (
+                                                    <div key={t.id} className="w-6 h-6 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[8px] text-emerald-500 font-black">
+                                                        {t.priority[0]}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+
+                            {/* Resource-wise Breakdown */}
+                            <section>
+                                <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                    <UserIcon className="w-3 h-3" /> Resource Allocation
+                                </h3>
+                                <div className="space-y-2">
+                                    {groupedByResource.map(({ user, tasks }) => (
+                                        <div key={user?.id || 'unassigned'} className="p-3 rounded-xl bg-black/20 border border-white/5 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <UserAvatar user={user} className="w-8 h-8" isOnline={user ? onlineUsers.has(user.id) : false} />
+                                                <span className="text-xs font-bold text-white">{user?.name || 'Unassigned Node'}</span>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <p className="text-[10px] font-mono text-white">{tasks.length} Syncs</p>
+                                                    <p className="text-[8px] text-gray-500 uppercase font-bold tracking-widest">Load factor</p>
+                                                </div>
+                                                <div className="w-24 h-1 bg-white/5 rounded-full overflow-hidden">
+                                                    <div className="bg-blue-500 h-full" style={{ width: `${Math.min(tasks.length * 20, 100)}%` }} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+
+                            {/* Task-wise Breakdown */}
+                            <section>
+                                <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                    <CheckSquareIcon className="w-3 h-3" /> Task Stream
+                                </h3>
+                                <div className="space-y-1">
+                                    {tasks.map(task => (
+                                        <div key={task.id} className="p-3 rounded-lg hover:bg-white/5 transition-colors border-b border-white/[0.02] flex items-center justify-between group/task">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-1.5 h-1.5 rounded-full ${task.priority === 'Urgent' ? 'bg-red-500 animate-pulse' : 'bg-gray-700'}`} />
+                                                <span className="text-xs text-gray-300 font-medium group-hover/task:text-white transition-colors">{task.title}</span>
+                                            </div>
+                                            <span className="text-[9px] font-mono text-gray-600 uppercase tracking-widest">Node_{task.id.slice(0,4)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        </>
+                    )}
+                </div>
+
+                <footer className="p-4 border-t border-white/5 bg-white/[0.01] flex justify-center">
+                    <p className="text-[9px] font-mono text-gray-600 uppercase tracking-[0.3em]">Graphynovus Neural Audit System v3.0</p>
+                </footer>
+            </div>
+        </div>
+    );
+};
+
+const MiniCalendar: React.FC<{ tasks: Task[], onDayClick: (date: Date, tasks: Task[]) => void }> = ({ tasks, onDayClick }) => {
     const [viewDate, setViewDate] = useState(new Date());
     const currentMonth = viewDate.getMonth();
     const currentYear = viewDate.getFullYear();
@@ -53,13 +198,14 @@ const MiniCalendar: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     const resetToToday = () => setViewDate(new Date());
 
     const engagementMap = useMemo(() => {
-        const counts = new Map<number, number>();
+        const counts = new Map<number, Task[]>();
         tasks.forEach(t => {
             if (t.dueDate) {
                 const d = new Date(t.dueDate);
                 if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
                     const day = d.getDate();
-                    counts.set(day, (counts.get(day) || 0) + 1);
+                    const existing = counts.get(day) || [];
+                    counts.set(day, [...existing, t]);
                 }
             }
         });
@@ -67,12 +213,14 @@ const MiniCalendar: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     }, [tasks, currentMonth, currentYear]);
 
     const maxEngagement = useMemo(() => {
-        const values = Array.from(engagementMap.values());
+        // FIX: Added explicit type annotation to 'list' to resolve "Property 'length' does not exist on type 'unknown'" error.
+        const values = Array.from(engagementMap.values()).map((list: Task[]) => list.length);
         return values.length > 0 ? Math.max(...(values as number[])) : 1;
     }, [engagementMap]);
 
     const getEngagementStyle = (day: number) => {
-        const count = engagementMap.get(day) || 0;
+        const dayTasks = engagementMap.get(day) || [];
+        const count = dayTasks.length;
         if (count === 0) return 'text-gray-500 hover:bg-white/5';
         
         const ratio = count / maxEngagement;
@@ -120,17 +268,22 @@ const MiniCalendar: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
                     const today = new Date();
                     const isToday = d === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
                     const engagementClass = getEngagementStyle(d);
-                    const count = engagementMap.get(d) || 0;
+                    const dayTasks = engagementMap.get(d) || [];
                     
                     return (
                         <div 
                             key={d} 
-                            title={count > 0 ? `${count} engagement nodes` : undefined}
-                            className={`aspect-square flex items-center justify-center rounded-lg text-[9px] transition-all duration-300 cursor-default relative overflow-hidden
+                            onClick={() => onDayClick(new Date(currentYear, currentMonth, d), dayTasks)}
+                            title={dayTasks.length > 0 ? `${dayTasks.length} engagement nodes` : undefined}
+                            className={`aspect-square flex items-center justify-center rounded-lg text-[9px] transition-all duration-300 relative overflow-hidden cursor-pointer group
                                 ${isToday ? 'ring-1 ring-white/60' : ''}
-                                ${engagementClass}`}
+                                ${engagementClass}
+                                hover:scale-110 hover:z-10`}
                         >
                             <span className="relative z-10">{d}</span>
+                            {dayTasks.length > 0 && (
+                                <div className="absolute inset-0 bg-emerald-400 opacity-0 group-hover:opacity-10 transition-opacity" />
+                            )}
                         </div>
                     );
                 })}
@@ -186,14 +339,19 @@ const DeadlineTracker: React.FC<{ tasks: Task[], onTaskClick: (task: Task) => vo
     );
 };
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, currentUser, onlineUsers, onSelectProject, onCreateProject, onManageMembers, onShareProject, addProjectFromPlan }) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, currentUser, onlineUsers, onSelectProject, onCreateProject, onManageMembers, onShareProject, addProjectFromPlan, aiFeaturesEnabled }) => {
     const [view, setView] = useState<'grid' | 'list'>('grid');
     const [generatedPlan, setGeneratedPlan] = useState<AiGeneratedProjectPlan | null>(null);
     const [isAiProcessing, setIsAiProcessing] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 8;
 
-    const allTasks = useMemo(() => projects.flatMap(p => p.board?.tasks ? Object.values(p.board.tasks) : []), [projects]);
+    // Day Activity Modal State
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [dayActivityTasks, setDayActivityTasks] = useState<Task[]>([]);
+
+    // FIX: Added explicit type casting (as Task[]) to ensure Object.values returns typed results for flatMap, resolving potential type inference issues.
+    const allTasks = useMemo(() => projects.flatMap(p => p.board?.tasks ? (Object.values(p.board.tasks) as Task[]) : []), [projects]);
     
     const activeTasks = useMemo(() => {
         return projects.flatMap(p => {
@@ -215,7 +373,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
         return 'Evening';
     }, []);
 
-    // Neural Affinity Sorting: prioritizes projects you last interacted with
     const sortedProjects = useMemo(() => {
         const affinityKey = `neural-affinity-${currentUser.id}`;
         let affinityMap: Record<string, number> = {};
@@ -245,6 +402,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
         } finally {
             setIsAiProcessing(false);
         }
+    };
+
+    const handleDayClick = (date: Date, tasks: Task[]) => {
+        setSelectedDate(date);
+        setDayActivityTasks(tasks);
     };
 
     return (
@@ -286,7 +448,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
                         </div>
                     </div>
 
-                    <ProjectDropzone onFileProcessed={handleFileProcessed} isLoading={isAiProcessing} />
+                    {aiFeaturesEnabled && (
+                        <ProjectDropzone onFileProcessed={handleFileProcessed} isLoading={isAiProcessing} />
+                    )}
 
                     {projects.length === 0 ? (
                         <div className="py-16 text-center bg-[#131C1B]/40 rounded-xl border border-dashed border-white/5 backdrop-blur-sm">
@@ -300,7 +464,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
                                 <div key={p.id} className="relative">
                                     {idx === 0 && currentPage === 1 && (
                                         <div className="absolute -top-2 -left-2 z-10 px-2 py-0.5 bg-emerald-500 text-black text-[8px] font-black uppercase tracking-widest rounded-md shadow-lg rotate-[-5deg] animate-bounce">
-                                            Current Nexus
+                                            Active Nexus
                                         </div>
                                     )}
                                     <ProjectCard project={p} users={users} onlineUsers={onlineUsers} onSelect={onSelectProject} onManageMembers={onManageMembers} onShare={() => onShareProject(p)} />
@@ -326,7 +490,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
                 </div>
 
                 <div className="col-span-12 lg:col-span-3 space-y-4">
-                    <MiniCalendar tasks={allTasks} />
+                    <MiniCalendar tasks={allTasks} onDayClick={handleDayClick} />
                     <DeadlineTracker tasks={activeTasks} onTaskClick={(task) => {
                         const parentProj = projects.find(p => p.board?.tasks?.[task.id]);
                         if (parentProj) onSelectProject(parentProj.id);
@@ -336,13 +500,26 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
                              Intelligence <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
                         </h4>
                         <p className="text-[10px] text-gray-400 leading-relaxed italic">
-                            Analyzing velocity. Sync in 24h.
+                            Analyzing velocity. Last sync {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
                         </p>
                     </div>
                 </div>
             </div>
 
             {generatedPlan && <ProjectConfirmationModal plan={generatedPlan} onConfirm={async () => { await addProjectFromPlan(generatedPlan); setGeneratedPlan(null); }} onCancel={() => setGeneratedPlan(null)} />}
+            
+            {selectedDate && (
+                <DayActivityModal 
+                    isOpen={!!selectedDate} 
+                    onClose={() => setSelectedDate(null)} 
+                    date={selectedDate} 
+                    tasks={dayActivityTasks} 
+                    projects={projects}
+                    users={users}
+                    onlineUsers={onlineUsers}
+                    onSelectProject={onSelectProject}
+                />
+            )}
         </div>
     );
 };
