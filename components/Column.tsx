@@ -1,5 +1,5 @@
 import React from 'react';
-import { Droppable } from 'react-beautiful-dnd';
+import { StrictModeDroppable } from './StrictModeDroppable';
 import { Column as ColumnType, Task, User, Sprint } from '../types';
 import { TaskCard } from './TaskCard';
 import { TrashIcon } from './Icons';
@@ -56,7 +56,7 @@ export const Column: React.FC<ColumnProps> = ({ column, tasks, sprints, users, o
           </button>
         </div>
       </div>
-      <Droppable droppableId={column.id} type="task">
+      <StrictModeDroppable droppableId={column.id} type="task">
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}
@@ -83,7 +83,7 @@ export const Column: React.FC<ColumnProps> = ({ column, tasks, sprints, users, o
             {provided.placeholder}
           </div>
         )}
-      </Droppable>
+      </StrictModeDroppable>
     </div>
   );
 };

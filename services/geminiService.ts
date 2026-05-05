@@ -1,4 +1,3 @@
-
 import { Type, GoogleGenAI } from "@google/genai";
 import { TaskPriority, Project, User, AiGeneratedProjectPlan, AiGeneratedTaskFromFile, BugResponse } from "../types";
 
@@ -21,10 +20,9 @@ export const validateGeminiKey = async (apiKey: string): Promise<boolean> => {
 
     // List of models to probe in order of likely availability
     const probeModels = [
-        "gemini-2.0-flash-exp",
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-8b",
-        "gemini-1.5-pro"
+        "gemini-3-flash-preview",
+        "gemini-3-pro-preview",
+        "gemini-flash-lite-latest"
     ];
 
     for (const modelName of probeModels) {
@@ -71,7 +69,7 @@ export const validateGeminiKey = async (apiKey: string): Promise<boolean> => {
  * If a user API key is present, it bypasses the backend and executes directly.
  */
 async function callGemini(model: string, prompt: string, schema?: any) {
-    const userKey = localStorage.getItem('user_gemini_api_key');
+    const userKey = localStorage.getItem('user_gemini_api_key') || process.env.API_KEY;
     const preferredModel = localStorage.getItem('active_neural_model') || model;
     
     // PATH A: DIRECT SDK EXECUTION (BYOK)
@@ -206,38 +204,38 @@ const projectFromCsvResponseSchema = {
 
 export const generateSubtasks = async (title: string, description: string): Promise<{title: string}[]> => {
     const prompt = `Break down into subtasks: "${title}". Context: "${description}"`;
-    return await callGemini("gemini-1.5-flash", prompt, subtaskResponseSchema);
+    return await callGemini("gemini-3-flash-preview", prompt, subtaskResponseSchema);
 };
 
 export const generateTaskFromPrompt = async (prompt: string): Promise<any> => {
-    return await callGemini("gemini-1.5-flash", prompt, taskResponseSchema);
+    return await callGemini("gemini-3-flash-preview", prompt, taskResponseSchema);
 };
 
 export const interpretVoiceCommand = async (command: string, context: any): Promise<any> => {
     const prompt = `Command: "${command}". Context: ${JSON.stringify(context)}`;
-    return await callGemini("gemini-1.5-flash", prompt, voiceCommandResponseSchema);
+    return await callGemini("gemini-3-flash-preview", prompt, voiceCommandResponseSchema);
 };
 
 export const performGlobalSearch = async (query: string, projects: any, users: any): Promise<SearchResponse> => {
     const prompt = `Search for: "${query}" in project context: ${JSON.stringify({ projects: Object.keys(projects), users: Object.keys(users) })}`;
-    return await callGemini("gemini-1.5-flash", prompt, searchResponseSchema);
+    return await callGemini("gemini-3-flash-preview", prompt, searchResponseSchema);
 };
 
 export const generateProjectLinks = async (name: string, desc: string): Promise<any[]> => {
     const prompt = `Suggest resource links (GitHub, Figma, Docs) for: ${name} (${desc})`;
-    return await callGemini("gemini-1.5-flash", prompt, projectLinkResponseSchema);
+    return await callGemini("gemini-3-flash-preview", prompt, projectLinkResponseSchema);
 };
 
 export const generateProjectFromCsv = async (csv: string): Promise<AiGeneratedProjectPlan> => {
-    return await callGemini("gemini-1.5-pro", `Generate project plan from CSV data: ${csv}`, projectFromCsvResponseSchema);
+    return await callGemini("gemini-3-pro-preview", `Generate project plan from CSV data: ${csv}`, projectFromCsvResponseSchema);
 };
 
 export const generateBugsFromFile = async (content: string, headers: string[]): Promise<BugResponse[]> => {
     const prompt = `Extract bug reports from this content. Data: ${content}. Headers: ${headers}`;
-    return await callGemini("gemini-1.5-flash", prompt, { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING } } } });
+    return await callGemini("gemini-3-flash-preview", prompt, { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING } } } });
 };
 
 export const generateTasksFromFile = async (fileData: any, columns: string[], headers: string[]): Promise<AiGeneratedTaskFromFile[]> => {
     const prompt = `Map file data to tasks for these columns: ${columns}. Headers: ${headers}. Data: ${fileData.content}`;
-    return await callGemini("gemini-1.5-pro", prompt, { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING }, priority: { type: Type.STRING, enum: Object.values(TaskPriority) }, status: { type: Type.STRING } } } });
+    return await callGemini("gemini-3-pro-preview", prompt, { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING }, priority: { type: Type.STRING, enum: Object.values(TaskPriority) }, status: { type: Type.STRING } } } });
 };

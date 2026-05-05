@@ -40,8 +40,13 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         const freshState = await api.data.fetchInitialData(userId);
         setState(freshState);
         syncCache(freshState);
-    } catch (error) {
+    } catch (error: any) {
         console.error("An error occurred while fetching app data:", error);
+        if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+            console.error("Network connectivity issue detected with Supabase.");
+        }
+        // Even on error, we stop loading so the UI can at least show cached data or empty state
+        setLoading(false); 
     } finally {
         setLoading(false);
     }
@@ -109,6 +114,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
                 [activeProjectId]: {
                     ...project,
                     chatMessages: newMessages.sort((a,b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+                    updatedAt: new Date().toISOString()
                 }
             }
         };
@@ -121,14 +127,53 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     return () => { subscription.unsubscribe(); };
   }, [activeProjectId, session, userId]);
 
+  /**
+   * Optimistically "touches" a project in the local state.
+   * This forces the project to the top of sorted lists immediately.
+   */
+  const optimisticTouch = (projectId: string, taskId?: string) => {
+      const now = new Date().toISOString();
+      setState(prevState => {
+          const project = prevState.projects[projectId];
+          if (!project) return prevState;
+          
+          let updatedTasks = project.board.tasks;
+          if (taskId && project.board.tasks[taskId]) {
+              updatedTasks = {
+                  ...project.board.tasks,
+                  [taskId]: { ...project.board.tasks[taskId], updatedAt: now }
+              };
+          }
 
-  const onDragEnd = useCallback(async (projectId: string, result: DropResult) => {
+          const updatedState = {
+              ...prevState,
+              projects: {
+                  ...prevState.projects,
+                  [projectId]: { 
+                      ...project, 
+                      updatedAt: now,
+                      board: { ...project.board, tasks: updatedTasks }
+                  }
+              }
+          };
+          syncCache(updatedState);
+          return updatedState;
+      });
+      // Synchronize with server
+      api.data.touchProject(projectId).catch(console.warn);
+  };
+
+
+  const onDragEnd = useCallback(async (projectId: string, result: DropResult, filteredBoardData?: BoardData) => {
     const { destination, source, draggableId, type } = result;
     if (!destination || !currentUser || !userId) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
     
     const project = state.projects[projectId];
     if (!project) return;
+
+    // Trigger immediate re-sequence on dashboard
+    optimisticTouch(projectId, type !== 'column' ? draggableId : undefined);
 
     if (type === 'column') {
         const newColumnOrder = Array.from(project.board.columnOrder) as string[];
@@ -162,13 +207,48 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     const endCol = project.board.columns[destination.droppableId];
     if (!startCol || !endCol) return;
 
+    // Handle index translation if filtered data is provided
+    let finalSourceIndex = source.index;
+    let finalDestinationIndex = destination.index;
+
+    if (filteredBoardData) {
+        const filteredStartCol = filteredBoardData.columns[source.droppableId];
+        const filteredEndCol = filteredBoardData.columns[destination.droppableId];
+
+        if (filteredStartCol) {
+            const taskId = filteredStartCol.taskIds[source.index];
+            finalSourceIndex = startCol.taskIds.indexOf(taskId);
+        }
+
+        if (filteredEndCol) {
+            if (destination.index >= filteredEndCol.taskIds.length) {
+                // Moving to the very end of the visible tasks
+                finalDestinationIndex = endCol.taskIds.length;
+            } else {
+                const targetTaskId = filteredEndCol.taskIds[destination.index];
+                finalDestinationIndex = endCol.taskIds.indexOf(targetTaskId);
+                // If we are moving within the same column and moving "down", 
+                // the index might need adjustment if we remove the item from before it.
+                // But splice handles this if we do it in order.
+            }
+        }
+    }
+
     const newStartTaskIds = Array.from(startCol.taskIds);
-    newStartTaskIds.splice(source.index, 1);
+    newStartTaskIds.splice(finalSourceIndex, 1);
     const newEndTaskIds = startCol.id === endCol.id ? newStartTaskIds : Array.from(endCol.taskIds);
+    
     if (startCol.id !== endCol.id) {
-        newEndTaskIds.splice(destination.index, 0, draggableId);
+        newEndTaskIds.splice(finalDestinationIndex, 0, draggableId);
     } else {
-        newStartTaskIds.splice(destination.index, 0, draggableId);
+        // Adjust destination index for same-column move
+        let adjustedDestIndex = finalDestinationIndex;
+        // If we removed an item from BEFORE the destination, the destination index shifted
+        // No, wait. splice(finalSourceIndex, 1) removes it.
+        // If finalSourceIndex < finalDestinationIndex, the list shortened before the dest.
+        // But if we used indexOf on the ORIGINAL list, then finalDestinationIndex is still correct for the original list.
+        // Actually, if we use the same list for start and end, we just splice it in.
+        newStartTaskIds.splice(adjustedDestIndex, 0, draggableId);
     }
 
     setState(prevState => {
@@ -215,7 +295,6 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
 
     try {
         await api.data.moveTask(draggableId, destination.droppableId, destination.index + 1, currentUser.id);
-        // Slightly longer delay to ensure server trigger finished logging
         setTimeout(() => fetchData(), 1200);
     } catch (error) {
         await fetchData();
@@ -224,6 +303,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   
   const updateTask = useCallback(async (projectId: string, updatedTask: Task) => {
       if (!currentUser) return;
+      optimisticTouch(projectId, updatedTask.id);
       
       setState(prevState => {
         const project = prevState.projects[projectId];
@@ -252,6 +332,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
         const mergedTask = {
             ...existingTask,
             ...updatedTask,
+            updatedAt: now,
             subtasks: updatedTask.subtasks && updatedTask.subtasks.length > 0 ? updatedTask.subtasks : (existingTask?.subtasks || []),
             comments: updatedTask.comments && updatedTask.comments.length > 0 ? updatedTask.comments : (existingTask?.comments || []),
             history: [...historyEntries, ...(existingTask?.history || [])],
@@ -286,6 +367,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, [fetchData, currentUser, state.users]);
 
   const addSubtasks = useCallback(async (projectId: string, taskId: string, newSubtasksData: Partial<Subtask>[], creatorId: string) => {
+    optimisticTouch(projectId, taskId);
     setState(prevState => {
         const project = prevState.projects[projectId];
         if (!project || !project.board.tasks[taskId]) return prevState;
@@ -321,7 +403,8 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
                             [taskId]: {
                                 ...task,
                                 subtasks: [...(task.subtasks || []), ...tempSubtasks],
-                                history: [historyEntry, ...(task.history || [])]
+                                history: [historyEntry, ...(task.history || [])],
+                                updatedAt: new Date().toISOString()
                             }
                         }
                     }
@@ -341,6 +424,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, [fetchData, currentUser]);
 
   const updateSubtask = useCallback(async (projectId: string, taskId: string, subtaskId: string, updates: Partial<Subtask>) => {
+    optimisticTouch(projectId, taskId);
     setState(prevState => {
         const project = prevState.projects[projectId];
         if (!project || !project.board.tasks[taskId]) return prevState;
@@ -356,7 +440,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
                         ...project.board,
                         tasks: {
                             ...project.board.tasks,
-                            [taskId]: { ...task, subtasks: updatedSubtasks }
+                            [taskId]: { ...task, subtasks: updatedSubtasks, updatedAt: new Date().toISOString() }
                         }
                     }
                 }
@@ -373,6 +457,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, [fetchData]);
 
   const deleteSubtask = useCallback(async (projectId: string, taskId: string, subtaskId: string) => {
+    optimisticTouch(projectId, taskId);
     setState(prevState => {
         const project = prevState.projects[projectId];
         if (!project || !project.board.tasks[taskId]) return prevState;
@@ -388,7 +473,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
                         ...project.board,
                         tasks: {
                             ...project.board.tasks,
-                            [taskId]: { ...task, subtasks: updatedSubtasks }
+                            [taskId]: { ...task, subtasks: updatedSubtasks, updatedAt: new Date().toISOString() }
                         }
                     }
                 }
@@ -405,6 +490,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, [fetchData]);
 
   const addComment = useCallback(async (projectId: string, taskId: string, commentText: string, author: User) => {
+      optimisticTouch(projectId, taskId);
       setState(prevState => {
         const project = prevState.projects[projectId];
         if (!project || !project.board.tasks[taskId]) return prevState;
@@ -429,7 +515,8 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
                             ...project.board.tasks,
                             [taskId]: {
                                 ...task,
-                                comments: [newCommentObj, ...(task.comments || [])]
+                                comments: [newCommentObj, ...(task.comments || [])],
+                                updatedAt: new Date().toISOString()
                             }
                         }
                     }
@@ -449,6 +536,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, [fetchData]);
 
   const addTask = useCallback(async (projectId: string, taskData: NewTaskData, creatorId: string) => {
+    optimisticTouch(projectId);
     const newTask = await api.data.addTask(taskData, creatorId);
     if (newTask && currentUser) {
       await api.data.moveTask(newTask.id, taskData.columnId, 1, currentUser.id);
@@ -460,6 +548,8 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     if (!currentUser) return;
     const project = state.projects[projectId];
     if (!project) return;
+    
+    optimisticTouch(projectId);
     
     const columnMap = new Map<string, string>();
     for (const colId of project.board.columnOrder) {
@@ -498,6 +588,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     const project = state.projects[projectId];
     if (!project || project.board.columnOrder.length === 0) throw new Error("Cannot add AI task to a project with no columns.");
 
+    optimisticTouch(projectId);
     const generatedData = await generateTaskFromPrompt(prompt);
     const taskData: NewTaskData = {
         title: generatedData.title,
@@ -516,6 +607,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
 
 
   const deleteTask = useCallback(async (projectId: string, taskId: string, columnId: string) => {
+    optimisticTouch(projectId);
     setState(prevState => {
         const project = prevState.projects[projectId];
         if (!project) return prevState;
@@ -557,11 +649,13 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, [fetchData]);
 
   const addColumn = useCallback(async (projectId: string, title: string) => {
+      optimisticTouch(projectId);
       await api.data.addColumn(projectId, title);
       await fetchData();
   }, [fetchData]);
 
   const deleteColumn = useCallback(async (projectId: string, columnId: string) => {
+    optimisticTouch(projectId);
     await api.data.deleteColumn(columnId);
     await fetchData();
   }, [fetchData]);
@@ -607,12 +701,14 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, [fetchData, userId]);
 
   const updateProjectMembers = useCallback(async (projectId: string, memberIds: string[]) => {
+      optimisticTouch(projectId);
       await api.data.updateProjectMembers(projectId, memberIds);
       await fetchData();
   }, [fetchData]);
   
   const sendChatMessage = useCallback(async (projectId: string, text: string, author: User) => {
     playSentSound();
+    optimisticTouch(projectId);
     const tempId = `temp-${Date.now()}`;
     const optimisticMessage: ChatMessage = {
         id: tempId,
@@ -630,7 +726,8 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
                 ...prevState.projects,
                 [projectId]: {
                     ...project,
-                    chatMessages: [...project.chatMessages, optimisticMessage]
+                    chatMessages: [...project.chatMessages, optimisticMessage],
+                    updatedAt: new Date().toISOString()
                 }
             }
         };
@@ -656,19 +753,24 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, []);
   
   const addProjectLink = useCallback(async (projectId: string, title: string, url: string, creatorId: string) => {
+    optimisticTouch(projectId);
     await api.data.addProjectLink(projectId, title, url, creatorId);
     await fetchData();
   }, [fetchData]);
 
   const deleteProjectLink = useCallback(async (linkId: string) => {
+      // FIX: Cast Object.values to Project[] to avoid unknown type errors when searching for the project containing the link.
+      const projectEntry = (Object.values(state.projects) as Project[]).find(p => p.links.some(l => l.id === linkId));
+      if (projectEntry) optimisticTouch(projectEntry.id);
       await api.data.deleteProjectLink(linkId);
       await fetchData();
-  }, [fetchData]);
+  }, [fetchData, state.projects]);
 
   const addBug = useCallback(async (projectId: string, bugData: { title: string, description: string, priority: TaskPriority }) => {
     if (!currentUser) return;
     const project = state.projects[projectId];
     if (!project) return;
+    optimisticTouch(projectId);
     const firstColumn = project.board.columns[project.board.columnOrder[0]];
     const initialStatus = firstColumn ? firstColumn.title : 'New';
 
@@ -685,6 +787,7 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     if (!currentUser) return;
     const project = state.projects[projectId];
      if (!project) return;
+    optimisticTouch(projectId);
     const firstColumn = project.board.columns[project.board.columnOrder[0]];
     const initialStatus = firstColumn ? firstColumn.title : 'New';
 
@@ -703,10 +806,13 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
   }, [fetchData, currentUser, state.projects]);
 
   const updateBug = useCallback(async (bugId: string, updates: Partial<Bug>) => {
+    const projectEntry = (Object.entries(state.projects) as [string, Project][]).find(([_, p]) => p.bugs && p.bugs[bugId]);
+    if (projectEntry) optimisticTouch(projectEntry[0]);
+
     setState(prevState => {
-        const projectEntry = (Object.entries(prevState.projects) as [string, Project][]).find(([_, p]) => p.bugs && p.bugs[bugId]);
-        if (!projectEntry) return prevState;
-        const [projectId, project] = projectEntry;
+        const projectEntryLocal = (Object.entries(prevState.projects) as [string, Project][]).find(([_, p]) => p.bugs && p.bugs[bugId]);
+        if (!projectEntryLocal) return prevState;
+        const [projectId, project] = projectEntryLocal;
         
         const newState = {
             ...prevState,
@@ -717,7 +823,8 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
                     bugs: {
                         ...(project as Project).bugs,
                         [bugId]: { ...(project as Project).bugs[bugId], ...updates }
-                    }
+                    },
+                    updatedAt: new Date().toISOString()
                 }
             }
         };
@@ -737,58 +844,84 @@ export const useAppState = (session: Session | null, currentUser: User | null, a
     } catch (err) {
         await fetchData();
     }
-  }, [fetchData]);
+  }, [fetchData, state.projects]);
 
   const deleteBug = useCallback(async (bugId: string) => {
+    // FIX: Cast Object.values to Project[] to avoid unknown type errors when searching for the project containing the bug.
+    const projectEntry = (Object.values(state.projects) as Project[]).find(p => p.bugs && p.bugs[bugId]);
+    if (projectEntry) optimisticTouch(projectEntry.id);
     await api.data.deleteBug(bugId);
     await fetchData();
-  }, [fetchData]);
+  }, [fetchData, state.projects]);
 
   const deleteBugsBatch = useCallback(async (bugIds: string[]) => {
+    if (bugIds.length > 0) {
+        // FIX: Cast Object.values to Project[] to avoid unknown type errors when searching for the project containing the bugs.
+        const projectEntry = (Object.values(state.projects) as Project[]).find(p => p.bugs && p.bugs[bugIds[0]]);
+        if (projectEntry) optimisticTouch(projectEntry.id);
+    }
     await api.data.deleteBugsBatch(bugIds);
     await fetchData();
-  }, [fetchData]);
+  }, [fetchData, state.projects]);
 
   const addSprint = useCallback(async (projectId: string, sprintData: Omit<Sprint, 'id' | 'projectId' | 'createdAt' | 'status' | 'isDefault'> & { isDefault?: boolean }): Promise<Sprint> => {
+    optimisticTouch(projectId);
     const newSprint = await api.data.addSprint({ ...sprintData, projectId });
     await fetchData();
     return newSprint;
   }, [fetchData]);
 
   const updateSprint = useCallback(async (projectId: string, sprintId: string, updates: Partial<Sprint>) => {
+    optimisticTouch(projectId);
     await api.data.updateSprint(sprintId, updates);
     await fetchData();
   }, [fetchData]);
 
   const deleteSprint = useCallback(async (projectId: string, sprintId: string) => {
+    optimisticTouch(projectId);
     await api.data.deleteSprint(sprintId);
     await fetchData();
   }, [fetchData]);
 
   const bulkUpdateTaskSprint = useCallback(async (taskIds: string[], sprintId: string | null) => {
+    if (taskIds.length > 0) {
+        // FIX: Cast Object.values to Project[] to avoid unknown type errors when searching for the project containing the tasks.
+        const projectEntry = (Object.values(state.projects) as Project[]).find(p => p.board.tasks[taskIds[0]]);
+        if (projectEntry) optimisticTouch(projectEntry.id);
+    }
     await api.data.bulkUpdateTaskSprint(taskIds, sprintId);
     await fetchData();
-  }, [fetchData]);
+  }, [fetchData, state.projects]);
 
   const completeSprint = async (sprintId: string, moveToSprintId: string | null) => {
+    // FIX: Cast Object.values to Project[] to avoid unknown type errors when searching for the project containing the sprint.
+    const projectEntry = (Object.values(state.projects) as Project[]).find(p => p.sprints.some(s => s.id === sprintId));
+    if (projectEntry) optimisticTouch(projectEntry.id);
     await api.data.completeSprint(sprintId, moveToSprintId);
     await fetchData();
   };
 
   const addFilterSegment = useCallback(async (projectId: string, name: string, filters: FilterSegment['filters'], creatorId: string) => {
+    optimisticTouch(projectId);
     await api.data.addFilterSegment(projectId, name, filters, creatorId);
     await fetchData();
   }, [fetchData]);
 
   const updateFilterSegment = async (segmentId: string, updates: { name?: string, filters?: FilterSegment['filters'] }) => {
+    // FIX: Cast Object.values to Project[] to avoid unknown type errors when searching for the project containing the filter segment.
+    const projectEntry = (Object.values(state.projects) as Project[]).find(p => p.filterSegments.some(s => s.id === segmentId));
+    if (projectEntry) optimisticTouch(projectEntry.id);
     await api.data.updateFilterSegment(segmentId, updates);
     await fetchData();
   };
 
   const deleteFilterSegment = useCallback(async (segmentId: string) => {
+    // FIX: Cast Object.values to Project[] to avoid unknown type errors when searching for the project containing the filter segment.
+    const projectEntry = (Object.values(state.projects) as Project[]).find(p => p.filterSegments.some(s => s.id === segmentId));
+    if (projectEntry) optimisticTouch(projectEntry.id);
     await api.data.deleteFilterSegment(segmentId);
     await fetchData();
-  }, [fetchData]);
+  }, [fetchData, state.projects]);
 
 
   return { state, loading, fetchData, onDragEnd, updateTask, addSubtasks, updateSubtask, deleteSubtask, addComment, addTask, addAiTask, deleteTask, addColumn, deleteColumn, addProject, addProjectFromPlan, deleteProject, updateUserProfile, updateProjectMembers, sendChatMessage, addProjectLink, deleteProjectLink, addBug, updateBug, deleteBug, addBugsBatch, deleteBugsBatch, addTasksBatch, addSprint, updateSprint, deleteSprint, bulkUpdateTaskSprint, completeSprint, addFilterSegment, updateFilterSegment, deleteFilterSegment };

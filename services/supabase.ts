@@ -9,9 +9,10 @@ if (!SUPABASE_URL || SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || !SUPABASE_ANON
 }
 
 // Use credentials from the central config file.
-const supabaseUrl = SUPABASE_URL;
+const supabaseUrl = SUPABASE_URL.replace(/\/$/, ""); // Ensure no trailing slash
 const supabaseAnonKey = SUPABASE_ANON_KEY;
 
+console.log("Initializing Supabase client with URL:", supabaseUrl.substring(0, 20) + "...");
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Define a type for our database schema to get type safety

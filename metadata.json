@@ -3,5 +3,6 @@
   "description": "A high-end project management board with AI-powered features for task generation and management, featuring modern parallax transitions and neural workflow optimization.",
   "requestFramePermissions": [
     "microphone"
-  ]
+  ],
+  "majorCapabilities": []
 }

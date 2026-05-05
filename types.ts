@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = 'Admin',
   MANAGER = 'Manager',
@@ -67,6 +68,7 @@ export interface Task {
   dueDate?: string;
   creatorId: string;
   createdAt: string;
+  updatedAt: string;
   sprintId?: string | null;
 }
 
@@ -134,6 +136,7 @@ export interface Project {
   members: string[];
   creatorId: string;
   createdAt: string;
+  updatedAt: string;
   chatMessages: ChatMessage[];
   links: ProjectLink[];
   bugs: Record<string, Bug>;

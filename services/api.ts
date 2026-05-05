@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase';
 import { User, Project, NewTaskData, Task, AppState, ChatMessage, ProjectInviteLink, UserRole, Subtask, Sprint, FilterSegment, BugResponse, Column, TaskHistory } from '../types';
 import { Session, RealtimeChannel, AuthChangeEvent, User as SupabaseUser } from '@supabase/supabase-js';
@@ -23,16 +24,31 @@ const getSession = async () => {
 };
 
 const getUserProfile = async (userId: string): Promise<User | null> => {
-    const { data: userProfile, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-    if (error && error.code !== 'PGRST116') { 
-        console.error("Error fetching user profile:", error.message || error);
-        throw error; 
+    try {
+        const { data: userProfile, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+        if (error) {
+            if (error.code === 'PGRST116') return null; // No profile found
+            // Improved error logging for Supabase issues
+            console.error(`[Supabase Error] getUserProfile(${userId}):`, {
+                code: error.code,
+                message: error.message,
+                hint: error.hint
+            });
+            return null; // Return null instead of throwing to allow fallback logic in App.tsx
+        }
+        return userProfile as User;
+    } catch (err: any) {
+        if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+            console.warn("[Network Error] fetching user profile. Fallback suggested.", err.message);
+        } else {
+            console.error("[Unexpected Error] getUserProfile:", err);
+        }
+        return null; // Return null for any failure to trigger App.tsx fallback
     }
-    return userProfile as User;
 };
 
 const createUserProfile = async (supabaseUser: SupabaseUser): Promise<User> => {
@@ -219,6 +235,7 @@ const fetchInitialData = async (userId: string): Promise<AppState> => {
         return { 
             ...p, 
             board,
+            updatedAt: p.updated_at || p.created_at,
             filterSegments: p.filterSegments || [],
             bugs: p.bugs || {},
             bugOrder: p.bugOrder || [],
@@ -553,6 +570,13 @@ const updateInviteLink = async (linkId: string, updates: any) => {
     await supabase.from('project_invites').update(updates).eq('id', linkId);
 };
 
+const touchProject = async (projectId: string) => {
+    await supabase
+        .from('projects')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', projectId);
+};
+
 /**
  * The central API object exported to the application.
  */
@@ -615,6 +639,7 @@ export const api = {
         getInviteLinksForProject,
         createInviteLink,
         updateInviteLink,
-        fetchTaskHistory
+        fetchTaskHistory,
+        touchProject
     }
 };

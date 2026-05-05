@@ -1,8 +1,9 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Project, User, AiGeneratedProjectPlan, Task, Column } from '../types';
 import { ProjectCard } from '../components/ProjectCard';
 import { ProjectListRow } from '../components/ProjectListRow';
-import { PlusIcon, DownloadIcon, GridIcon, ListIcon, LayoutDashboardIcon, CalendarIcon, TrendingUpIcon, ClockIcon, SparklesIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, XIcon, UserIcon, ZapIcon } from '../components/Icons';
+import { PlusIcon, DownloadIcon, GridIcon, ListIcon, LayoutDashboardIcon, CalendarIcon, TrendingUpIcon, ClockIcon, SparklesIcon, CheckSquareIcon, ChevronLeftIcon, ChevronRightIcon, XIcon, UserIcon, ZapIcon, SearchIcon } from '../components/Icons';
 import { exportTasksToCsv } from '../utils/export';
 import { ProjectDropzone } from '../components/ProjectDropzone';
 import { ProjectConfirmationModal } from '../components/ProjectConfirmationModal';
@@ -200,12 +201,24 @@ const MiniCalendar: React.FC<{ tasks: Task[], onDayClick: (date: Date, tasks: Ta
     const engagementMap = useMemo(() => {
         const counts = new Map<number, Task[]>();
         tasks.forEach(t => {
+            // Track activity by updatedAt (modifications) or createdAt (new task creation)
+            const activityDate = new Date(t.updatedAt || t.createdAt);
+            if (activityDate.getMonth() === currentMonth && activityDate.getFullYear() === currentYear) {
+                const day = activityDate.getDate();
+                const existing = counts.get(day) || [];
+                counts.set(day, [...existing, t]);
+            }
+            
+            // Also track by Due Date for planning visibility
             if (t.dueDate) {
-                const d = new Date(t.dueDate);
-                if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-                    const day = d.getDate();
+                const dDate = new Date(t.dueDate);
+                if (dDate.getMonth() === currentMonth && dDate.getFullYear() === currentYear) {
+                    const day = dDate.getDate();
                     const existing = counts.get(day) || [];
-                    counts.set(day, [...existing, t]);
+                    // Only add if not already in the list for this day
+                    if (!existing.find(task => task.id === t.id)) {
+                        counts.set(day, [...existing, t]);
+                    }
                 }
             }
         });
@@ -235,7 +248,7 @@ const MiniCalendar: React.FC<{ tasks: Task[], onDayClick: (date: Date, tasks: Ta
         <div className="p-4 rounded-xl bg-[#131C1B]/80 border border-white/5 shadow-xl backdrop-blur-md">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex flex-col">
-                    <h4 className="text-[9px] font-bold uppercase tracking-[0.2em] text-gray-500">Flow Calendar</h4>
+                    <h4 className="text-[9px] font-bold uppercase tracking-[0.2em] text-gray-500">Neural Heartbeat</h4>
                     <button 
                         onClick={resetToToday}
                         className="text-[10px] font-bold text-white mt-0.5 hover:text-emerald-400 transition-colors text-left flex items-center gap-1.5"
@@ -260,7 +273,7 @@ const MiniCalendar: React.FC<{ tasks: Task[], onDayClick: (date: Date, tasks: Ta
                 </div>
             </div>
             <div className="grid grid-cols-7 gap-1 text-[9px] text-center mb-2 font-bold text-gray-600">
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d} className="w-full">{d}</div>)}
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <div key={`${d}-${i}`} className="w-full">{d}</div>)}
             </div>
             <div className="grid grid-cols-7 gap-1">
                 {blanks.map(b => <div key={`b-${b}`} className="aspect-square" />)}
@@ -341,6 +354,7 @@ const DeadlineTracker: React.FC<{ tasks: Task[], onTaskClick: (task: Task) => vo
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, currentUser, onlineUsers, onSelectProject, onCreateProject, onManageMembers, onShareProject, addProjectFromPlan, aiFeaturesEnabled }) => {
     const [view, setView] = useState<'grid' | 'list'>('grid');
+    const [searchQuery, setSearchQuery] = useState('');
     const [generatedPlan, setGeneratedPlan] = useState<AiGeneratedProjectPlan | null>(null);
     const [isAiProcessing, setIsAiProcessing] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -373,24 +387,26 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
         return 'Evening';
     }, []);
 
-    const sortedProjects = useMemo(() => {
-        const affinityKey = `neural-affinity-${currentUser.id}`;
-        let affinityMap: Record<string, number> = {};
-        try {
-            affinityMap = JSON.parse(localStorage.getItem(affinityKey) || '{}');
-        } catch (e) {
-            console.error("Affinity read error", e);
+    // Optimized Filtering & Sorting Logic
+    const filteredAndSortedProjects = useMemo(() => {
+        let filtered = projects;
+        if (searchQuery.trim()) {
+            const query = searchQuery.toLowerCase();
+            filtered = projects.filter(p => 
+                p.name.toLowerCase().includes(query) || 
+                p.description?.toLowerCase().includes(query)
+            );
         }
 
-        return [...projects].sort((a, b) => {
-            const timeA = affinityMap[a.id] || new Date(a.createdAt).getTime();
-            const timeB = affinityMap[b.id] || new Date(b.createdAt).getTime();
+        return [...filtered].sort((a, b) => {
+            const timeA = new Date(a.updatedAt || a.createdAt).getTime();
+            const timeB = new Date(b.updatedAt || b.createdAt).getTime();
             return timeB - timeA;
         });
-    }, [projects, currentUser.id]);
+    }, [projects, searchQuery]);
 
-    const totalPages = Math.ceil(sortedProjects.length / ITEMS_PER_PAGE);
-    const paginatedProjects = sortedProjects.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(filteredAndSortedProjects.length / ITEMS_PER_PAGE);
+    const paginatedProjects = filteredAndSortedProjects.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
     const handleFileProcessed = async (csvContent: string) => {
         setIsAiProcessing(true);
@@ -425,7 +441,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
                     <button onClick={onCreateProject} className="px-5 py-2 bg-white text-black font-bold rounded-lg hover:scale-105 transition-all flex items-center gap-2 text-xs shadow-xl shadow-white/5">
                         <PlusIcon className="w-4 h-4" /> New Node
                     </button>
-                    <button onClick={() => exportTasksToCsv(projects, users)} className="p-2.5 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-white/10 transition-all">
+                    <button onClick={() => exportTasksToCsv(filteredAndSortedProjects, users)} className="p-2.5 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-white/10 transition-all">
                         <DownloadIcon className="w-4 h-4" />
                     </button>
                 </div>
@@ -440,11 +456,26 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
 
             <div className="grid grid-cols-12 gap-6">
                 <div className="col-span-12 lg:col-span-9 space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-base font-bold text-white flex items-center gap-2">Project Canvas <span className="text-[10px] font-medium text-gray-600 bg-white/5 px-2 py-0.5 rounded-full">{projects.length}</span></h3>
-                        <div className="flex items-center gap-1.5 p-1 bg-white/5 rounded-lg border border-white/5">
-                            <button onClick={() => setView('grid')} className={`p-1.5 rounded-md transition-all ${view === 'grid' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}><GridIcon className="w-3.5 h-3.5"/></button>
-                            <button onClick={() => setView('list')} className={`p-1.5 rounded-md transition-all ${view === 'list' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}><ListIcon className="w-3.5 h-3.5"/></button>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <h3 className="text-base font-bold text-white flex items-center gap-2">Project Canvas <span className="text-[10px] font-medium text-gray-600 bg-white/5 px-2 py-0.5 rounded-full">{filteredAndSortedProjects.length}</span></h3>
+                        <div className="flex items-center gap-3 w-full sm:w-auto">
+                            <div className="relative group flex-grow sm:flex-grow-0">
+                                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 group-focus-within:text-emerald-400 transition-colors" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search Canvas..." 
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    className="w-full sm:w-64 pl-9 pr-4 py-1.5 bg-white/5 border border-white/5 rounded-xl text-xs text-white placeholder-gray-600 focus:outline-none focus:border-emerald-500/30 focus:bg-white/[0.07] transition-all"
+                                />
+                            </div>
+                            <div className="flex items-center gap-1.5 p-1 bg-white/5 rounded-lg border border-white/5">
+                                <button onClick={() => setView('grid')} className={`p-1.5 rounded-md transition-all ${view === 'grid' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}><GridIcon className="w-3.5 h-3.5"/></button>
+                                <button onClick={() => setView('list')} className={`p-1.5 rounded-md transition-all ${view === 'list' ? 'bg-white/10 text-white shadow-lg' : 'text-gray-500 hover:text-white'}`}><ListIcon className="w-3.5 h-3.5"/></button>
+                            </div>
                         </div>
                     </div>
 
@@ -486,7 +517,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ projects, users, c
                         </div>
                     )}
                     
-                    {totalPages > 1 && <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} itemsPerPage={ITEMS_PER_PAGE} totalItems={projects.length} />}
+                    {totalPages > 1 && <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} itemsPerPage={ITEMS_PER_PAGE} totalItems={filteredAndSortedProjects.length} />}
                 </div>
 
                 <div className="col-span-12 lg:col-span-3 space-y-4">

@@ -131,10 +131,33 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (session?.user) {
-      api.auth.getUserProfile(session.user.id).then(profile => {
-        if (profile) setCurrentUser(profile);
-        else api.auth.createUserProfile(session.user).then(setCurrentUser);
-      });
+      const fetchProfile = async (retries = 2) => {
+        try {
+          const profile = await api.auth.getUserProfile(session.user.id);
+          if (profile) {
+            setCurrentUser(profile);
+          } else {
+            const newProfile = await api.auth.createUserProfile(session.user);
+            setCurrentUser(newProfile);
+          }
+        } catch (error) {
+          console.error("Critical error fetching profile:", error);
+          if (retries > 0) {
+            console.log(`Retrying profile fetch... (${retries} attempts left)`);
+            setTimeout(() => fetchProfile(retries - 1), 2000);
+          } else {
+            // If all retries fail, set a fallback guest profile based on session data
+            console.warn("All profile fetch retries failed. Using session fallback.");
+            setCurrentUser({
+              id: session.user.id,
+              name: session.user.email?.split('@')[0] || 'Member',
+              role: UserRole.MEMBER,
+              avatarUrl: ''
+            });
+          }
+        }
+      };
+      fetchProfile();
     } else {
       setCurrentUser(null);
     }
@@ -190,16 +213,8 @@ const App: React.FC = () => {
   };
 
   const handleSelectProject = (projectId: string) => {
-    if (currentUser) {
-        const affinityKey = `neural-affinity-${currentUser.id}`;
-        try {
-            const affinityMap = JSON.parse(localStorage.getItem(affinityKey) || '{}');
-            affinityMap[projectId] = Date.now();
-            localStorage.setItem(affinityKey, JSON.stringify(affinityMap));
-        } catch (e) {
-            console.warn("Affinity sync failed", e);
-        }
-    }
+    // Perform server-side touch to ensure sorting persists across browsers/sessions
+    api.data.touchProject(projectId).catch(console.warn);
     setActiveProjectId(projectId);
   };
 
@@ -306,7 +321,7 @@ const App: React.FC = () => {
           {activeProjectId && project ? (
             <KanbanBoard 
               project={project} currentUser={currentUser} users={Object.values(state.users)} onlineUsers={onlineUsers} aiFeaturesEnabled={featureFlags.ai}
-              onDragEnd={(r) => onDragEnd(project.id, r)} updateTask={(t) => updateTask(project.id, t)} addSubtasks={(tid, sts) => addSubtasks(project.id, tid, sts, currentUser.id)}
+              onDragEnd={(r, fd) => onDragEnd(project.id, r, fd)} updateTask={(t) => updateTask(project.id, t)} addSubtasks={(tid, sts) => addSubtasks(project.id, tid, sts, currentUser.id)}
               addComment={(tid, text) => addComment(project.id, tid, text, currentUser)} addAiTask={(p) => addAiTask(project.id, p)}
               addTask={(td) => addTask(project.id, td, currentUser.id)} deleteTask={(tid, cid) => deleteTask(project.id, tid, cid)}
               addColumn={(t) => addColumn(project.id, t)} deleteColumn={(cid) => deleteColumn(project.id, cid)} isChatOpen={isChatOpen} onCloseChat={() => setIsChatOpen(false)} chatMessages={project.chatMessages}
