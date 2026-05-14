@@ -168,6 +168,7 @@ export interface FilterSegment {
     relativeTimeValue?: string;
     relativeTimeUnit?: 'seconds' | 'minutes' | 'hours' | 'days' | 'months' | 'years';
     relativeTimeCondition?: 'within' | 'older_than';
+    reporterFilter?: string[];
   };
 }
 

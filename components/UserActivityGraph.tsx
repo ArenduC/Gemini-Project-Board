@@ -103,15 +103,15 @@ export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, 
                                                 <div 
                                                     key={task.id}
                                                     onClick={() => onTaskClick(task)}
-                                                    className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group/task
+                                                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group/task
                                                         ${isDone ? 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30' : 'bg-white/5 border-white/5 hover:border-white/10'}
                                                     `}
                                                 >
-                                                    <CheckSquareIcon className={`w-4 h-4 ${isDone ? 'text-emerald-500' : 'text-gray-600 group-hover/task:text-gray-400'}`} />
-                                                    <p className={`flex-grow text-xs font-medium truncate ${isDone ? 'text-emerald-400/70 line-through' : 'text-white'}`}>
+                                                    <CheckSquareIcon className={`w-3.5 h-3.5 ${isDone ? 'text-emerald-500' : 'text-gray-600 group-hover/task:text-gray-400'}`} />
+                                                    <p className={`flex-grow text-[11px] font-bold truncate ${isDone ? 'text-emerald-400/50 line-through' : 'text-white'}`}>
                                                         {task.title}
                                                     </p>
-                                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${colorInfo.bg} ${colorInfo.text}`}>
+                                                    <span className={`text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-[0.2em] ${colorInfo.bg} ${colorInfo.text}`}>
                                                         {name}
                                                     </span>
                                                 </div>
@@ -122,16 +122,16 @@ export const UserActivityGraph: React.FC<UserActivityGraphProps> = ({ projects, 
                                             return (
                                                 <div 
                                                     key={bug.id}
-                                                    className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer group/bug
+                                                    className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer group/bug
                                                         ${isDone ? 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30' : 'bg-red-500/5 border-red-500/10 hover:border-red-500/20'}
                                                     `}
                                                 >
-                                                    <LifeBuoyIcon className={`w-4 h-4 ${isDone ? 'text-emerald-500' : 'text-red-500/50 group-hover/bug:text-red-500'}`} />
-                                                    <p className={`flex-grow text-xs font-medium truncate ${isDone ? 'text-emerald-400/70 line-through' : 'text-white'}`}>
-                                                        <span className="font-mono text-[10px] text-gray-600 mr-2">{bug.bugNumber}</span>
+                                                    <LifeBuoyIcon className={`w-3.5 h-3.5 ${isDone ? 'text-emerald-500' : 'text-red-500/50 group-hover/bug:text-red-500'}`} />
+                                                    <p className={`flex-grow text-[11px] font-bold truncate ${isDone ? 'text-emerald-400/50 line-through' : 'text-white'}`}>
+                                                        <span className="font-mono text-[9px] text-gray-600 mr-2 uppercase tracking-tighter">ANM_{bug.bugNumber}</span>
                                                         {bug.title}
                                                     </p>
-                                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${colorInfo.bg} ${colorInfo.text}`}>
+                                                    <span className={`text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-[0.2em] ${colorInfo.bg} ${colorInfo.text}`}>
                                                         {name}
                                                     </span>
                                                 </div>

@@ -57,56 +57,76 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({ project, tasks, us
     return columns.find(c => c.taskIds.includes(taskId))?.id;
   };
 
+  const getStatusStyle = (columnId: string | undefined): string => {
+    const column = columns.find(c => c.id === columnId);
+    const title = (column?.title || '').toLowerCase();
+    if (title.includes('done') || title.includes('complete')) return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+    if (title.includes('progress') || title.includes('current')) return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+    if (title.includes('review') || title.includes('verify')) return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+    return 'bg-white/5 text-gray-400 border-white/5';
+  };
+
+  const priorityStyles: Record<TaskPriority, string> = {
+    [TaskPriority.URGENT]: 'bg-red-500/10 text-red-400 border-red-500/20 font-bold',
+    [TaskPriority.HIGH]: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+    [TaskPriority.MEDIUM]: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    [TaskPriority.LOW]: 'bg-white/5 text-gray-500 border-white/5',
+  };
+
   return (
-    <div className="bg-[#131C1B] rounded-xl shadow-md border border-gray-800 overflow-hidden">
-      <table className="w-full text-left">
-        <thead className="bg-[#1C2326]/50">
-          <tr className="text-xs">
-            <th className="px-6 py-4 font-semibold text-white uppercase tracking-wider">Task</th>
-            <th className="px-4 py-4 font-semibold text-white uppercase tracking-wider">Status</th>
-            <th className="px-4 py-4 font-semibold text-white uppercase tracking-wider">Priority</th>
-            <th className="px-6 py-4 font-semibold text-white uppercase tracking-wider">Assignee</th>
+    <div className="bg-[#131C1B]/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/5 overflow-hidden">
+      <table className="w-full text-left table-fixed">
+        <thead className="bg-white/5">
+          <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
+            <th className="px-6 py-4 w-auto">Task</th>
+            <th className="px-6 py-4 w-40">Status</th>
+            <th className="px-6 py-4 w-32">Priority</th>
+            <th className="px-6 py-4 w-48">Assignee</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-800">
+        <tbody className="divide-y divide-white/5">
           {tasks.map(task => {
             const currentColumnId = getTaskColumnId(task.id);
             return (
-              <tr key={task.id} className="text-sm text-white hover:bg-gray-800/50">
-                <td className="px-6 py-3">
-                  <button onClick={() => onTaskClick(task)} className="font-medium hover:underline text-left">
+              <tr key={task.id} className="text-[11px] text-white hover:bg-white/[0.03] transition-all group">
+                <td className="px-6 py-4 overflow-hidden">
+                  <button onClick={() => onTaskClick(task)} className="font-bold text-white hover:text-emerald-400 transition-colors text-left truncate w-full">
                     {task.title}
                   </button>
                 </td>
-                <td className="px-4 py-3">
-                  <select
-                    value={currentColumnId || ''}
-                    onChange={e => handleStatusChange(task, e.target.value)}
-                    className="bg-transparent border-none focus:ring-2 focus:ring-gray-500 rounded-md p-1 -m-1"
-                  >
-                    {columns.map(col => (
-                      <option key={col.id} value={col.id} className="bg-[#1C2326]">{col.title}</option>
-                    ))}
-                  </select>
+                <td className="px-6 py-4">
+                  <div className={`inline-flex items-center rounded-md border px-2 py-0.5 w-full ${getStatusStyle(currentColumnId)}`}>
+                    <select
+                      value={currentColumnId || ''}
+                      onChange={e => handleStatusChange(task, e.target.value)}
+                      className="bg-transparent border-none text-[8px] font-black uppercase tracking-widest focus:ring-0 p-0 w-full cursor-pointer appearance-none"
+                    >
+                      {columns.map(col => (
+                        <option key={col.id} value={col.id} className="bg-[#1C2326]">{col.title}</option>
+                      ))}
+                    </select>
+                  </div>
                 </td>
-                <td className="px-4 py-3">
-                  <select
-                    value={task.priority}
-                    onChange={e => handlePriorityChange(task, e.target.value as TaskPriority)}
-                    className={`bg-transparent border text-xs font-semibold rounded-full px-2 py-1 focus:ring-2 focus:ring-gray-500 ${priorityStyles[task.priority]}`}
-                  >
-                    {Object.values(TaskPriority).map(p => (
-                      <option key={p} value={p} className="bg-[#1C2326] text-white font-normal">{p}</option>
-                    ))}
-                  </select>
+                <td className="px-6 py-4">
+                    <div className={`inline-block border rounded-md px-2 py-0.5 w-full ${priorityStyles[task.priority]}`}>
+                    <select
+                        value={task.priority}
+                        onChange={e => handlePriorityChange(task, e.target.value as TaskPriority)}
+                        className="bg-transparent border-none text-[8px] font-black uppercase tracking-widest focus:ring-0 p-0 w-full cursor-pointer appearance-none"
+                    >
+                        {Object.values(TaskPriority).map(p => (
+                        <option key={p} value={p} className="bg-[#1C2326] text-white font-normal">{p}</option>
+                        ))}
+                    </select>
+                    </div>
                 </td>
-                <td className="px-6 py-3">
-                  <div className="flex items-center gap-2">
-                    <UserAvatar user={task.assignee} className="w-7 h-7" />
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2 bg-white/5 rounded-md p-1 pr-3">
+                    <UserAvatar user={task.assignee} className="w-5 h-5 ring-1 ring-white/10" />
                     <select
                       value={task.assignee?.id || ''}
                       onChange={e => handleAssigneeChange(task, e.target.value)}
-                      className="bg-transparent border-none focus:ring-2 focus:ring-gray-500 rounded-md p-1 -m-1 max-w-[120px]"
+                      className="bg-transparent border-none text-[9px] text-gray-400 hover:text-white focus:ring-0 p-0 w-full cursor-pointer appearance-none truncate"
                     >
                       <option value="" className="bg-[#1C2326]">Unassigned</option>
                       {projectMembers.map(m => (
@@ -121,7 +141,9 @@ export const TaskTableView: React.FC<TaskTableViewProps> = ({ project, tasks, us
         </tbody>
       </table>
       {tasks.length === 0 && (
-        <p className="text-center py-8 text-gray-500">No tasks match your current filters.</p>
+        <div className="text-center py-20 text-gray-600 font-mono text-xs italic uppercase tracking-widest">
+            NO DATA IN MATRIX
+        </div>
       )}
     </div>
   );

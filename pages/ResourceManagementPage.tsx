@@ -125,11 +125,11 @@ const Metric: React.FC<{ icon: any, label: string, value: any, color: string }> 
 );
 
 export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ projects, users, onlineUsers, onTaskClick }) => {
-    const [view, setView] = useState<'table' | 'graph' | 'neural'>('graph');
     const [currentPage, setCurrentPage] = useState(1);
     const [viewDate, setViewDate] = useState(new Date());
     const [selectedUser, setSelectedUser] = useState<string | 'all'>('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [isNeuralModalOpen, setIsNeuralModalOpen] = useState(false);
     
     // FIX: Explicitly cast Object.values to Project[] and User[] to ensure property access on known types and resolve compilation errors.
     const pList = Object.values(projects) as Project[], uList = Object.values(users) as User[];
@@ -149,65 +149,85 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                 </div>
                 <div>
                     <h2 className="text-lg font-black text-white tracking-tighter uppercase leading-none">Resource <span className="text-emerald-500">Node Array</span></h2>
-                    <p className="text-gray-500 text-[9px] uppercase tracking-widest mt-1 flex items-center gap-1.5 font-mono">
+                    <p className="text-gray-500 text-[9px] uppercase tracking-widest mt-1 flex items-center gap-1.5 font-mono font-black">
                         <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
                         SYNC STATUS: NOMINAL
                     </p>
                 </div>
             </div>
-            <div className="flex items-center p-0.5 bg-black/40 rounded-xl border border-white/5">
-                {['neural', 'graph', 'table'].map(v => (
-                    <button key={v} onClick={() => setView(v as any)} className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${view === v ? 'bg-white text-black shadow-lg' : 'text-gray-500 hover:text-white'}`}>{v === 'graph' ? 'Flow' : v}</button>
-                ))}
+            <div className="flex items-center gap-2">
+                <button 
+                    onClick={() => setIsNeuralModalOpen(true)}
+                    className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-black rounded-lg hover:bg-emerald-500 hover:text-black transition-all flex items-center gap-2 text-[9px] uppercase tracking-widest shadow-xl shadow-emerald-500/5 group"
+                >
+                    <SparklesIcon className="w-4 h-4 group-hover:rotate-12 transition-transform" /> Neural Mesh
+                </button>
             </div>
         </div>
 
         <div className="grid grid-cols-12 gap-5">
             <div className="col-span-12 lg:col-span-8 space-y-5">
-                {view === 'graph' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                        <GlobalEngagementCalendar tasks={allT} bugs={allB} users={uList} selectedUserId={selectedUser} onUserSelect={setSelectedUser} viewDate={viewDate} onViewDateChange={setViewDate} />
-                        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#131C1B] to-black border border-white/5 flex flex-col justify-center">
-                            <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-1.5">Neural Audit</h4>
-                            <p className="text-[10px] text-gray-400 leading-relaxed italic">
-                                "Synthesizing cross-project effort. {selectedUser === 'all' ? 'Global mesh' : 'Target node'} exhibits peak throughput in this cycle. Adjusting allocation protocol."
-                            </p>
-                            <div className="mt-3.5 flex items-center gap-2">
-                                <div className="px-1.5 py-0.5 rounded bg-white/5 text-[7px] font-bold text-gray-500 uppercase tracking-widest">Latency: 2ms</div>
-                                <div className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-[7px] font-bold text-emerald-500 uppercase tracking-widest">Status: Ready</div>
-                            </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <GlobalEngagementCalendar tasks={allT} bugs={allB} users={uList} selectedUserId={selectedUser} onUserSelect={setSelectedUser} viewDate={viewDate} onViewDateChange={setViewDate} />
+                    <div className="p-4 rounded-2xl bg-gradient-to-br from-[#131C1B] to-black border border-white/5 flex flex-col justify-center">
+                        <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-1.5">Neural Audit</h4>
+                        <p className="text-[10px] text-gray-400 leading-relaxed italic">
+                            "Synthesizing cross-project effort. {selectedUser === 'all' ? 'Global mesh' : 'Target node'} exhibits peak throughput in this cycle. Adjusting allocation protocol."
+                        </p>
+                        <div className="mt-3.5 flex items-center gap-2">
+                            <div className="px-1.5 py-0.5 rounded bg-white/5 text-[7px] font-bold text-gray-500 uppercase tracking-widest">Latency: 2ms</div>
+                            <div className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-[7px] font-bold text-emerald-500 uppercase tracking-widest">Status: Ready</div>
                         </div>
                     </div>
-                )}
+                </div>
                 
-                {view === 'neural' && <ResourceNeuralGraph projects={projects} users={users} onlineUsers={onlineUsers} onTaskClick={onTaskClick} />}
-                
-                {view === 'graph' && <div className="p-4 bg-[#0D1117]/60 rounded-2xl border border-white/5 shadow-2xl overflow-y-auto max-h-[600px] custom-scrollbar"><UserActivityGraph projects={projects} users={users} onlineUsers={onlineUsers} onTaskClick={onTaskClick} /></div>}
-                
-                {view === 'table' && (
-                    <div className="bg-[#131C1B] rounded-2xl border border-white/5 overflow-hidden shadow-2xl">
-                         <div className="p-3 border-b border-white/5 flex items-center gap-2.5 bg-white/[0.01]">
-                            <SearchIcon className="w-3 h-3 text-gray-500" />
-                            <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="SCAN NODES..." className="bg-transparent text-[9px] text-white focus:outline-none uppercase tracking-widest w-full" />
+                <div className="bg-[#131C1B] rounded-2xl border border-white/5 overflow-hidden shadow-2xl">
+                        <div className="p-4 border-b border-white/5 flex items-center gap-3 bg-white/[0.01] group">
+                            <SearchIcon className="w-4 h-4 text-gray-600 group-focus-within:text-emerald-500 transition-colors" />
+                            <input 
+                                type="text" 
+                                value={searchQuery} 
+                                onChange={e => setSearchQuery(e.target.value)} 
+                                placeholder="SCAN RESOURCE ARRAY..." 
+                                className="bg-transparent text-[10px] font-black text-white focus:outline-none uppercase tracking-widest w-full placeholder:text-gray-700" 
+                            />
                         </div>
                         <table className="w-full text-left">
-                            <thead className="bg-white/5 text-[7px] uppercase tracking-[0.2em] font-black text-gray-500"><tr className="border-b border-white/5"><th className="px-4 py-2.5">Component</th><th className="px-4 py-2.5">Load</th><th className="px-4 py-2.5 text-right">Bitmask</th></tr></thead>
+                            <thead className="bg-white/5 text-[9px] uppercase tracking-[0.2em] font-black text-gray-500">
+                                <tr className="border-b border-white/5">
+                                    <th className="px-6 py-3">Resource Cluster</th>
+                                    <th className="px-6 py-3">Neural Load</th>
+                                    <th className="px-6 py-3 text-right">Bitmask</th>
+                                </tr>
+                            </thead>
                             <tbody className="divide-y divide-white/5">
                                 {paginated.map(user => (
-                                    <tr key={user.id} className="hover:bg-white/[0.02] transition-colors group">
-                                        <td className="px-4 py-2.5 flex items-center gap-2.5">
-                                            <UserAvatar user={user} className="w-7 h-7 ring-1 ring-white/5" isOnline={onlineUsers.has(user.id)} />
-                                            <div><p className="font-bold text-[10px] text-white leading-none">{user.name}</p><p className="text-[7px] text-gray-600 uppercase mt-0.5 tracking-widest">{user.role}</p></div>
+                                    <tr key={user.id} className="hover:bg-white/[0.03] transition-all group cursor-default">
+                                        <td className="px-6 py-4 flex items-center gap-3">
+                                            <UserAvatar user={user} className="w-8 h-8 ring-1 ring-white/10 group-hover:scale-110 transition-transform" isOnline={onlineUsers.has(user.id)} />
+                                            <div>
+                                                <p className="font-bold text-[11px] text-white leading-none group-hover:text-emerald-400 transition-colors">{user.name}</p>
+                                                <p className="text-[9px] text-gray-500 uppercase mt-1 tracking-widest font-mono opacity-50">{user.role}</p>
+                                            </div>
                                         </td>
-                                        <td className="px-4 py-2.5"><div className="w-24 bg-white/5 h-0.5 rounded-full overflow-hidden"><div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: '45%' }} /></div></td>
-                                        <td className="px-4 py-2.5 text-right text-[8px] font-mono text-gray-600">0xActive</td>
+                                        <td className="px-6 py-4">
+                                            <div className="w-32 bg-white/5 h-1 rounded-full overflow-hidden">
+                                                <div className="bg-emerald-500 h-full rounded-full transition-all duration-1000" style={{ width: `${Math.floor(Math.random() * 60 + 20)}%` }} />
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right text-[10px] font-mono text-gray-600 group-hover:text-emerald-500/50 transition-colors">
+                                            0x{user.id.slice(0, 6).toUpperCase()}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                         <Pagination currentPage={currentPage} totalPages={pgs} onPageChange={setCurrentPage} itemsPerPage={15} totalItems={uList.length} />
                     </div>
-                )}
+
+                <div className="p-4 bg-[#0D1117]/60 rounded-2xl border border-white/5 shadow-2xl overflow-y-auto max-h-[600px] custom-scrollbar">
+                    <UserActivityGraph projects={projects} users={users} onlineUsers={onlineUsers} onTaskClick={onTaskClick} />
+                </div>
             </div>
 
             <div className="col-span-12 lg:col-span-4 space-y-3.5">
@@ -226,11 +246,11 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                     <div className="space-y-3 relative z-10">
                         {pList.slice(0, 4).map((p) => (
                             <div key={p.id} className="space-y-1">
-                                <div className="flex justify-between items-center text-[7px] font-bold uppercase tracking-widest text-gray-500">
+                                <div className="flex justify-between items-center text-[8px] font-black uppercase tracking-[0.2em] text-gray-600">
                                     <span className="truncate max-w-[120px]">{p.name}</span>
-                                    <span className="font-mono">{Math.floor(Math.random() * 30 + 70)}%</span>
+                                    <span className="font-mono text-white/40">{Math.floor(Math.random() * 30 + 70)}%</span>
                                 </div>
-                                <div className="w-full bg-white/5 h-0.5 rounded-full overflow-hidden">
+                                <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
                                     <div className="bg-blue-500 h-full shadow-[0_0_6px_rgba(59,130,246,0.4)]" style={{ width: `${Math.floor(Math.random() * 30 + 70)}%` }} />
                                 </div>
                             </div>
@@ -239,6 +259,35 @@ export const ResourceManagementPage: React.FC<ResourceManagementPageProps> = ({ 
                 </div>
             </div>
         </div>
+
+        {/* Neural Mesh Modal */}
+        {isNeuralModalOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in zoom-in duration-300">
+                <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setIsNeuralModalOpen(false)} />
+                <div className="relative w-full max-w-6xl h-[85vh] bg-[#131C1B] rounded-[2rem] border border-white/10 shadow-2xl overflow-hidden flex flex-col">
+                    <header className="px-8 py-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                        <div className="flex items-center gap-4">
+                            <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-500 shadow-lg shadow-emerald-500/5">
+                                <SparklesIcon className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-black uppercase tracking-[0.3em] text-white leading-none">Neural Resource Mesh</h2>
+                                <p className="text-[10px] font-mono text-emerald-500/70 uppercase tracking-widest mt-1">Topology: Real-time Dynamic Array Synthesis</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setIsNeuralModalOpen(false)} className="p-3 rounded-2xl text-gray-500 hover:text-white hover:bg-white/10 transition-all hover:scale-110 active:scale-95">
+                            <XIcon className="w-8 h-8" />
+                        </button>
+                    </header>
+                    <div className="flex-grow p-4">
+                        <ResourceNeuralGraph projects={projects} users={users} onlineUsers={onlineUsers} onTaskClick={onTaskClick} />
+                    </div>
+                    <footer className="px-8 py-4 border-t border-white/5 bg-white/[0.01] flex justify-center">
+                         <p className="text-[9px] font-mono text-gray-700 uppercase tracking-[0.5em]">Graphynovus Neural Mesh Engine v4.0.2-BETA</p>
+                    </footer>
+                </div>
+            </div>
+        )}
     </div>
   );
 };

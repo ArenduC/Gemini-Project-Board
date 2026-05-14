@@ -1,4 +1,5 @@
 import React, { useState, FormEvent, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { TaskPriority, Column, NewTaskData, User, Sprint } from '../types';
 import { XIcon, LoaderCircleIcon, PlusIcon } from './Icons';
 
@@ -74,8 +75,8 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ columns, users
     }
   };
   
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         <header className="p-4 border-b border-gray-800 flex justify-between items-center">
           <h2 className="text-lg font-bold text-white">Create New Task</h2>
@@ -211,6 +212,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ columns, users
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

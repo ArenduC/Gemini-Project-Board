@@ -84,7 +84,6 @@ export const SprintsPage: React.FC<SprintsPageProps> = ({ project, onAddSprint, 
             setNewSprintName('');
         } catch (error) {
             console.error("Failed to add sprint:", error);
-            // In a real app, show a toast notification
         } finally {
             setIsAdding(false);
         }
@@ -110,84 +109,97 @@ export const SprintsPage: React.FC<SprintsPageProps> = ({ project, onAddSprint, 
     };
     
     return (
-        <div className="max-w-4xl mx-auto">
-            <h3 className="text-xl font-bold text-white mb-6">Sprints</h3>
+        <div className="max-w-[1000px] mx-auto animate-in fade-in duration-700">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                <div>
+                    <h3 className="text-xl font-bold text-white tracking-tight">Iterative <span className="text-gray-500">Sprints</span></h3>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-1 font-black">Velocity & Milestone Tracking</p>
+                </div>
+            </div>
             
-            <div className="bg-[#131C1B] p-4 rounded-xl border border-gray-800 mb-6">
-                <h4 className="font-semibold text-white mb-3">Create New Sprint</h4>
-                <form onSubmit={handleAddSprint} className="flex items-center gap-2">
-                    <input
-                        type="text"
-                        value={newSprintName}
-                        onChange={(e) => setNewSprintName(e.target.value)}
-                        placeholder="e.g., March Frontend Polish"
-                        className="flex-grow px-3 py-2 border border-gray-700 rounded-md bg-[#1C2326] text-white text-sm focus:outline-none focus:ring-2 focus:ring-gray-500"
-                        required
-                    />
-                    <button type="submit" disabled={isAdding} className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg shadow-sm hover:bg-gray-400 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center gap-2 text-sm">
-                        {isAdding ? <LoaderCircleIcon className="w-5 h-5 animate-spin"/> : <PlusIcon className="w-5 h-5" />}
-                        {isAdding ? 'Creating...' : 'Create'}
+            <div className="bg-[#131C1B]/60 backdrop-blur-xl p-5 rounded-2xl border border-white/5 mb-8 shadow-2xl">
+                <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-4">Initialize Iteration</h4>
+                <form onSubmit={handleAddSprint} className="flex items-center gap-3">
+                    <div className="relative flex-grow group">
+                        <PlusIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 group-focus-within:text-emerald-500 transition-colors" />
+                        <input
+                            type="text"
+                            value={newSprintName}
+                            onChange={(e) => setNewSprintName(e.target.value)}
+                            placeholder="NAME YOUR SPHERE..."
+                            className="w-full pl-10 pr-4 py-2.5 border border-white/5 rounded-xl bg-white/5 text-white text-[11px] font-bold uppercase tracking-widest focus:outline-none focus:border-emerald-500/30 focus:bg-white/[0.08] transition-all placeholder:text-gray-700"
+                            required
+                        />
+                    </div>
+                    <button type="submit" disabled={isAdding} className="px-6 py-2.5 bg-white text-black font-black rounded-xl shadow-xl hover:scale-105 active:scale-95 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-2 text-[10px] uppercase tracking-widest transition-all">
+                        {isAdding ? <LoaderCircleIcon className="w-4 h-4 animate-spin"/> : <PlusIcon className="w-4 h-4" />}
+                        {isAdding ? 'Syncing...' : 'Deploy'}
                     </button>
                 </form>
             </div>
 
             <div className="space-y-4">
                 {project.sprints.length > 0 ? project.sprints.map(sprint => (
-                    <div key={sprint.id} className="bg-[#131C1B] p-4 rounded-xl border border-gray-800">
-                        <div className="flex justify-between items-start gap-4">
-                            <div className="flex-grow space-y-3">
-                                <EditableField
-                                    value={sprint.name}
-                                    onSave={(name) => onUpdateSprint(sprint.id, { name })}
-                                    className="font-bold text-base text-white"
-                                    placeholder="Sprint Name"
-                                />
-                                <div className="grid grid-cols-2 gap-4 text-xs">
-                                    <div>
-                                        <label className="block text-gray-400 mb-1">Start Date</label>
-                                        <EditableField value={sprint.startDate} onSave={(startDate) => onUpdateSprint(sprint.id, { startDate })} type="date" className="text-white" />
+                    <div key={sprint.id} className="bg-[#131C1B]/80 backdrop-blur-xl p-6 rounded-2xl border border-white/5 shadow-2xl group/card hover:border-white/10 transition-colors">
+                        <div className="flex justify-between items-start gap-8">
+                            <div className="flex-grow space-y-5">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2 h-8 rounded-full bg-emerald-500/20 group-hover/card:bg-emerald-500 transition-colors" />
+                                    <EditableField
+                                        value={sprint.name}
+                                        onSave={(name) => onUpdateSprint(sprint.id, { name })}
+                                        className="font-black text-xs text-white uppercase tracking-widest"
+                                        placeholder="Sprint Designation"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-gray-600 px-1">Synapse Start</label>
+                                        <EditableField value={sprint.startDate} onSave={(startDate) => onUpdateSprint(sprint.id, { startDate })} type="date" className="text-white text-[11px] font-bold bg-white/5 rounded-lg px-3 py-2 border border-white/5" />
                                     </div>
-                                    <div>
-                                        <label className="block text-gray-400 mb-1">End Date</label>
-                                        <EditableField value={sprint.endDate} onSave={(endDate) => onUpdateSprint(sprint.id, { endDate })} type="date" className="text-white" />
+                                    <div className="space-y-1.5">
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-gray-600 px-1">Termination Date</label>
+                                        <EditableField value={sprint.endDate} onSave={(endDate) => onUpdateSprint(sprint.id, { endDate })} type="date" className="text-white text-[11px] font-bold bg-white/5 rounded-lg px-3 py-2 border border-white/5" />
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="block text-gray-400 mb-1 text-xs">Goal</label>
-                                    <EditableField value={sprint.goal} onSave={(goal) => onUpdateSprint(sprint.id, { goal })} isTextArea placeholder="Set a sprint goal..." className="text-white text-xs" />
+                                <div className="space-y-1.5 pt-2">
+                                    <label className="text-[9px] font-black uppercase tracking-widest text-gray-600 px-1">Neural Objective</label>
+                                    <EditableField value={sprint.goal} onSave={(goal) => onUpdateSprint(sprint.id, { goal })} isTextArea placeholder="Define the core objective for this cycle..." className="text-white text-[11px] font-medium bg-white/5 rounded-lg px-3 py-2 border border-white/5 leading-relaxed" />
                                 </div>
                             </div>
-                            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                            <div className="flex flex-col items-end gap-3 flex-shrink-0">
                                 <button
                                     onClick={() => handleSetDefault(sprint)}
                                     disabled={sprint.isDefault}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors disabled:cursor-not-allowed text-yellow-300 bg-yellow-900/30 hover:bg-yellow-900/60 disabled:bg-yellow-900/60 disabled:text-yellow-500"
+                                    className={`flex items-center gap-2 px-4 py-2 text-[8px] font-black uppercase tracking-[0.2em] rounded-xl transition-all shadow-xl ${sprint.isDefault ? 'bg-emerald-500 text-black' : 'bg-white/5 text-gray-500 hover:text-white hover:bg-white/10'}`}
                                 >
-                                    <StarIcon className={`w-4 h-4 ${sprint.isDefault ? 'fill-current' : ''}`} />
-                                    {sprint.isDefault ? 'Default' : 'Set Default'}
+                                    <StarIcon className={`w-3.5 h-3.5 ${sprint.isDefault ? 'fill-current' : ''}`} />
+                                    {sprint.isDefault ? 'Primary' : 'Set Primary'}
                                 </button>
-                                <button
-                                    onClick={() => handleDelete(sprint)}
-                                    className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-900/30 rounded-full"
-                                >
-                                    <TrashIcon className="w-5 h-5" />
-                                </button>
-                                {/* FIX: Added a button to trigger the sprint completion flow. */}
-                                <button
-                                    onClick={() => onCompleteSprint(sprint)}
-                                    disabled={sprint.status === 'completed'}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors disabled:cursor-not-allowed text-green-300 bg-green-900/30 hover:bg-green-900/60 disabled:bg-green-900/60 disabled:text-green-500"
-                                >
-                                    <CheckSquareIcon className="w-4 h-4" />
-                                    {sprint.status === 'completed' ? 'Completed' : 'Complete'}
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => onCompleteSprint(sprint)}
+                                        disabled={sprint.status === 'completed'}
+                                        className={`flex items-center gap-2 px-4 py-2 text-[8px] font-black uppercase tracking-[0.2em] rounded-xl transition-all shadow-xl ${sprint.status === 'completed' ? 'bg-white/5 text-gray-700 cursor-not-allowed' : 'bg-blue-600/10 text-blue-400 hover:bg-blue-600 hover:text-white'}`}
+                                    >
+                                        <CheckSquareIcon className="w-3.5 h-3.5" />
+                                        {sprint.status === 'completed' ? 'SYNCHRONIZED' : 'TERMINATE'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(sprint)}
+                                        className="p-2.5 text-gray-600 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 rounded-xl transition-all"
+                                    >
+                                        <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 )) : (
-                    <div className="text-center py-10 text-gray-500">
-                        <p>No sprints created yet.</p>
-                        <p className="text-xs mt-1">Create your first sprint to start organizing your work.</p>
+                    <div className="text-center py-24 bg-white/5 rounded-3xl border border-dashed border-white/10">
+                        <LoaderCircleIcon className="mx-auto h-12 w-12 text-gray-800 mb-4" />
+                        <p className="text-sm font-black text-white uppercase tracking-[0.2em]">No Iterations Detected</p>
+                        <p className="text-[10px] text-gray-600 mt-2 uppercase tracking-widest">Initialize a new sprint to begin velocity tracking.</p>
                     </div>
                 )}
             </div>

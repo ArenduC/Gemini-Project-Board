@@ -317,7 +317,7 @@ const App: React.FC = () => {
           </div>
         </nav>
 
-        <main className="flex-grow p-6 overflow-x-hidden custom-scrollbar">
+        <main className="flex-grow p-6 overflow-x-hidden no-scrollbar">
           {activeProjectId && project ? (
             <KanbanBoard 
               project={project} currentUser={currentUser} users={Object.values(state.users)} onlineUsers={onlineUsers} aiFeaturesEnabled={featureFlags.ai}

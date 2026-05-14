@@ -13,6 +13,8 @@ interface FiltersProps {
   setPriorityFilter: (value: string[]) => void;
   assigneeFilter: string[];
   setAssigneeFilter: (value: string[]) => void;
+  reporterFilter?: string[];
+  setReporterFilter?: (value: string[]) => void;
   statusFilter?: string[];
   setStatusFilter?: (value: string[]) => void;
   tagFilter: string[];
@@ -30,7 +32,8 @@ interface FiltersProps {
   setRelativeTimeUnit: (value: FilterSegment['filters']['relativeTimeUnit']) => void;
   relativeTimeCondition: FilterSegment['filters']['relativeTimeCondition'];
   setRelativeTimeCondition: (value: FilterSegment['filters']['relativeTimeCondition']) => void;
-  assignees: string[];
+  assigneeOptions: { value: string; label: string; }[];
+  reporterOptions?: { value: string; label: string; }[];
   statuses?: string[];
   tags: string[];
   segments: FilterSegment[];
@@ -40,6 +43,7 @@ interface FiltersProps {
   onDeleteSegment: (segmentId: string) => Promise<void>;
   onApplySegment: (segmentId: string | null) => void;
   onClearFilters: () => void;
+  isCompact?: boolean;
 }
 
 const MultiSelectFilter: React.FC<{
@@ -78,7 +82,7 @@ const MultiSelectFilter: React.FC<{
                 </button>
             </div>
             {isOpen && (
-                <div className="absolute top-full left-0 mt-2 w-48 bg-[#131C1B] border border-gray-800 rounded-xl shadow-2xl z-[60] max-h-64 overflow-y-auto custom-scrollbar py-2 ring-1 ring-white/5">
+                <div className="absolute top-full left-0 mt-2 w-48 bg-[#131C1B] border border-gray-800 rounded-xl shadow-2xl z-[9999] max-h-64 overflow-y-auto custom-scrollbar py-2 ring-1 ring-white/5">
                     {options.map(option => (
                         <label key={option.value} className="flex items-center gap-3 px-4 py-2 text-[11px] text-gray-300 hover:text-white hover:bg-white/5 cursor-pointer transition-colors">
                             <input type="checkbox" checked={selectedValues.includes(option.value)} onChange={() => toggleOption(option.value)} className="w-4 h-4 rounded border-gray-700 bg-gray-800 text-emerald-500 focus:ring-emerald-500/50" />
@@ -136,7 +140,7 @@ const RangeFilter: React.FC<{
                 </button>
             </div>
             {isOpen && (
-                <div className="absolute top-full left-0 mt-2 w-64 bg-[#131C1B] border border-gray-800 rounded-xl shadow-2xl z-[60] p-4 ring-1 ring-white/5 space-y-4">
+                <div className="absolute top-full left-0 mt-2 w-64 bg-[#131C1B] border border-gray-800 rounded-xl shadow-2xl z-[9999] p-4 ring-1 ring-white/5 space-y-4">
                     <div className="flex p-1 bg-white/5 rounded-lg">
                         <button onClick={() => setMode('absolute')} className={`flex-1 py-1 text-[9px] font-black uppercase tracking-widest rounded-md transition-all ${mode === 'absolute' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300'}`}>Absolute</button>
                         <button onClick={() => setMode('relative')} className={`flex-1 py-1 text-[9px] font-black uppercase tracking-widest rounded-md transition-all ${mode === 'relative' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300'}`}>Relative</button>
@@ -177,7 +181,7 @@ const RangeFilter: React.FC<{
 };
 
 export const Filters: React.FC<FiltersProps> = ({
-  projectId, currentUser, searchTerm, setSearchTerm, priorityFilter, setPriorityFilter, assigneeFilter, setAssigneeFilter, statusFilter, setStatusFilter, tagFilter, setTagFilter, sprintFilter, setSprintFilter, sprints, startDate, setStartDate, endDate, setEndDate, relativeTimeValue, setRelativeTimeValue, relativeTimeUnit, setRelativeTimeUnit, relativeTimeCondition, setRelativeTimeCondition, assignees, statuses, tags, segments, activeSegmentId, onAddSegment, onUpdateSegment, onDeleteSegment, onApplySegment, onClearFilters,
+  projectId, currentUser, searchTerm, setSearchTerm, priorityFilter, setPriorityFilter, assigneeFilter, setAssigneeFilter, statusFilter, setStatusFilter, tagFilter, setTagFilter, sprintFilter, setSprintFilter, sprints, startDate, setStartDate, endDate, setEndDate, relativeTimeValue, setRelativeTimeValue, relativeTimeUnit, setRelativeTimeUnit, relativeTimeCondition, setRelativeTimeCondition, assigneeOptions, reporterOptions, statuses, tags, segments, activeSegmentId, onAddSegment, onUpdateSegment, onDeleteSegment, onApplySegment, onClearFilters, isCompact, reporterFilter, setReporterFilter
 }) => {
   const [visibleFilters, setVisibleFilters] = useState<Set<string>>(new Set());
   const [isAddFilterOpen, setIsAddFilterOpen] = useState(false);
@@ -188,6 +192,7 @@ export const Filters: React.FC<FiltersProps> = ({
     const nextVisible = new Set<string>();
     if (priorityFilter.length > 0) nextVisible.add('priority');
     if (assigneeFilter.length > 0) nextVisible.add('assignee');
+    if (reporterFilter && reporterFilter.length > 0) nextVisible.add('reporter');
     if (statusFilter && statusFilter.length > 0) nextVisible.add('status');
     if (tagFilter.length > 0) nextVisible.add('tag');
     if (sprintFilter.length > 0) nextVisible.add('sprint');
@@ -210,17 +215,19 @@ export const Filters: React.FC<FiltersProps> = ({
   const filterTypes = useMemo(() => [
     { id: 'priority', name: 'Priority' },
     { id: 'assignee', name: 'Assignee' },
+    ...(setReporterFilter ? [{ id: 'reporter', name: 'Created By' }] : []),
     ...(statuses && setStatusFilter ? [{ id: 'status', name: 'Status' }] : []),
     { id: 'tag', name: 'Tag' },
     { id: 'sprint', name: 'Sprint' },
     { id: 'date', name: 'Range' },
-  ], [statuses, setStatusFilter]);
+  ], [statuses, setStatusFilter, setReporterFilter]);
 
   const addFilter = (type: string) => { setVisibleFilters(prev => new Set(prev).add(type)); setIsAddFilterOpen(false); };
   const removeFilter = (type: string) => {
     setVisibleFilters(prev => { const next = new Set(prev); next.delete(type); return next; });
     if (type === 'priority') setPriorityFilter([]);
     if (type === 'assignee') setAssigneeFilter([]);
+    if (type === 'reporter' && setReporterFilter) setReporterFilter([]);
     if (type === 'status' && setStatusFilter) setStatusFilter([]);
     if (type === 'tag') setTagFilter([]);
     if (type === 'sprint') setSprintFilter([]);
@@ -230,13 +237,14 @@ export const Filters: React.FC<FiltersProps> = ({
     }
   };
 
-  const currentFilters = useMemo(() => ({ searchTerm, priorityFilter, assigneeFilter, statusFilter: statusFilter || [], tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition }), [searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
+  const currentFilters = useMemo(() => ({ searchTerm, priorityFilter, assigneeFilter, reporterFilter, statusFilter: statusFilter || [], tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition }), [searchTerm, priorityFilter, assigneeFilter, reporterFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
   
   const hasActiveFilters = useMemo(() => {
       return (
           searchTerm !== '' ||
           priorityFilter.length > 0 ||
           assigneeFilter.length > 0 ||
+          (reporterFilter && reporterFilter.length > 0) ||
           (statusFilter && statusFilter.length > 0) ||
           tagFilter.length > 0 ||
           sprintFilter.length > 0 ||
@@ -248,11 +256,11 @@ export const Filters: React.FC<FiltersProps> = ({
 
   return (
     <div className="flex items-center gap-2 flex-wrap flex-grow">
-      <div className="relative flex-grow max-w-sm">
+      <div className={`relative flex-grow ${isCompact ? 'max-w-[200px]' : 'max-w-sm'}`}>
         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500" />
         <input 
           type="text" 
-          placeholder="Neural Search..." 
+          placeholder={isCompact ? "Search..." : "Neural Search..."} 
           value={searchTerm} 
           onChange={(e) => setSearchTerm(e.target.value)} 
           className="pl-8 pr-3 py-1.5 w-full border border-white/5 rounded-xl bg-[#1C2326] text-white focus:outline-none focus:ring-1 focus:ring-emerald-500/50 text-[9px] font-medium h-8 shadow-inner" 
@@ -260,7 +268,8 @@ export const Filters: React.FC<FiltersProps> = ({
       </div>
       
       {visibleFilters.has('priority') && <MultiSelectFilter label="PRIORITY" options={Object.values(TaskPriority).map(p => ({ value: p, label: p }))} selectedValues={priorityFilter} onChange={setPriorityFilter} onRemove={() => removeFilter('priority')} />}
-      {visibleFilters.has('assignee') && <MultiSelectFilter label="ASSIGNEE" options={assignees.map(a => ({ value: a, label: a }))} selectedValues={assigneeFilter} onChange={setAssigneeFilter} onRemove={() => removeFilter('assignee')} />}
+      {visibleFilters.has('assignee') && <MultiSelectFilter label="ASSIGNEE" options={assigneeOptions} selectedValues={assigneeFilter} onChange={setAssigneeFilter} onRemove={() => removeFilter('assignee')} />}
+      {visibleFilters.has('reporter') && reporterOptions && setReporterFilter && <MultiSelectFilter label="CREATED BY" options={reporterOptions} selectedValues={reporterFilter || []} onChange={setReporterFilter} onRemove={() => removeFilter('reporter')} />}
       {visibleFilters.has('status') && statuses && setStatusFilter && <MultiSelectFilter label="STATUS" options={statuses.map(s => ({ value: s, label: s }))} selectedValues={statusFilter || []} onChange={setStatusFilter} onRemove={() => removeFilter('status')} />}
       {visibleFilters.has('tag') && <MultiSelectFilter label="TAG" options={tags.map(t => ({ value: t, label: t }))} selectedValues={tagFilter} onChange={setTagFilter} onRemove={() => removeFilter('tag')} />}
       {visibleFilters.has('sprint') && <MultiSelectFilter label="SPRINT" options={sprints.map(s => ({ value: s.id, label: s.name }))} selectedValues={sprintFilter} onChange={setSprintFilter} onRemove={() => removeFilter('sprint')} />}
@@ -278,12 +287,17 @@ export const Filters: React.FC<FiltersProps> = ({
       <div className="relative flex-shrink-0" ref={addFilterButtonRef}>
           <button 
             onClick={() => setIsAddFilterOpen(prev => !prev)} 
-            className="flex items-center gap-2 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest bg-white/5 border border-white/5 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all h-8"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest bg-white/5 border border-white/5 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all h-8 relative"
           >
-              <PlusIcon className="w-3 h-3 text-emerald-400"/> Filter
+              <PlusIcon className="w-3 h-3 text-emerald-400"/> {isCompact ? "" : "Filter"}
+              {hasActiveFilters && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-emerald-500 text-[7px] text-black font-black">
+                  {[searchTerm, priorityFilter.length > 0, assigneeFilter.length > 0, reporterFilter?.length, statusFilter?.length, tagFilter.length > 0, sprintFilter.length > 0, startDate || endDate, relativeTimeValue].filter(Boolean).length}
+                </span>
+              )}
           </button>
           {isAddFilterOpen && (
-              <div className="absolute top-full left-0 mt-2 w-32 bg-[#131C1B] border border-gray-800 rounded-xl shadow-2xl z-[60] py-2 ring-1 ring-white/5">
+              <div className="absolute top-full left-0 mt-2 w-32 bg-[#131C1B] border border-gray-800 rounded-xl shadow-2xl z-[9999] py-2 ring-1 ring-white/5">
                   {filterTypes.filter(ft => !visibleFilters.has(ft.id)).map(filter => (
                       <button key={filter.id} onClick={() => addFilter(filter.id)} className="w-full text-left px-4 py-2 text-[9px] font-bold uppercase tracking-widest text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
                         {filter.name}
@@ -303,9 +317,9 @@ export const Filters: React.FC<FiltersProps> = ({
               </button>
               <button 
                 onClick={() => setSaveModalOpen(true)} 
-                className="flex items-center gap-1.5 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-all h-8"
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-[8px] font-black uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl hover:bg-emerald-500/20 transition-all h-8 ${isCompact ? 'w-8 justify-center p-0' : ''}`}
               >
-                  <BookmarkPlusIcon className="w-3 h-3" /> Save
+                  <BookmarkPlusIcon className="w-3 h-3" /> {!isCompact && "Save"}
               </button>
           </div>
       )}

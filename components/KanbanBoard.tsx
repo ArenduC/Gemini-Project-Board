@@ -1,23 +1,27 @@
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { DragDropContext, Draggable, DropResult } from 'react-beautiful-dnd';
 import { StrictModeDroppable } from './StrictModeDroppable';
 import { Column as ColumnType, BoardData, Task, Subtask, User, ChatMessage, FilterSegment, Project, Bug, TaskPriority, AiGeneratedTaskFromFile, Sprint, BugResponse, NewTaskData } from '../types';
 import { Column } from './Column';
 import { Filters } from './Filters';
-import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon, RocketIcon, DownloadIcon, XIcon, SparklesIcon, ZapIcon, LinkIcon, CheckIcon } from './Icons';
+import { PlusIcon, LayoutDashboardIcon, GitBranchIcon, TableIcon, LifeBuoyIcon, RocketIcon, DownloadIcon, XIcon, SparklesIcon, ZapIcon, LinkIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from './Icons';
 import { ProjectChat } from './ProjectChat';
 import { AiTaskCreator } from './AiTaskCreator';
 import { TaskGraphView } from './TaskGraphView';
 import { ProjectLinksManager } from './ProjectLinksManager';
 import { TaskTableView } from './TaskTableView';
 import { BugReporter } from './BugReporter';
+import { ResourceMeshModal } from './ResourceMeshModal';
 import { Pagination } from './Pagination';
 import { TaskImportDropzone } from './TaskImportDropzone';
 import { generateTasksFromFile } from '../services/geminiService';
 import { TaskConfirmationModal } from './TaskConfirmationModal';
 import { SprintsPage } from './SprintsPage';
 import { BulkActionsBar } from './BulkActionsBar';
+import { UserAvatar } from './UserAvatar';
 import { BulkUpdateSprintModal } from './BulkUpdateSprintModal';
 import { CompleteSprintModal } from './CompleteSprintModal';
 import { CreateTaskModal } from './CreateTaskModal';
@@ -152,8 +156,8 @@ const SelectHeadersModal: React.FC<{
   
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         <header className="p-4 border-b border-gray-800 flex justify-between items-center">
           <h2 className="text-lg font-bold text-white">Select Columns to Import</h2>
@@ -177,9 +181,18 @@ const SelectHeadersModal: React.FC<{
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
+
+const viewOptions = [
+  { id: 'board', label: 'Board', icon: LayoutDashboardIcon },
+  { id: 'table', label: 'Table', icon: TableIcon },
+  { id: 'graph', label: 'Graph', icon: GitBranchIcon },
+  { id: 'bugs', label: 'Bugs', icon: LifeBuoyIcon },
+  { id: 'sprints', label: 'Sprints', icon: RocketIcon },
+];
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({ 
     project, currentUser, users, onlineUsers, aiFeaturesEnabled, onDragEnd, 
@@ -192,6 +205,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
+  const [reporterFilter, setReporterFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [sprintFilter, setSprintFilter] = useState<string[]>([]);
@@ -208,21 +222,27 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [initialBugSearch, setInitialBugSearch] = useState<string>('');
 
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>('all');
+  const [isResourceMeshModalOpen, setIsResourceMeshModalOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
   const boardData = project.board;
   const requestConfirmation = useConfirmation();
 
   const filteredBoardData: BoardData = useMemo(() => {
-    if (!boardData?.tasks || !boardData?.columns) return boardData || { tasks: {}, columns: {}, columnOrder: [] };
+    const defaultBoard: BoardData = { tasks: {}, columns: {}, columnOrder: [] };
+    if (!boardData?.tasks || !boardData?.columns) return defaultBoard;
 
     const taskIdToColumnIdMap = new Map<string, string>();
-    for (const column of Object.values(boardData.columns) as ColumnType[]) {
-        for (const taskId of column.taskIds) {
-            taskIdToColumnIdMap.set(taskId, column.id);
+    const columns = boardData.columns || {};
+    for (const column of Object.values(columns) as ColumnType[]) {
+        if (column?.taskIds) {
+            for (const taskId of column.taskIds) {
+                taskIdToColumnIdMap.set(taskId, column.id);
+            }
         }
     }
 
-    const tasks = Object.values(boardData.tasks) as Task[];
+    const tasks = Object.values(boardData.tasks || {}) as Task[];
     let filteredTasks = tasks;
 
     if (searchTerm) {
@@ -237,7 +257,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
 
     if (assigneeFilter.length > 0) {
-      filteredTasks = filteredTasks.filter(task => assigneeFilter.includes(task.assignee?.name || ''));
+      filteredTasks = filteredTasks.filter(task => task.assignee?.id ? assigneeFilter.includes(task.assignee.id) : false);
+    }
+
+    if (reporterFilter.length > 0) {
+      filteredTasks = filteredTasks.filter(task => reporterFilter.includes(task.creatorId));
     }
     
     if (statusFilter.length > 0) {
@@ -311,12 +335,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         tasks: newTasks,
         columns: newColumns
     };
-  }, [boardData, searchTerm, priorityFilter, assigneeFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
+  }, [boardData, searchTerm, priorityFilter, assigneeFilter, reporterFilter, statusFilter, tagFilter, sprintFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
 
   // FIX: Explicitly filter users to only those who are members of this project
   const projectMembers = useMemo(() => {
     return (project.members || []).map(id => users.find(u => u.id === id)).filter((u): u is User => !!u);
   }, [project.members, users]);
+
+  const uniqueReporters = useMemo(() => {
+    const tasks = boardData?.tasks ? Object.values(boardData.tasks) as Task[] : [];
+    const creatorIds = Array.from(new Set(tasks.map(t => t.creatorId)));
+    return creatorIds
+      .map(id => users.find(u => u.id === id))
+      .filter((u): u is User => !!u);
+  }, [boardData?.tasks, users]);
 
   const handleDragEnd = useCallback((result: DropResult) => {
     onDragEnd(result, filteredBoardData);
@@ -358,6 +390,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     setSearchTerm(segment.filters.searchTerm || '');
     setPriorityFilter(segment.filters.priorityFilter || []);
     setAssigneeFilter(segment.filters.assigneeFilter || []);
+    setReporterFilter(segment.filters.reporterFilter || []);
     setStatusFilter(segment.filters.statusFilter || []);
     setTagFilter(segment.filters.tagFilter || []);
     setSprintFilter(segment.filters.sprintFilter || []);
@@ -403,6 +436,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           setSearchTerm('');
           setPriorityFilter([]);
           setAssigneeFilter([]);
+          setReporterFilter([]);
           setStatusFilter([]);
           setTagFilter([]);
           setSprintFilter([]);
@@ -414,6 +448,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       } else {
           const segment = (project.filterSegments || []).find(s => s.id === segmentId);
           if (segment) {
+            if (segment.name.toUpperCase() === 'NEURAL RESOURCE MESH') {
+              setIsResourceMeshModalOpen(true);
+              return;
+            }
             applySegmentFilters(segment)
           }
       }
@@ -526,21 +564,24 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const uniqueAssignees = useMemo(() => {
       if (!boardData?.tasks) return [];
-      const assignees = (Object.values(boardData.tasks) as Task[])
-          .map(task => task.assignee?.name)
-          .filter((name): name is string => !!name);
-      return [...new Set(assignees)];
+      const assignees = (Object.values(boardData.tasks || {}) as Task[])
+          .map(task => task.assignee)
+          .filter((u): u is User => !!u);
+      
+      const unique = new Map<string, User>();
+      assignees.forEach(u => unique.set(u.id, u));
+      return Array.from(unique.values());
   }, [boardData?.tasks]);
 
   const uniqueStatuses = useMemo(() => {
       if (!boardData?.columns) return [];
-      return [...new Set((Object.values(boardData.columns) as ColumnType[]).map(c => c.title).filter(Boolean))];
+      return [...new Set((Object.values(boardData.columns || {}) as ColumnType[]).map(c => c.title).filter(Boolean))];
   }, [boardData?.columns]);
 
   const uniqueTags = useMemo(() => {
     if (!boardData?.tasks) return [];
     const tags = new Set<string>();
-    (Object.values(boardData.tasks) as Task[]).forEach(task => {
+    (Object.values(boardData.tasks || {}) as Task[]).forEach(task => {
         task.tags?.forEach(tag => tags.add(tag));
     });
     return Array.from(tags).sort();
@@ -587,6 +628,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     if (searchTerm) count++;
     if (priorityFilter.length > 0) count++;
     if (assigneeFilter.length > 0) count++;
+    if (reporterFilter.length > 0) count++;
     if (statusFilter.length > 0) count++;
     if (tagFilter.length > 0) count++;
     if (sprintFilter.length > 0) count++;
@@ -599,15 +641,132 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <>
-      <div className="mb-4">
-        <ProjectLinksManager
-            project={project}
-            onAddLink={addProjectLink}
-            onDeleteLink={deleteProjectLink}
-        />
-      </div>
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Neural Sidebar */}
+      <motion.aside 
+        initial={false}
+        animate={{ width: isSidebarCollapsed ? 80 : 288 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="hidden lg:flex lg:fixed lg:left-6 lg:top-24 lg:bottom-6 flex-shrink-0 flex-col space-y-6 overflow-y-auto no-scrollbar z-20"
+      >
+        {/* Collapse Toggle */}
+        <button 
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="absolute -right-3 top-4 w-6 h-6 bg-emerald-500 text-black rounded-full shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-30 border-none"
+        >
+          {isSidebarCollapsed ? <ChevronRightIcon className="w-3.5 h-3.5" /> : <ChevronLeftIcon className="w-3.5 h-3.5" />}
+        </button>
 
-      <div className="space-y-3 mb-4">
+        {/* View Switcher Sidebar Section */}
+        <div className={`bg-[#1C2326]/50 backdrop-blur-sm border border-white/5 rounded-2xl flex-grow space-y-6 shadow-2xl transition-all flex flex-col ${isSidebarCollapsed ? 'p-2' : 'p-4'}`}>
+          <div className="space-y-4">
+            {!isSidebarCollapsed && <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 px-1">Navigation</h3>}
+            <div className="space-y-2">
+              {viewOptions.map(option => (
+                <button
+                  key={option.id}
+                  onClick={() => handleSetProjectView(option.id)}
+                  title={isSidebarCollapsed ? option.label : undefined}
+                  className={`w-full relative flex items-center rounded-xl text-[10px] font-black uppercase tracking-widest transition-all group ${
+                    isSidebarCollapsed ? 'justify-center h-12 w-12 mx-auto' : 'gap-3 px-3 py-2.5'
+                  } ${
+                    projectView === option.id 
+                      ? 'bg-white text-black shadow-lg shadow-white/10' 
+                      : 'text-gray-500 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <option.icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${projectView === option.id ? 'text-black' : 'text-gray-500'}`} />
+                  {!isSidebarCollapsed && <span className="flex-grow text-left">{option.label}</span>}
+                  {option.id === 'bugs' && activeBugsCount > 0 && (
+                      <span className={`bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md min-w-[15px] text-center ${isSidebarCollapsed ? 'absolute -top-1 -right-1 shadow-lg' : ''}`}>
+                          {activeBugsCount}
+                      </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={`space-y-4 pt-4 border-t border-white/5 flex flex-col ${isSidebarCollapsed ? 'items-center' : ''}`}>
+            {!isSidebarCollapsed && <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 px-1">Health Matrix</h3>}
+            <div className={`grid gap-2 w-full ${isSidebarCollapsed ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                <div className={`bg-white/5 rounded-xl border border-white/5 text-center flex flex-col items-center justify-center ${isSidebarCollapsed ? 'h-12 w-12 mx-auto' : 'p-3'}`}>
+                  <p className="text-[7px] font-black text-gray-500 uppercase tracking-widest mb-0.5">{isSidebarCollapsed ? 'ITM' : 'Items'}</p>
+                  <p className={`${isSidebarCollapsed ? 'text-[10px]' : 'text-sm'} font-black text-white`}>{Object.keys(project?.board?.tasks || {}).length}</p>
+                </div>
+                <div className={`bg-white/5 rounded-xl border border-white/5 text-center flex flex-col items-center justify-center ${isSidebarCollapsed ? 'h-12 w-12 mx-auto' : 'p-3'}`}>
+                  <p className="text-[7px] font-black text-gray-500 uppercase tracking-widest mb-0.5">{isSidebarCollapsed ? 'BUG' : 'Bugs'}</p>
+                  <p className={`${isSidebarCollapsed ? 'text-[10px]' : 'text-sm'} font-black text-white`}>{Object.keys(project.bugs || {}).length}</p>
+                </div>
+            </div>
+
+            
+            {!isSidebarCollapsed && (
+              <div className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Active Velocity</span>
+                    <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">88%</span>
+                  </div>
+                  <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]" style={{ width: '88%' }}></div>
+                  </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4 pt-4 border-t border-white/5">
+            {!isSidebarCollapsed && <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 px-1">Network Hub</h3>}
+            <button 
+              onClick={() => setIsResourceMeshModalOpen(true)}
+              title={isSidebarCollapsed ? "Resource Mesh" : undefined}
+              className={`w-full flex items-center bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:bg-emerald-500/20 transition-all group ${
+                isSidebarCollapsed ? 'justify-center h-12' : 'gap-3 px-3 py-3'
+              }`}
+            >
+              <ZapIcon className="w-5 h-5 animate-pulse" />
+              {!isSidebarCollapsed && (
+                <>
+                  <span className="flex-grow text-left">Resource Mesh</span>
+                  <span className="bg-emerald-500/20 text-emerald-400 text-[8px] font-black px-1.5 py-0.5 rounded-md min-w-[15px] text-center">
+                      {project.links.length}
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </motion.aside>
+
+      {/* Mobile Sidebar (Fixed) */}
+      <aside className="lg:hidden w-full flex-shrink-0 space-y-6 mb-6">
+        <div className="bg-[#1C2326]/50 backdrop-blur-sm border border-white/5 rounded-2xl p-4 space-y-6">
+          <div className="flex overflow-x-auto no-scrollbar gap-2">
+              {viewOptions.map(option => (
+                <button
+                  key={option.id}
+                  onClick={() => handleSetProjectView(option.id)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex-shrink-0 ${
+                    projectView === option.id 
+                      ? 'bg-white text-black shadow-lg shadow-white/10' 
+                      : 'text-gray-500 hover:bg-white/5 hover:text-white'
+                  }`}
+                >
+                  <option.icon className="w-3.5 h-3.5" />
+                  {option.label}
+                </button>
+              ))}
+          </div>
+        </div>
+      </aside>
+
+      {/* Main content stage */}
+      <motion.div 
+        animate={{ 
+          marginLeft: isSidebarCollapsed ? 112 : 336 
+        }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="flex-grow min-w-0 w-full space-y-6"
+      >
         {/* Row 1: Segment Tabs */}
         {!['bugs', 'sprints'].includes(projectView) && (
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 px-1">
@@ -655,7 +814,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 <div className="flex items-center gap-2 px-3 h-8">
                     <LifeBuoyIcon className="w-4 h-4 text-emerald-400" />
                     <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Bug Tracker</h3>
-                    <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center animate-pulse">
+                    <span className="bg-red-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md min-w-[18px] text-center animate-pulse">
                         {activeBugsCount}
                     </span>
                 </div>
@@ -669,6 +828,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 setPriorityFilter={setPriorityFilter}
                 assigneeFilter={assigneeFilter}
                 setAssigneeFilter={setAssigneeFilter}
+                reporterFilter={reporterFilter}
+                setReporterFilter={setReporterFilter}
                 statusFilter={statusFilter}
                 setStatusFilter={setStatusFilter}
                 tagFilter={tagFilter}
@@ -686,7 +847,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 setRelativeTimeUnit={setRelativeTimeUnit}
                 relativeTimeCondition={relativeTimeCondition}
                 setRelativeTimeCondition={setRelativeTimeCondition}
-                assignees={uniqueAssignees}
+                assigneeOptions={uniqueAssignees.map(u => ({ value: u.id, label: u.name }))}
+                reporterOptions={uniqueReporters.map(u => ({ value: u.id, label: u.name }))}
                 statuses={uniqueStatuses}
                 tags={uniqueTags}
                 segments={project.filterSegments}
@@ -700,25 +862,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-4 flex-shrink-0">
-            <div className="flex items-center gap-3 border-l border-white/10 pl-4 h-9">
-              <span className="text-[9px] font-black text-gray-600 uppercase tracking-widest hidden sm:block">View</span>
-              <div className="flex items-center p-0.5 bg-white/5 rounded-xl border border-white/5 h-8">
-                <button onClick={() => handleSetProjectView('board')} className={`p-1.5 rounded-lg transition-all ${projectView === 'board' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Board View"><LayoutDashboardIcon className="w-3.5 h-3.5" /></button>
-                <button onClick={() => handleSetProjectView('table')} className={`p-1.5 rounded-lg transition-all ${projectView === 'table' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Table View"><TableIcon className="w-3.5 h-3.5" /></button>
-                <button onClick={() => handleSetProjectView('graph')} className={`p-1.5 rounded-lg transition-all ${projectView === 'graph' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Graph View"><GitBranchIcon className="w-3.5 h-3.5" /></button>
-                <button onClick={() => handleSetProjectView('bugs')} className={`p-1.5 rounded-lg transition-all ${projectView === 'bugs' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'} relative`} title="Bug Tracker">
-                    <LifeBuoyIcon className="w-3.5 h-3.5" />
-                    {activeBugsCount > 0 && projectView !== 'bugs' && (
-                        <div className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-red-500 rounded-full" />
-                    )}
-                </button>
-                <button onClick={() => handleSetProjectView('sprints')} className={`p-1.5 rounded-lg transition-all ${projectView === 'sprints' ? 'bg-white/10 text-white' : 'text-gray-600 hover:text-white'}`} title="Sprints"><RocketIcon className="w-3.5 h-3.5" /></button>
-              </div>
-            </div>
+          <div className="flex items-center gap-2">
+            {projectView === 'bugs' ? (
 
-            <div className="flex items-center gap-2">
-              {projectView === 'bugs' ? (
                 <>
                   <button
                     onClick={() => setBugTrigger({ type: 'export' })}
@@ -780,25 +926,24 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               )}
             </div>
           </div>
-        </div>
-      </div>
-      
-      {projectView === 'bugs' ? (
-        <BugReporter
-            project={project}
-            users={users}
-            currentUser={currentUser}
-            onAddBug={(bugData) => addBug(project.id, bugData)}
-            onUpdateBug={updateBug}
-            onDeleteBug={deleteBug}
-            onAddBugsBatch={addBugsBatch}
-            onDeleteBugsBatch={deleteBugsBatch}
-            initialSearchTerm={initialBugSearch}
-            trigger={bugTrigger}
-            aiFeaturesEnabled={aiFeaturesEnabled}
-            onTriggerComplete={() => setBugTrigger({ type: null })}
-        />
-      ) : projectView === 'sprints' ? (
+        
+          {projectView === 'bugs' ? (
+            <BugReporter
+                project={project}
+                users={users}
+                currentUser={currentUser}
+                onAddBug={(bugData) => addBug(project.id, bugData)}
+                onUpdateBug={updateBug}
+                onDeleteBug={deleteBug}
+                onAddBugsBatch={addBugsBatch}
+                onDeleteBugsBatch={deleteBugsBatch}
+                initialSearchTerm={initialBugSearch}
+                trigger={bugTrigger}
+                aiFeaturesEnabled={aiFeaturesEnabled}
+                onTriggerComplete={() => setBugTrigger({ type: null })}
+                hideReportButton={true}
+            />
+          ) : projectView === 'sprints' ? (
         <SprintsPage
             project={project}
             onAddSprint={addSprint}
@@ -813,7 +958,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     <div
                         {...provided.droppableProps}
                         ref={provided.innerRef}
-                        className="flex gap-6 items-start pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto custom-scrollbar"
+                        className="flex gap-6 items-start pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6 overflow-x-auto no-scrollbar"
                     >
                         {filteredBoardData.columnOrder.map((columnId, index) => {
                             const column = filteredBoardData.columns[columnId];
@@ -870,6 +1015,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       ) : (
         <TaskGraphView boardData={filteredBoardData} users={users} onTaskClick={onTaskClick} />
       )}
+      </motion.div>
+    </div>
       
        {isChatOpen && (
         <ProjectChat 
@@ -881,6 +1028,23 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             onClose={onCloseChat}
             onSendMessage={onSendMessage}
             onNavigateToBug={handleNavigateToBug}
+        />
+      )}
+
+      {isResourceMeshModalOpen && (
+        <ResourceMeshModal
+          isOpen={isResourceMeshModalOpen}
+          onClose={() => setIsResourceMeshModalOpen(false)}
+          projects={{ [project.id]: project }}
+          users={users}
+          onlineUsers={onlineUsers}
+          onTaskClick={onTaskClick}
+          onAddTask={() => {
+            setIsResourceMeshModalOpen(false);
+            setIsCreateTaskOpen(true);
+          }}
+          addProjectLink={addProjectLink}
+          deleteProjectLink={deleteProjectLink}
         />
       )}
 
@@ -948,7 +1112,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
       {isCreateTaskOpen && (
         <CreateTaskModal 
-          columns={Object.values(project.board.columns)} 
+          columns={Object.values(project?.board?.columns || {})} 
           users={projectMembers} 
           sprints={project.sprints} 
           onClose={() => setIsCreateTaskOpen(false)} 
@@ -995,8 +1159,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             isOpen={isCompleteSprintModalOpen}
             onClose={() => { setCompleteSprintModalOpen(false); setSprintToComplete(null); }}
             sprint={sprintToComplete}
-            projectTasks={Object.values(project.board.tasks)}
-            projectColumns={project.board.columns}
+            projectTasks={Object.values(project?.board?.tasks || {})}
+            projectColumns={project?.board?.columns || {}}
             projectSprints={project.sprints}
             onConfirm={handleConfirmCompleteSprint}
           />

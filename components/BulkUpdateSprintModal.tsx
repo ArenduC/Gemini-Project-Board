@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Sprint } from '../types';
 import { XIcon, LoaderCircleIcon, RocketIcon } from './Icons';
 
@@ -25,8 +26,8 @@ export const BulkUpdateSprintModal: React.FC<BulkUpdateSprintModalProps> = ({ is
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <header className="p-4 border-b border-gray-800 flex justify-between items-center">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -72,6 +73,7 @@ export const BulkUpdateSprintModal: React.FC<BulkUpdateSprintModalProps> = ({ is
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

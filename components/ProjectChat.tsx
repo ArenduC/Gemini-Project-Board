@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ChatMessage, User, Project, Bug } from '../types';
-import { XIcon, SendIcon, CopyIcon, CheckIcon } from './Icons';
+import { XIcon, SendIcon, CopyIcon, CheckIcon, MessageSquareIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 import { JsonSyntaxHighlighter } from './JsonSyntaxHighlighter';
 
@@ -243,14 +243,22 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
     };
 
     return (
-        <div className="fixed top-0 right-0 h-full w-full max-w-md bg-[#131C1B] shadow-2xl z-40 flex flex-col transform transition-transform duration-300 ease-in-out border-l border-gray-800">
-             <header className="p-4 border-b border-gray-800 flex justify-between items-center flex-shrink-0 bg-[#131C1B]/95 backdrop-blur">
-                <h3 className="text-base font-bold text-white">Project Chat</h3>
-                <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800 transition-colors">
-                    <XIcon className="w-6 h-6" />
+        <div className="fixed inset-0 bg-[#131C1B] z-[100] flex flex-col transform transition-transform duration-300 ease-in-out">
+             <header className="p-6 border-b border-white/5 flex justify-between items-center flex-shrink-0 bg-[#131C1B]/95 backdrop-blur max-w-5xl mx-auto w-full">
+                <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-400">
+                        <MessageSquareIcon className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white">Neural Chat Interface</h3>
+                        <p className="text-[9px] font-mono text-blue-500/70 uppercase tracking-widest mt-0.5">Secure Pipeline Active</p>
+                    </div>
+                </div>
+                <button onClick={onClose} className="p-3 rounded-xl text-gray-500 hover:text-white hover:bg-white/5 transition-all">
+                    <XIcon className="w-8 h-8" />
                 </button>
             </header>
-            <div ref={scrollContainerRef} className="flex-grow p-4 overflow-y-auto custom-scrollbar">
+            <div ref={scrollContainerRef} className="flex-grow p-6 overflow-y-auto custom-scrollbar max-w-5xl mx-auto w-full">
                 {messages.map((msg, index) => {
                     const currentDate = new Date(msg.createdAt).toDateString();
                     const prevDate = index > 0 ? new Date(messages[index - 1].createdAt).toDateString() : null;
@@ -278,7 +286,7 @@ export const ProjectChat: React.FC<ProjectChatProps> = ({ project, users, messag
                 })}
                 <div ref={messagesEndRef} className="h-px w-full" />
             </div>
-            <footer className="p-4 border-t border-gray-800 flex-shrink-0 relative bg-[#131C1B]">
+            <footer className="p-6 border-t border-white/5 flex-shrink-0 relative bg-[#131C1B] max-w-5xl mx-auto w-full">
                 {suggestionState.show && filteredSuggestions.length > 0 && (
                     <div className="absolute bottom-full mb-2 w-[calc(100%-2rem)] bg-[#1C2326] border border-gray-700 rounded-md shadow-lg max-h-48 overflow-y-auto custom-scrollbar z-10">
                         <ul>

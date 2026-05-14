@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-// FIX: Import the `Column` type to use in component props.
+import { createPortal } from 'react-dom';
 import { Sprint, Task, Column } from '../types';
 import { XIcon, LoaderCircleIcon, CheckSquareIcon } from './Icons';
 
@@ -54,8 +54,8 @@ export const CompleteSprintModal: React.FC<CompleteSprintModalProps> = ({ isOpen
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         <header className="p-4 border-b border-gray-800 flex justify-between items-center">
           <div>
@@ -130,6 +130,7 @@ export const CompleteSprintModal: React.FC<CompleteSprintModalProps> = ({ isOpen
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

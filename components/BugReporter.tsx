@@ -1,10 +1,12 @@
 
 import React, { useState, FormEvent, DragEvent, useRef, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Project, User, Bug, TaskPriority, BugResponse } from '../types';
 import { LifeBuoyIcon, PlusIcon, FileUpIcon, LoaderCircleIcon, SparklesIcon, XIcon, TrashIcon, SearchIcon, DownloadIcon, BookmarkPlusIcon } from './Icons';
 import { UserAvatar } from './UserAvatar';
 import { Pagination } from './Pagination';
 import { Filters } from './Filters';
+import { ExportBugsModal } from './ExportBugsModal';
 import { useConfirmation } from '../App';
 import { generateBugsFromFile } from '../services/geminiService';
 import { exportBugsToCsv } from '../utils/export';
@@ -99,8 +101,8 @@ const CreateBugModal: React.FC<{
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         <header className="p-4 border-b border-gray-800 flex justify-between items-center">
           <h2 className="text-lg font-bold text-white">Report a New Bug</h2>
@@ -122,7 +124,8 @@ const CreateBugModal: React.FC<{
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -205,8 +208,8 @@ const ImportBugsModal: React.FC<{
     if (e.dataTransfer.files?.[0]) processFile(e.dataTransfer.files[0]);
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
         <header className="p-4 border-b border-gray-800 flex justify-between items-center">
           <h2 className="text-lg font-bold text-white">Import Bugs with AI</h2>
@@ -259,7 +262,8 @@ const ImportBugsModal: React.FC<{
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -279,28 +283,34 @@ interface BugReporterProps {
   trigger?: { type: 'create' | 'import' | 'export' | null };
   aiFeaturesEnabled?: boolean;
   onTriggerComplete?: () => void;
+  hideReportButton?: boolean;
 }
 
 const priorityStyles: Record<TaskPriority, string> = {
-  [TaskPriority.URGENT]: 'bg-red-400 border-red-400',
-  [TaskPriority.HIGH]: 'bg-yellow-400 border-yellow-400',
-  [TaskPriority.MEDIUM]: 'bg-blue-400 border-blue-400',
-  [TaskPriority.LOW]: 'bg-gray-400 border-gray-400',
+  [TaskPriority.URGENT]: 'bg-red-500/10 text-red-400 border-red-500/20 font-bold',
+  [TaskPriority.HIGH]: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  [TaskPriority.MEDIUM]: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  [TaskPriority.LOW]: 'bg-white/5 text-gray-500 border-white/5',
 };
 
 const getStatusStyle = (status: string): string => {
     const lowerCaseStatus = (status || '').toLowerCase();
-    if (lowerCaseStatus.includes('done') || lowerCaseStatus.includes('resolved') || lowerCaseStatus.includes('closed')) {
-        return 'bg-green-800 text-green-300';
+    if (lowerCaseStatus.includes('done') || lowerCaseStatus.includes('resolved') || lowerCaseStatus.includes('closed') || lowerCaseStatus.includes('complete')) {
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
     }
     if (lowerCaseStatus.includes('progress') || lowerCaseStatus.includes('review') || lowerCaseStatus.includes('testing')) {
-        return 'bg-blue-800 text-blue-300';
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
     }
-    return 'bg-gray-700 text-gray-300'; 
+    return 'bg-white/5 text-gray-400 border-white/5'; 
 };
 
 
-export const BugReporter: React.FC<BugReporterProps> = ({ project, users, currentUser, onAddBug, onUpdateBug, onDeleteBug, onAddBugsBatch, onDeleteBugsBatch, initialSearchTerm = '', trigger, aiFeaturesEnabled = false, onTriggerComplete }) => {
+export const BugReporter: React.FC<BugReporterProps> = ({ 
+    project, users, currentUser, onAddBug, onUpdateBug, onDeleteBug, 
+    onAddBugsBatch, onDeleteBugsBatch, initialSearchTerm = '', 
+    trigger, aiFeaturesEnabled = false, onTriggerComplete,
+    hideReportButton = false
+}) => {
   const [isExportModalOpen, setExportModalOpen] = useState(false);
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const [isImportModalOpen, setImportModalOpen] = useState(false);
@@ -309,6 +319,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
+  const [reporterFilter, setReporterFilter] = useState<string[]>([]);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [sprintFilter, setSprintFilter] = useState<string[]>([]);
   const [startDate, setStartDate] = useState('');
@@ -341,6 +352,12 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
     });
     return Array.from(unique.values());
   }, [project.bugs]);
+  
+  const uniqueReporters = useMemo(() => {
+    const bugs = (Object.values(project.bugs || {}) as Bug[]);
+    const reporterIds = Array.from(new Set(bugs.map(b => b.reporterId)));
+    return reporterIds.map(id => users.find(u => u.id === id)).filter((u): u is User => !!u);
+  }, [project.bugs, users]);
 
   const totalBugsInProject = useMemo(() => Object.keys(project.bugs || {}).length, [project.bugs]);
 
@@ -363,6 +380,9 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
     }
     if (assigneeFilter.length > 0) {
       bugsToFilter = bugsToFilter.filter(bug => bug.assignee?.id ? assigneeFilter.includes(bug.assignee.id) : false);
+    }
+    if (reporterFilter.length > 0) {
+      bugsToFilter = bugsToFilter.filter(bug => reporterFilter.includes(bug.reporterId));
     }
     if (startDate) {
       const start = new Date(startDate).setHours(0, 0, 0, 0);
@@ -393,7 +413,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
     }
     
     return bugsToFilter;
-  }, [project.bugs, project.bugOrder, searchTerm, statusFilter, priorityFilter, assigneeFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
+  }, [project.bugs, project.bugOrder, searchTerm, statusFilter, priorityFilter, assigneeFilter, reporterFilter, startDate, endDate, relativeTimeValue, relativeTimeUnit, relativeTimeCondition]);
 
   useEffect(() => {
     try {
@@ -466,6 +486,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
       setSearchTerm('');
       setPriorityFilter([]);
       setAssigneeFilter([]);
+      setReporterFilter([]);
       setStatusFilter([]);
       setTagFilter([]);
       setSprintFilter([]);
@@ -480,6 +501,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
         setSearchTerm(segment.filters.searchTerm || '');
         setPriorityFilter(segment.filters.priorityFilter || []);
         setAssigneeFilter(segment.filters.assigneeFilter || []);
+        setReporterFilter(segment.filters.reporterFilter || []);
         setStatusFilter(segment.filters.statusFilter || []);
         setTagFilter(segment.filters.tagFilter || []);
         setSprintFilter(segment.filters.sprintFilter || []);
@@ -604,6 +626,7 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
           searchTerm !== '' ||
           priorityFilter.length > 0 ||
           assigneeFilter.length > 0 ||
+          reporterFilter.length > 0 ||
           statusFilter.length > 0 ||
           tagFilter.length > 0 ||
           sprintFilter.length > 0 ||
@@ -616,12 +639,12 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
   const bugsExist = Object.keys(project.bugs || {}).length > 0;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-4 p-2 bg-[#1C2326]/50 rounded-xl border border-white/5 backdrop-blur-sm">
-        <div className="flex items-center gap-1.5 border-r border-white/10 pr-3 overflow-x-auto no-scrollbar max-w-[40%] sm:max-w-[50%]">
+    <div className="space-y-2">
+      <div className="relative z-30 flex items-center justify-between gap-3 p-1.5 bg-[#1C2326]/50 rounded-xl border border-white/5 backdrop-blur-sm">
+        <div className="flex items-center gap-1 border-r border-white/10 pr-2 overflow-x-auto no-scrollbar max-w-[40%] sm:max-w-[50%]">
           <button 
               onClick={() => handleApplySegment('all')} 
-              className={`px-3 py-1.5 flex-shrink-0 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeSegmentId === 'all' ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-500 hover:bg-white/10'}`}
+              className={`px-2.5 py-1 flex-shrink-0 text-[8px] font-black uppercase tracking-widest rounded-lg transition-all ${activeSegmentId === 'all' ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-500 hover:bg-white/10'}`}
           >
               All
           </button>
@@ -629,23 +652,23 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
               <div key={segment.id} className="relative group flex-shrink-0">
                   <button 
                       onClick={() => handleApplySegment(segment.id)} 
-                      className={`pl-3 ${activeSegmentId === segment.id ? 'pr-7' : 'pr-3'} py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeSegmentId === segment.id ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+                      className={`pl-2.5 ${activeSegmentId === segment.id ? 'pr-6' : 'pr-2.5'} py-1 text-[8px] font-black uppercase tracking-widest rounded-lg transition-all ${activeSegmentId === segment.id ? 'bg-white text-black shadow-lg shadow-white/5' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
                   >
                       {segment.name}
                   </button>
                   {activeSegmentId === segment.id && (
                       <button 
                           onClick={(e) => { e.stopPropagation(); handleDeleteSegment(segment.id); }}
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-black hover:text-red-600 transition-colors"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-black hover:text-red-600 transition-colors"
                       >
-                          <XIcon className="w-2.5 h-2.5" />
+                          <XIcon className="w-2 h-2" />
                       </button>
                   )}
               </div>
           ))}
         </div>
 
-        <div className="flex-grow min-w-[200px]">
+        <div className="flex-grow min-w-[150px]">
           <Filters
               projectId={project.id}
               currentUser={currentUser}
@@ -655,6 +678,8 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
               setPriorityFilter={setPriorityFilter}
               assigneeFilter={assigneeFilter}
               setAssigneeFilter={setAssigneeFilter}
+              reporterFilter={reporterFilter}
+              setReporterFilter={setReporterFilter}
               statusFilter={statusFilter}
               setStatusFilter={setStatusFilter}
               tagFilter={tagFilter}
@@ -672,7 +697,8 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
               setRelativeTimeUnit={setRelativeTimeUnit}
               relativeTimeCondition={relativeTimeCondition}
               setRelativeTimeCondition={setRelativeTimeCondition}
-              assignees={uniqueAssignees.map(a => a.id)}
+              assigneeOptions={uniqueAssignees.map(a => ({ value: a.id, label: a.name }))}
+              reporterOptions={uniqueReporters.map(r => ({ value: r.id, label: r.name }))}
               statuses={columnTitles}
               tags={[]}
               segments={segments}
@@ -686,31 +712,33 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
             />
         </div>
 
-        <div className="flex items-center gap-2 border-l border-white/10 pl-3">
+        <div className="flex items-center gap-1.5 border-l border-white/10 pl-2">
             {selectedBugIds.size > 0 && (
                 <button
                     onClick={handleDeleteSelected}
                     disabled={isDeleting}
-                    className="flex items-center gap-2 px-3 py-1 bg-red-500/10 border border-red-500/20 text-red-400 font-bold rounded-lg text-[9px] uppercase hover:bg-red-500/20 transition-all h-8"
+                    className="flex items-center gap-1.5 px-2 py-0.5 bg-red-500/10 border border-red-500/20 text-red-400 font-bold rounded-lg text-[8px] uppercase hover:bg-red-500/20 transition-all h-7"
                 >
-                    {isDeleting ? <LoaderCircleIcon className="w-3 h-3 animate-spin" /> : <TrashIcon className="w-3 h-3" />}
+                    {isDeleting ? <LoaderCircleIcon className="w-2.5 h-2.5 animate-spin" /> : <TrashIcon className="w-2.5 h-2.5" />}
                     Delete
                 </button>
             )}
-            <button
-                onClick={() => setCreateModalOpen(true)}
-                className="flex items-center gap-2 px-3 py-1 bg-white text-black font-bold rounded-lg text-[9px] uppercase hover:bg-gray-200 transition-all h-8 shadow-sm"
-            >
-                <PlusIcon className="w-3 h-3" />
-                Report
-            </button>
+            {!hideReportButton && (
+                <button
+                    onClick={() => setCreateModalOpen(true)}
+                    className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white text-black font-bold rounded-lg text-[8px] uppercase hover:bg-gray-200 transition-all h-7 shadow-sm"
+                >
+                    <PlusIcon className="w-2.5 h-2.5" />
+                    Report
+                </button>
+            )}
             {aiFeaturesEnabled && (
                 <button
                     onClick={() => setImportModalOpen(true)}
-                    className="flex items-center justify-center p-1.5 bg-white/5 text-white rounded-lg hover:bg-white/10 transition-all h-8 w-8"
+                    className="flex items-center justify-center p-1 bg-white/5 text-white rounded-lg hover:bg-white/10 transition-all h-7 w-7"
                     title="Import with AI"
                 >
-                    <FileUpIcon className="w-4 h-4" />
+                    <FileUpIcon className="w-3.5 h-3.5" />
                 </button>
             )}
         </div>
@@ -719,56 +747,83 @@ export const BugReporter: React.FC<BugReporterProps> = ({ project, users, curren
       <div className="bg-[#131C1B]/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/5 overflow-hidden">
         <table className="w-full text-left min-w-[800px] table-fixed">
             <thead className="bg-white/5">
-              <tr className="text-[8px] uppercase tracking-[0.2em] font-black text-gray-500">
-                  <th className="px-3 py-2 w-10 text-center">
-                    <input type="checkbox" checked={isAllOnPageSelected} ref={input => { if (input) { const numSelectedOnPage = paginatedBugs.filter(b => selectedBugIds.has(b.id)).length; input.indeterminate = numSelectedOnPage > 0 && !isAllOnPageSelected; }}} onChange={handleSelectAll} className="w-3 h-3 rounded border-gray-700 bg-gray-800 text-emerald-500 focus:ring-emerald-500/50" />
+              <tr className="text-[10px] uppercase tracking-[0.2em] font-black text-gray-500">
+                  <th className="px-6 py-4 w-12 text-center">
+                    <input type="checkbox" checked={isAllOnPageSelected} ref={input => { if (input) { const numSelectedOnPage = paginatedBugs.filter(b => selectedBugIds.has(b.id)).length; input.indeterminate = numSelectedOnPage > 0 && !isAllOnPageSelected; }}} onChange={handleSelectAll} className="w-3 h-3 rounded border-white/10 bg-white/5 text-emerald-500 focus:ring-emerald-500/50" />
                   </th>
-                  <th className="px-2 py-2 w-16">ID</th>
-                  <th className="px-2 py-2 w-auto">Details</th>
-                  <th className="px-2 py-2 w-28 text-center">Status</th>
-                  <th className="px-2 py-2 w-24 text-center">Priority</th>
-                  <th className="px-2 py-2 w-20 text-center">Date</th>
-                  <th className="px-2 py-2 w-32">Assignee</th>
-                  <th className="px-3 py-2 text-right w-12"></th>
+                  <th className="px-6 py-4 w-20">ID</th>
+                  <th className="px-6 py-4 w-auto">Details</th>
+                  <th className="px-6 py-4 w-36 text-center">Status</th>
+                  <th className="px-6 py-4 w-32 text-center">Priority</th>
+                  <th className="px-6 py-4 w-24 text-center">Date</th>
+                  <th className="px-6 py-4 w-44">Assignee</th>
+                  <th className="px-4 py-4 text-right w-12"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {bugsExist && paginatedBugs.length > 0 ? paginatedBugs.map(bug => (
-                <tr key={bug.id} className={`text-[11px] text-white transition-all ${selectedBugIds.has(bug.id) ? 'bg-white/5' : 'hover:bg-white/[0.02]'}`}>
-                  <td className="px-3 py-1.5 text-center"><input type="checkbox" checked={selectedBugIds.has(bug.id)} onChange={() => handleSelectOne(bug.id)} className="w-3 h-3 rounded border-gray-700 bg-gray-800 text-emerald-500 focus:ring-emerald-500/50" /></td>
-                  <td className="px-2 py-1.5 font-mono text-[#5865F2] text-[9px] font-black">#{bug.bugNumber}</td>
-                  <td className="px-2 py-1.5 overflow-hidden">
+                <tr key={bug.id} className={`text-[11px] text-white transition-all group ${selectedBugIds.has(bug.id) ? 'bg-white/10' : 'hover:bg-white/[0.03]'}`}>
+                  <td className="px-6 py-4 text-center"><input type="checkbox" checked={selectedBugIds.has(bug.id)} onChange={() => handleSelectOne(bug.id)} className="w-3 h-3 rounded border-white/10 bg-white/5 text-emerald-500 focus:ring-emerald-500/50" /></td>
+                  <td className="px-6 py-4 font-mono text-[#5865F2] font-black tracking-wider">#{bug.bugNumber}</td>
+                  <td className="px-6 py-4 overflow-hidden">
                      <EditableField
                         value={bug.title}
                         onSave={(newTitle) => handleUpdate(bug.id, 'title', newTitle)}
-                        textClassName="font-semibold text-white truncate max-w-full block"
-                        inputClassName="px-2 py-0.5 text-xs"
+                        textClassName="font-bold text-white truncate max-w-full block hover:text-emerald-400 group-hover:translate-x-1 transition-all"
+                        inputClassName="px-2 py-1 text-[11px]"
                         placeholder="Bug Title"
                     />
                     <EditableField
                         value={bug.description}
                         onSave={(newDescription) => handleUpdate(bug.id, 'description', newDescription)}
                         isTextArea
-                        textClassName="text-[9px] text-gray-500 mt-0.5 truncate max-w-full block"
-                        inputClassName="px-2 py-0.5 text-[9px] mt-0.5"
+                        textClassName="text-[9px] text-gray-500 truncate max-w-full block mt-0.5 opacity-50 group-hover:opacity-100 transition-opacity"
+                        inputClassName="px-2 py-1 text-[9px]"
                         placeholder="Description"
                     />
                   </td>
-                  <td className="px-2 py-1.5 text-center"><select value={bug.status} onChange={e => handleUpdate(bug.id, 'status', e.target.value)} className={`text-[8px] font-black uppercase tracking-widest border-none rounded-md px-2 py-1 w-full focus:ring-1 focus:ring-emerald-500/50 cursor-pointer ${getStatusStyle(bug.status)}`}>{columnTitles.map(s => <option key={s} value={s}>{s}</option>)}</select></td>
-                  <td className="px-2 py-1.5 text-center"><select value={bug.priority} onChange={e => handleUpdate(bug.id, 'priority', e.target.value)} className={`bg-transparent border border-white/10 text-[8px] font-black uppercase tracking-widest rounded-md px-2 py-1 w-full focus:ring-1 focus:ring-emerald-500/50 cursor-pointer ${priorityStyles[bug.priority]} bg-opacity-10 text-opacity-100`}>{Object.values(TaskPriority).map(p => <option key={p} value={p} className="bg-[#1C2326] text-white font-normal">{p}</option>)}</select></td>
-                  <td className="px-2 py-1.5 text-center text-gray-500 font-mono text-[9px]">{new Date(bug.createdAt).toLocaleDateString()}</td>
-                  <td className="px-2 py-1.5">
-                    <div className="flex items-center gap-1.5 bg-white/5 rounded-md p-1 pr-2">
-                        <UserAvatar user={bug.assignee} className="w-4 h-4 ring-1 ring-white/10 flex-shrink-0" />
-                        <select value={bug.assignee?.id || ''} onChange={e => handleUpdate(bug.id, 'assignee', e.target.value)} className="bg-transparent border-none text-[9px] text-gray-400 hover:text-white focus:outline-none focus:ring-0 p-0 w-full truncate leading-none"><option value="">Nobody</option>{projectMembers.map(m => <option key={m.id} value={m.id} className="bg-[#131C1B]">{m.name}</option>)}</select>
+                  <td className="px-6 py-4 text-center">
+                    <div className={`inline-flex items-center rounded-md border px-2.5 py-0.5 w-full ${getStatusStyle(bug.status)}`}>
+                        <select 
+                            value={bug.status} 
+                            onChange={e => handleUpdate(bug.id, 'status', e.target.value)} 
+                            className="bg-transparent border-none text-[8px] font-black uppercase tracking-widest focus:ring-0 p-0 w-full cursor-pointer appearance-none text-center"
+                        >
+                            {columnTitles.map(s => <option key={s} value={s} className="bg-[#131C1B]">{s}</option>)}
+                        </select>
                     </div>
                   </td>
-                  <td className="px-3 py-1.5 text-right"><button onClick={() => handleDeleteOne(bug)} className="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded transition-all opacity-0 group-hover:opacity-100"><TrashIcon className="w-3 h-3" /></button></td>
+                  <td className="px-6 py-4 text-center">
+                    <div className={`inline-flex items-center rounded-md border px-2.5 py-0.5 w-full ${priorityStyles[bug.priority]}`}>
+                        <select 
+                            value={bug.priority} 
+                            onChange={e => handleUpdate(bug.id, 'priority', e.target.value)} 
+                            className="bg-transparent border-none text-[8px] font-black uppercase tracking-widest focus:ring-0 p-0 w-full cursor-pointer appearance-none text-center"
+                        >
+                            {Object.values(TaskPriority).map(p => <option key={p} value={p} className="bg-[#131C1B] text-white font-normal">{p}</option>)}
+                        </select>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center text-gray-500 font-mono text-[9px] tracking-tight">{new Date(bug.createdAt).toLocaleDateString()}</td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 bg-white/5 rounded-md p-1 pr-3">
+                        <UserAvatar user={bug.assignee} className="w-5 h-5 ring-1 ring-white/10 flex-shrink-0" />
+                        <select 
+                            value={bug.assignee?.id || ''} 
+                            onChange={e => handleUpdate(bug.id, 'assignee', e.target.value)} 
+                            className="bg-transparent border-none text-[9px] text-gray-400 hover:text-white focus:ring-0 p-0 w-full truncate leading-none cursor-pointer appearance-none"
+                        >
+                            <option value="" className="bg-[#131C1B]">Unassigned</option>
+                            {projectMembers.map(m => <option key={m.id} value={m.id} className="bg-[#131C1B]">{m.name}</option>)}
+                        </select>
+                    </div>
+                  </td>
+                  <td className="px-4 py-4 text-right"><button onClick={() => handleDeleteOne(bug)} className="p-1 text-gray-600 hover:text-red-400 hover:bg-red-500/10 rounded transition-all opacity-0 group-hover:opacity-100"><TrashIcon className="w-3 h-3" /></button></td>
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={8} className="text-center py-20 text-gray-600 font-mono text-xs italic uppercase tracking-widest">
-                    {hasActiveFilters ? "NO RESULTS IN SCOPE" : "BUG DATABASE EMPTY"}
+                  <td colSpan={8} className="text-center py-40 text-gray-700 font-mono text-[10px] italic uppercase tracking-[0.3em]">
+                    {hasActiveFilters ? "ZERO RESULTS IN SECTOR" : "DATASET UNDEFINED"}
                   </td>
                 </tr>
               )}

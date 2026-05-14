@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { XIcon, LoaderCircleIcon, BookmarkPlusIcon } from './Icons';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { XIcon, LoaderCircleIcon, BookmarkPlusIcon, CheckIcon } from './Icons';
 
 interface SaveViewModalProps {
   isOpen: boolean;
@@ -11,6 +12,13 @@ export const SaveViewModal: React.FC<SaveViewModalProps> = ({ isOpen, onClose, o
   const [name, setName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Reset name when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setName('');
+    }
+  }, [isOpen]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -21,45 +29,55 @@ export const SaveViewModal: React.FC<SaveViewModalProps> = ({ isOpen, onClose, o
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#131C1B] rounded-xl shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-        <header className="p-4 border-b border-gray-800 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <BookmarkPlusIcon className="w-6 h-6" />
-            Save View
+  return createPortal(
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-[#131C1B] border border-white/10 rounded-2xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] w-full max-w-sm overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <header className="p-5 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+          <h2 className="text-sm font-black text-white flex items-center gap-2.5 uppercase tracking-widest">
+            <BookmarkPlusIcon className="w-5 h-5 text-emerald-400" />
+            Save Current View
           </h2>
-          <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:bg-gray-800">
-            <XIcon className="w-6 h-6" />
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/5 transition-colors">
+            <XIcon className="w-5 h-5" />
           </button>
         </header>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label htmlFor="view-name" className="block text-sm font-medium text-white mb-1">
-              View Name
+        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <div className="space-y-2">
+            <label htmlFor="view-name" className="block text-[8px] font-black text-gray-500 uppercase tracking-[0.2em] ml-1">
+              Filter Alias
             </label>
             <input
               id="view-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., My High-Priority Tasks"
-              className="w-full px-3 py-2 border border-gray-800 rounded-md bg-[#1C2326] text-white"
+              placeholder="e.g., Critical Bug Cluster"
+              className="w-full px-4 py-3 border border-white/5 rounded-xl bg-[#1C2326] text-white text-xs font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500/50 placeholder:text-gray-600 transition-all shadow-inner"
               required
               autoFocus
             />
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} disabled={isSaving} className="px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600">
-              Cancel
+            <button 
+              type="button" 
+              onClick={onClose} 
+              disabled={isSaving} 
+              className="px-5 py-2.5 text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition-colors"
+            >
+              Abort
             </button>
-            <button type="submit" disabled={isSaving || !name.trim()} className="px-4 py-2 bg-gray-300 text-black font-semibold rounded-lg hover:bg-gray-400 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center gap-2">
-              {isSaving && <LoaderCircleIcon className="w-5 h-5 animate-spin" />}
-              Save
+            <button 
+              type="submit" 
+              disabled={isSaving || !name.trim()} 
+              className="px-6 py-2.5 bg-emerald-500 text-black text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-emerald-400 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed flex items-center gap-2 transition-all shadow-lg shadow-emerald-500/10"
+            >
+              {isSaving ? <LoaderCircleIcon className="w-3.5 h-3.5 animate-spin" /> : <CheckIcon className="w-3.5 h-3.5" />}
+              Committing View
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -52,26 +52,34 @@ export const BugsPage: React.FC<BugsPageProps> = ({
   };
 
   return (
-    <div>
-      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-        <h2 className="text-xl font-bold text-white">Bug Tracker</h2>
+    <div className="animate-in fade-in duration-700">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <label htmlFor="project-select" className="block text-xs font-medium text-gray-400 mb-1">
-            Select a Project
-          </label>
-          <select
-            id="project-select"
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="w-full sm:w-64 px-3 py-2 border border-gray-800 rounded-lg bg-[#131C1B] text-white focus:outline-none focus:ring-2 focus:ring-gray-500 text-xs"
-          >
-            <option value="">-- View Bugs For --</option>
-            {projectList.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            <h2 className="text-xl font-bold text-white tracking-tight">Bug <span className="text-gray-500">Tracker</span></h2>
+            <p className="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5 font-black">Anomaly Detection & Management</p>
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="relative flex-grow sm:flex-grow-0 group">
+             <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                <LifeBuoyIcon className="w-3.5 h-3.5 text-gray-500 group-focus-within:text-emerald-500 transition-colors" />
+             </div>
+              <select
+                id="project-select"
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="w-full sm:w-64 pl-9 pr-8 py-2 bg-white/5 border border-white/5 rounded-xl text-white focus:outline-none focus:border-emerald-500/30 focus:bg-white/[0.08] text-[10px] uppercase font-black tracking-widest appearance-none transition-all cursor-pointer"
+              >
+                <option value="">-- VIEW PROJECT ANOMALIES --</option>
+                {projectList.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
+              </div>
+          </div>
         </div>
       </div>
 
@@ -87,11 +95,11 @@ export const BugsPage: React.FC<BugsPageProps> = ({
           onDeleteBugsBatch={deleteBugsBatch}
         />
       ) : (
-        <div className="text-center py-20 px-6 bg-[#131C1B] rounded-xl border border-dashed border-gray-800">
-          <LifeBuoyIcon className="mx-auto h-12 w-12 text-gray-500" />
-          <h3 className="mt-4 text-base font-semibold text-white">{projectList.length > 0 ? 'Select a Project' : 'No Projects Found'}</h3>
-          <p className="mt-1 text-xs text-gray-400">
-            {projectList.length > 0 ? 'Please choose a project from the dropdown above to view and manage its bugs.' : 'You need to create a project before you can track bugs.'}
+        <div className="text-center py-24 bg-[#131C1B]/40 rounded-3xl border border-dashed border-white/5 transition-all hover:bg-white/[0.02]">
+          <LifeBuoyIcon className="mx-auto h-16 w-16 text-gray-800 mb-4" />
+          <h3 className="text-lg font-black text-white uppercase tracking-[0.2em]">Select Target Node</h3>
+          <p className="mt-2 text-[10px] text-gray-500 uppercase tracking-widest max-w-sm mx-auto font-medium">
+            {projectList.length > 0 ? 'Choose a project to synchronize its anomaly reporting stream.' : 'No active projects detected in the neural array.'}
           </p>
         </div>
       )}

@@ -61,7 +61,7 @@ export const Column: React.FC<ColumnProps> = ({ column, tasks, sprints, users, o
           <div
             ref={provided.innerRef}
             {...provided.droppableProps}
-            className={`flex-grow p-4 overflow-y-auto custom-scrollbar transition-colors duration-200 ${
+            className={`flex-grow p-4 overflow-y-auto no-scrollbar transition-colors duration-200 ${
               snapshot.isDraggingOver ? 'bg-gray-900/50' : ''
             }`}
           >
